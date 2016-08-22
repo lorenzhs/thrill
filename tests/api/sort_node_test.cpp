@@ -120,6 +120,22 @@ struct IntIntStruct {
     }
 };
 
+// custom specialization of std::hash can be injected in namespace std
+namespace std
+{
+    template<> struct hash<IntIntStruct>
+    {
+        typedef IntIntStruct argument_type;
+        typedef std::size_t result_type;
+        result_type operator()(argument_type const& s) const
+        {
+            result_type const h1 = std::hash<int>()(s.a);
+            result_type const h2 = std::hash<int>()(s.b);
+            return h1 ^ (h2 << 1); // or use boost::hash_combine
+        }
+    };
+}
+
 TEST(Sort, SortRandomIntIntStructs) {
 
     auto start_func =

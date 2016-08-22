@@ -37,6 +37,90 @@
 namespace thrill {
 namespace api {
 
+template <typename ValueType, typename CompareFunction,
+          typename Hash = std::hash<ValueType>>
+class SortChecker
+{
+    static const bool debug = true;
+public:
+    using hash_t = decltype(Hash()(ValueType{}));
+
+    SortChecker(CompareFunction cmp_): cmp(cmp_) {}
+
+    void reset() {
+        min_post = nullptr;
+        last_post = nullptr;
+        sum_pre = 0;
+        sum_post = 0;
+        done_ = false;
+        sorted_ = true;
+    }
+
+    void add_pre(const ValueType &v) {
+        sum_pre += hash(v);
+    }
+
+    void add_post(const ValueType &v) {
+        if (min_post == nullptr)
+            min_post = &v;
+        if (last_post != nullptr && cmp(v, *last_post)) {
+            sLOG << "Non-sorted values in output" << *last_post << v;
+            sorted_ = false;
+        }
+        last_post = &v;
+        sum_post += hash(v);
+    }
+
+    void done() { done_ = true; }
+
+    bool is_likely_permutation(Context &context_) {
+        assert(done_);
+        const size_t my_rank(context_.my_rank()),
+            num_workers(context_.num_workers());
+        ValueType next_min, prev_max;
+
+        LOGC(my_rank==0) << "check() with " << num_workers << " workers";
+        if (my_rank > 0) {
+            sLOG << "check() on" << my_rank << "talking to predecessor" << my_rank-1;
+            context_.net.group().SendTo(my_rank - 1, *min_post);
+            context_.net.group().ReceiveFrom(my_rank - 1, &prev_max);
+            if (cmp(prev_max, *min_post)) {
+                sLOG << "Previous post has smaller item" << prev_max << *min_post;
+                sorted_ = false;
+            }
+        }
+        if (my_rank + 1 < num_workers) {
+            sLOG << "check() on" << my_rank << "talking to successor" << my_rank + 1;
+            context_.net.group().SendTo(my_rank + 1, *last_post);
+            context_.net.group().ReceiveFrom(my_rank + 1, &next_min);
+            if (cmp(next_min, *last_post)) {
+                sLOG << "Next host has smaller item" << next_min << *last_post;
+                sorted_ = false;
+            }
+        }
+
+        auto global_sum_pre = context_.net.AllReduce(sum_pre);
+        auto global_sum_post = context_.net.AllReduce(sum_post);
+        sLOGC(context_.my_rank() == 0)
+            << "check() sorted:" << (sorted_ ? "yes" : "NOOOO!!!")
+            << (global_sum_pre == global_sum_post ? "success" : "FAILURE!!!")
+            << "global pre-sum:" << global_sum_pre
+            << "global post-sum:" << global_sum_post;
+        return sorted_ && (global_sum_pre == global_sum_post);
+    }
+
+    auto get_pre() const { return sum_pre; }
+    auto get_post() const { return sum_post; }
+protected:
+    hash_t sum_pre, sum_post;
+    const ValueType *min_post, *last_post;
+    Hash hash;
+    CompareFunction cmp;
+    bool done_ = false;
+    bool sorted_ = true;
+};
+
+
 /*!
  * A DIANode which performs a Sort operation. Sort sorts a DIA according to a
  * given compare function
@@ -57,6 +141,9 @@ class SortNode final : public DOpNode<ValueType>
 
     //! Set this variable to true to enable generation and output of stats
     static constexpr bool stats_enabled = false;
+
+    //! Set this variable to true to enable the checker
+    static constexpr bool check = true;
 
     using Super = DOpNode<ValueType>;
     using Super::context_;
@@ -81,7 +168,8 @@ public:
         : Super(parent.ctx(), "Sort", { parent.id() }, { parent.node() }),
           compare_function_(compare_function),
           sort_algorithm_(sort_algorithm),
-          parent_stack_empty_(ParentDIA::stack_empty)
+          parent_stack_empty_(ParentDIA::stack_empty),
+          local_checker_(compare_function)
     {
         // Hook PreOp(s)
         auto pre_op_fn = [this](const ValueType& input) {
@@ -92,12 +180,26 @@ public:
         parent.node()->AddChild(this, lop_chain);
     }
 
+    bool DumpCheckerStatus() {
+        if (!check) return true;
+        return local_checker_.is_likely_permutation(context_);
+        /*
+        const bool debug = true;
+        LOG << "Checker: " << local_checker_.is_likely_permutation(context_)
+            << "; pre = "  << local_checker_.get_pre()
+            << "; post = " << local_checker_.get_post();*/
+    }
+
     void StartPreOp(size_t /* id */) final {
         timer_preop_.Start();
+        if (check) local_checker_.reset();
         unsorted_writer_ = unsorted_file_.GetWriter();
     }
 
     void PreOp(const ValueType& input) {
+        if (check) {
+            local_checker_.add_pre(input);
+        }
         unsorted_writer_.Put(input);
         // In this stage we do not know how many elements are there in total.
         // Therefore we draw samples based on current number of elements and
@@ -125,6 +227,13 @@ public:
         // accept file
         unsorted_file_ = file.Copy();
         local_items_ = unsorted_file_.num_items();
+
+        if (check) {
+            auto reader = unsorted_file_.GetKeepReader(false);
+            for (size_t i = 0; i < local_items_; ++i) {
+                local_checker_.add_pre(reader.template Next<ValueType>());
+            }
+        }
 
         size_t pick_items = std::min(local_items_, wanted_sample_size());
 
@@ -207,6 +316,12 @@ public:
         }
         else if (files_.size() == 1) {
             local_size = files_[0].num_items();
+            if (check) {
+                auto reader = files_[0].GetKeepReader();
+                while (reader.HasNext()) {
+                    local_checker_.add_post(reader.Next<ValueType>());
+                }
+            }
             this->PushFile(files_[0], consume);
         }
         else {
@@ -266,9 +381,16 @@ public:
                 seq.begin(), seq.end(), compare_function_);
 
             while (puller.HasNext()) {
-                this->PushItem(puller.Next());
+                auto next = puller.Next();
+                if (check) local_checker_.add_post(next);
+                this->PushItem(next);
                 local_size++;
             }
+        }
+
+        if (check) {
+            local_checker_.done();
+            DumpCheckerStatus();
         }
 
         timer_pushdata.Stop();
@@ -304,6 +426,8 @@ private:
     data::File::Writer unsorted_writer_;
     //! Number of items on this worker
     size_t local_items_ = 0;
+
+    SortChecker<ValueType, CompareFunction> local_checker_;
 
     //! Sample vector: pairs of (sample,local index)
     std::vector<SampleIndexPair> samples_;
