@@ -51,8 +51,7 @@ public:
     SortChecker(CompareFunction cmp_): cmp(cmp_) {}
 
     void reset() {
-        first_post = nullptr;
-        last_post = nullptr;
+        has_items = false;
         sum_pre = 0;
         sum_post = 0;
         sorted_ = true;
@@ -63,14 +62,18 @@ public:
     }
 
     void add_post(const ValueType &v) {
-        if (first_post == nullptr)
-            first_post = &v;
 
-        if (last_post != nullptr && cmp(v, *last_post)) {
-            sLOG1 << "Non-sorted values in output" << *last_post << v;
+        if (has_items && cmp(v, last_post)) {
+            sLOG1 << "Non-sorted values in output" << last_post << v;
             sorted_ = false;
         }
-        last_post = &v;
+        last_post = v;
+
+        // Init "first" (= minimum)
+        if (!has_items) {
+            first_post = v;
+            has_items = true;
+        }
 
         sum_post += hash(v);
     }
@@ -78,18 +81,18 @@ public:
     bool is_sorted(Context &ctx) {
         std::vector<ValueType> send;
 
-        if (last_post != nullptr) {
-            send.emplace_back(*last_post);
+        if (has_items) {
+            send.push_back(last_post);
         }
         auto recv = ctx.net.Predecessor(1, send);
 
         // If any predecessor PE has an item, and we have one,
         // check that the predecessor is smaller
-        if (recv.size() > 0 && first_post != nullptr &&
-            cmp(*first_post, recv[0]))
+        if (recv.size() > 0 && has_items &&
+            cmp(first_post, recv[0]))
         {
             sLOG1 << "check(): predecessor has larger item"
-                  << *first_post << " > " << recv[0];
+                  << first_post << " > " << recv[0];
             sorted_ = false;
         }
 
@@ -119,7 +122,8 @@ public:
     auto get_post() const { return sum_post; }
 protected:
     hash_t sum_pre, sum_post;
-    const ValueType *first_post, *last_post;
+    bool has_items = false;
+    ValueType first_post, last_post;
     Hash hash;
     CompareFunction cmp;
     bool sorted_ = true;
