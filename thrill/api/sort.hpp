@@ -17,6 +17,7 @@
 #include <thrill/api/context.hpp>
 #include <thrill/api/dia.hpp>
 #include <thrill/api/dop_node.hpp>
+#include <thrill/common/hash.hpp>
 #include <thrill/common/logger.hpp>
 #include <thrill/common/math.hpp>
 #include <thrill/common/porting.hpp>
@@ -37,8 +38,10 @@
 namespace thrill {
 namespace api {
 
+namespace checkers {
+
 template <typename ValueType, typename CompareFunction,
-          typename Hash = std::hash<ValueType>>
+          typename Hash = common::hash_crc32<ValueType>>
 class SortChecker
 {
     static const bool debug = false;
@@ -98,7 +101,7 @@ public:
         int fail = sorted_ ? 0 : 1;
         fail = ctx.net.AllReduce(fail);
         sLOGC(ctx.my_rank() == 0 && fail > 0)
-            << fail << " PEs with unsorted output";
+            << fail << "of" << ctx.num_workers() << "PEs with unsorted output";
 
         return (fail == 0);
     }
@@ -123,6 +126,8 @@ protected:
     CompareFunction cmp;
     bool sorted_ = true;
 };
+
+}
 
 
 /*!
@@ -431,7 +436,7 @@ private:
     //! Number of items on this worker
     size_t local_items_ = 0;
 
-    SortChecker<ValueType, CompareFunction> local_checker_;
+    checkers::SortChecker<ValueType, CompareFunction> local_checker_;
 
     //! Sample vector: pairs of (sample,local index)
     std::vector<SampleIndexPair> samples_;
