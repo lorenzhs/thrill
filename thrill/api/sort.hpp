@@ -52,7 +52,6 @@ public:
         last_post = nullptr;
         sum_pre = 0;
         sum_post = 0;
-        done_ = false;
         sorted_ = true;
     }
 
@@ -71,42 +70,39 @@ public:
         sum_post += hash(v);
     }
 
-    void done() { done_ = true; }
+    bool is_sorted(Context &ctx) {
+        if (!sorted_) return false;
 
-    bool is_likely_permutation(Context &context_) {
-        assert(done_);
-        const size_t my_rank(context_.my_rank()),
-            num_workers(context_.num_workers());
-        ValueType next_min, prev_max;
-
-        LOGC(my_rank==0) << "check() with " << num_workers << " workers";
-        if (my_rank > 0) {
-            sLOG << "check() on" << my_rank << "talking to predecessor" << my_rank-1;
-            context_.net.group().SendTo(my_rank - 1, *min_post);
-            context_.net.group().ReceiveFrom(my_rank - 1, &prev_max);
-            if (cmp(prev_max, *min_post)) {
-                sLOG << "Previous post has smaller item" << prev_max << *min_post;
-                sorted_ = false;
-            }
+        std::vector<ValueType> send;
+        if (last_post != nullptr) {
+            send.emplace_back(*last_post);
         }
-        if (my_rank + 1 < num_workers) {
-            sLOG << "check() on" << my_rank << "talking to successor" << my_rank + 1;
-            context_.net.group().SendTo(my_rank + 1, *last_post);
-            context_.net.group().ReceiveFrom(my_rank + 1, &next_min);
-            if (cmp(next_min, *last_post)) {
-                sLOG << "Next host has smaller item" << next_min << *last_post;
-                sorted_ = false;
-            }
+        auto recv = ctx.net.Predecessor(1, send);
+
+        // If any predecessor PE has an item, and we have one,
+        // check that the predecessor is smaller
+        if (recv.size() > 0 && min_post != nullptr && cmp(*min_post, recv[0]))
+        {
+            sLOG << "check(): predecessor has larger item"
+                 << *min_post << " > " << recv[0];
+            sorted_ = false;
         }
 
-        auto global_sum_pre = context_.net.AllReduce(sum_pre);
-        auto global_sum_post = context_.net.AllReduce(sum_post);
-        sLOGC(context_.my_rank() == 0)
-            << "check() sorted:" << (sorted_ ? "yes" : "NOOOO!!!")
-            << (global_sum_pre == global_sum_post ? "success" : "FAILURE!!!")
+        sLOGC(ctx.my_rank() == 0)
+            << "check() sorted:" << (sorted_ ? "yes" : "NOOOO!!!");
+
+        return sorted_;
+    }
+
+    bool is_likely_permutation(Context &ctx) {
+        auto global_sum_pre = ctx.net.AllReduce(sum_pre);
+        auto global_sum_post = ctx.net.AllReduce(sum_post);
+        sLOGC(ctx.my_rank() == 0)
+            << "check() permutation:"
+            << (global_sum_pre == global_sum_post ? "success." : "FAILURE!!!")
             << "global pre-sum:" << global_sum_pre
             << "global post-sum:" << global_sum_post;
-        return sorted_ && (global_sum_pre == global_sum_post);
+        return (global_sum_pre == global_sum_post);
     }
 
     auto get_pre() const { return sum_pre; }
@@ -116,7 +112,6 @@ protected:
     const ValueType *min_post, *last_post;
     Hash hash;
     CompareFunction cmp;
-    bool done_ = false;
     bool sorted_ = true;
 };
 
@@ -182,7 +177,8 @@ public:
 
     bool DumpCheckerStatus() {
         if (!check) return true;
-        return local_checker_.is_likely_permutation(context_);
+        return local_checker_.is_sorted(context_) &&
+            local_checker_.is_likely_permutation(context_);
         /*
         const bool debug = true;
         LOG << "Checker: " << local_checker_.is_likely_permutation(context_)
@@ -319,7 +315,7 @@ public:
             if (check) {
                 auto reader = files_[0].GetKeepReader();
                 while (reader.HasNext()) {
-                    local_checker_.add_post(reader.Next<ValueType>());
+                    local_checker_.add_post(reader.template Next<ValueType>());
                 }
             }
             this->PushFile(files_[0], consume);
@@ -389,7 +385,6 @@ public:
         }
 
         if (check) {
-            local_checker_.done();
             DumpCheckerStatus();
         }
 
