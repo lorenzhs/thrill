@@ -41,7 +41,7 @@ template <typename ValueType, typename CompareFunction,
           typename Hash = std::hash<ValueType>>
 class SortChecker
 {
-    static const bool debug = true;
+    static const bool debug = false;
 public:
     using hash_t = decltype(Hash()(ValueType{}));
 
@@ -49,6 +49,7 @@ public:
 
     void reset() {
         min_post = nullptr;
+        max_post = nullptr;
         last_post = nullptr;
         sum_pre = 0;
         sum_post = 0;
@@ -60,22 +61,25 @@ public:
     }
 
     void add_post(const ValueType &v) {
-        if (min_post == nullptr)
+        if (min_post == nullptr || cmp(v, *min_post))
             min_post = &v;
+
+        if (max_post == nullptr || cmp(*max_post, v))
+            max_post = &v;
+
         if (last_post != nullptr && cmp(v, *last_post)) {
-            sLOG << "Non-sorted values in output" << *last_post << v;
+            sLOG1 << "Non-sorted values in output" << *last_post << v;
             sorted_ = false;
         }
         last_post = &v;
+
         sum_post += hash(v);
     }
 
     bool is_sorted(Context &ctx) {
-        if (!sorted_) return false;
-
         std::vector<ValueType> send;
-        if (last_post != nullptr) {
-            send.emplace_back(*last_post);
+        if (max_post != nullptr) {
+            send.emplace_back(*max_post);
         }
         auto recv = ctx.net.Predecessor(1, send);
 
@@ -83,21 +87,26 @@ public:
         // check that the predecessor is smaller
         if (recv.size() > 0 && min_post != nullptr && cmp(*min_post, recv[0]))
         {
-            sLOG << "check(): predecessor has larger item"
-                 << *min_post << " > " << recv[0];
+            sLOG1 << "check(): predecessor has larger item"
+                  << *min_post << " > " << recv[0];
             sorted_ = false;
         }
 
-        sLOGC(ctx.my_rank() == 0)
+        sLOGC(debug && ctx.my_rank() == 0)
             << "check() sorted:" << (sorted_ ? "yes" : "NOOOO!!!");
 
-        return sorted_;
+        int fail = sorted_ ? 0 : 1;
+        fail = ctx.net.AllReduce(fail);
+        sLOGC(ctx.my_rank() == 0 && fail > 0)
+            << fail << " PEs with unsorted output";
+
+        return (fail == 0);
     }
 
     bool is_likely_permutation(Context &ctx) {
         auto global_sum_pre = ctx.net.AllReduce(sum_pre);
         auto global_sum_post = ctx.net.AllReduce(sum_post);
-        sLOGC(ctx.my_rank() == 0)
+        sLOGC(debug && ctx.my_rank() == 0)
             << "check() permutation:"
             << (global_sum_pre == global_sum_post ? "success." : "FAILURE!!!")
             << "global pre-sum:" << global_sum_pre
@@ -109,7 +118,7 @@ public:
     auto get_post() const { return sum_post; }
 protected:
     hash_t sum_pre, sum_post;
-    const ValueType *min_post, *last_post;
+    const ValueType *min_post, *max_post, *last_post;
     Hash hash;
     CompareFunction cmp;
     bool sorted_ = true;
