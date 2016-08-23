@@ -118,15 +118,26 @@ public:
         return (global_sum_pre == global_sum_post);
     }
 
+
+    bool check(Context &ctx) {
+        return is_sorted(ctx) && is_likely_permutation(ctx);
+        /*
+        const bool debug = true;
+        LOG << "Checker: " << is_likely_permutation(context_)
+            << "; pre = "  << get_pre()
+            << "; post = " << get_post();*/
+    }
+
+
     auto get_pre() const { return sum_pre; }
     auto get_post() const { return sum_post; }
 protected:
     hash_t sum_pre, sum_post;
-    bool has_items = false;
     ValueType first_post, last_post;
     Hash hash;
     CompareFunction cmp;
     bool sorted_ = true;
+    bool has_items = false;
 };
 
 }
@@ -189,17 +200,6 @@ public:
 
         auto lop_chain = parent.stack().push(pre_op_fn).fold();
         parent.node()->AddChild(this, lop_chain);
-    }
-
-    bool DumpCheckerStatus() {
-        if (!check) return true;
-        return local_checker_.is_sorted(context_) &&
-            local_checker_.is_likely_permutation(context_);
-        /*
-        const bool debug = true;
-        LOG << "Checker: " << local_checker_.is_likely_permutation(context_)
-            << "; pre = "  << local_checker_.get_pre()
-            << "; post = " << local_checker_.get_post();*/
     }
 
     void StartPreOp(size_t /* id */) final {
@@ -401,7 +401,7 @@ public:
         }
 
         if (check) {
-            DumpCheckerStatus();
+            local_checker_.check(context_);
         }
 
         timer_pushdata.Stop();
