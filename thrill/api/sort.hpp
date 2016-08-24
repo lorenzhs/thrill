@@ -46,7 +46,7 @@ class SortChecker
 {
     static const bool debug = false;
 public:
-    using hash_t = decltype(Hash()(ValueType{}));
+    // using hash_t = decltype(Hash()(ValueType{}));
 
     SortChecker(CompareFunction cmp_): cmp(cmp_) {
         reset();
