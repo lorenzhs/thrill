@@ -48,21 +48,25 @@ class SortChecker
 public:
     using hash_t = decltype(Hash()(ValueType{}));
 
-    SortChecker(CompareFunction cmp_): cmp(cmp_) {}
+    SortChecker(CompareFunction cmp_): cmp(cmp_) {
+        reset();
+    }
 
     void reset() {
         has_items = false;
         sum_pre = 0;
         sum_post = 0;
         sorted_ = true;
+        count_pre = 0;
+        count_post = 0;
     }
 
     void add_pre(const ValueType &v) {
         sum_pre += hash(v);
+        ++count_pre;
     }
 
     void add_post(const ValueType &v) {
-
         if (has_items && cmp(v, last_post)) {
             sLOG1 << "Non-sorted values in output"; // << last_post << v;
             sorted_ = false;
@@ -76,6 +80,7 @@ public:
         }
 
         sum_post += hash(v);
+        ++count_post;
     }
 
     bool is_sorted(Context &ctx) {
@@ -110,12 +115,17 @@ public:
     bool is_likely_permutation(Context &ctx) {
         auto global_sum_pre = ctx.net.AllReduce(sum_pre);
         auto global_sum_post = ctx.net.AllReduce(sum_post);
+
+        auto global_pre = ctx.net.AllReduce(count_pre);
+        auto global_post = ctx.net.AllReduce(count_post);
         sLOGC(debug && ctx.my_rank() == 0)
             << "check() permutation:"
+            << global_pre << "pre-items," << global_post << "post-items;"
             << (global_sum_pre == global_sum_post ? "success." : "FAILURE!!!")
             << "global pre-sum:" << global_sum_pre
             << "global post-sum:" << global_sum_post;
-        return (global_sum_pre == global_sum_post);
+        return (global_pre == global_post) &&
+            (global_sum_pre == global_sum_post);
     }
 
 
@@ -132,12 +142,13 @@ public:
     auto get_pre() const { return sum_pre; }
     auto get_post() const { return sum_post; }
 protected:
-    hash_t sum_pre, sum_post;
+    uint64_t sum_pre, sum_post;
     ValueType first_post, last_post;
+    size_t count_pre, count_post;
     Hash hash;
     CompareFunction cmp;
-    bool sorted_ = true;
-    bool has_items = false;
+    bool sorted_;
+    bool has_items;
 };
 
 }
