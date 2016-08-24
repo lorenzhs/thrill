@@ -64,7 +64,7 @@ public:
     void add_post(const ValueType &v) {
 
         if (has_items && cmp(v, last_post)) {
-            sLOG1 << "Non-sorted values in output" << last_post << v;
+            sLOG1 << "Non-sorted values in output"; // << last_post << v;
             sorted_ = false;
         }
         last_post = v;
@@ -91,8 +91,8 @@ public:
         if (recv.size() > 0 && has_items &&
             cmp(first_post, recv[0]))
         {
-            sLOG1 << "check(): predecessor has larger item"
-                  << first_post << " > " << recv[0];
+            sLOG1 << "check(): predecessor has larger item";
+            //<< first_post << " > " << recv[0];
             sorted_ = false;
         }
 
