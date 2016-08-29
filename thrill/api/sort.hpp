@@ -53,12 +53,11 @@ public:
     }
 
     void reset() {
-        has_items = false;
+        count_pre = 0;
+        count_post = 0;
         sum_pre = 0;
         sum_post = 0;
         sorted_ = true;
-        count_pre = 0;
-        count_post = 0;
     }
 
     void add_pre(const ValueType &v) {
@@ -67,16 +66,15 @@ public:
     }
 
     void add_post(const ValueType &v) {
-        if (has_items && cmp(v, last_post)) {
+        if (THRILL_LIKELY(count_post > 0) && cmp(v, last_post)) {
             sLOG1 << "Non-sorted values in output"; // << last_post << v;
             sorted_ = false;
         }
         last_post = v;
 
         // Init "first" (= minimum)
-        if (!has_items) {
+        if (THRILL_UNLIKELY(count_post == 0)) {
             first_post = v;
-            has_items = true;
         }
 
         sum_post += hash(v);
@@ -86,69 +84,56 @@ public:
     bool is_sorted(Context &ctx) {
         std::vector<ValueType> send;
 
-        if (has_items) {
+        if (count_post > 0) {
             send.push_back(last_post);
         }
         auto recv = ctx.net.Predecessor(1, send);
 
         // If any predecessor PE has an item, and we have one,
         // check that the predecessor is smaller
-        if (recv.size() > 0 && has_items &&
-            cmp(first_post, recv[0]))
-        {
+        if (recv.size() > 0 && count_post > 0 && cmp(first_post, recv[0])) {
             sLOG1 << "check(): predecessor has larger item";
-            //<< first_post << " > " << recv[0];
             sorted_ = false;
         }
 
-        sLOGC(debug && ctx.my_rank() == 0)
-            << "check() sorted:" << (sorted_ ? "yes" : "NOOOO!!!");
+        int unsorted_count = sorted_ ? 0 : 1;
+        unsorted_count = ctx.net.AllReduce(unsorted_count);
 
-        int fail = sorted_ ? 0 : 1;
-        fail = ctx.net.AllReduce(fail);
-        sLOGC(ctx.my_rank() == 0 && fail > 0)
-            << fail << "of" << ctx.num_workers() << "PEs with unsorted output";
+        sLOGC(ctx.my_rank() == 0 && unsorted_count > 0)
+            << unsorted_count << "of" << ctx.num_workers()
+            << "PEs have output that isn't sorted";
 
-        return (fail == 0);
+        return (unsorted_count == 0);
     }
 
     bool is_likely_permutation(Context &ctx) {
-        auto global_sum_pre = ctx.net.AllReduce(sum_pre);
-        auto global_sum_post = ctx.net.AllReduce(sum_post);
+        std::array<uint64_t, 4> sum{{count_pre, count_post, sum_pre, sum_post}};
+        sum = ctx.net.AllReduce(sum, common::ComponentSum<decltype(sum)>());
 
-        auto global_pre = ctx.net.AllReduce(count_pre);
-        auto global_post = ctx.net.AllReduce(count_post);
+        const bool success = (sum[0] == sum[1]) && (sum[2] == sum[3]);
         sLOGC(debug && ctx.my_rank() == 0)
             << "check() permutation:"
-            << global_pre << "pre-items," << global_post << "post-items;"
-            << (global_sum_pre == global_sum_post ? "success." : "FAILURE!!!")
-            << "global pre-sum:" << global_sum_pre
-            << "global post-sum:" << global_sum_post;
-        return (global_pre == global_post) &&
-            (global_sum_pre == global_sum_post);
+            << sum[0] << "pre-items," << sum[1] << "post-items;"
+            << (success  ? "success." : "FAILURE!!!")
+            << "global pre-sum:" << sum[2] << "global post-sum:" << sum[3];
+
+        return success;
     }
 
 
     bool check(Context &ctx) {
         return is_sorted(ctx) && is_likely_permutation(ctx);
-        /*
-        const bool debug = true;
-        LOG << "Checker: " << is_likely_permutation(context_)
-            << "; pre = "  << get_pre()
-            << "; post = " << get_post();*/
     }
-
 
     auto get_pre() const { return sum_pre; }
     auto get_post() const { return sum_post; }
 protected:
+    uint64_t count_pre, count_post;
     uint64_t sum_pre, sum_post;
     ValueType first_post, last_post;
-    size_t count_pre, count_post;
     Hash hash;
     CompareFunction cmp;
     bool sorted_;
-    bool has_items;
 };
 
 }
