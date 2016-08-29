@@ -10,6 +10,7 @@
 
 #include <thrill/api/generate.hpp>
 #include <thrill/api/read_binary.hpp>
+#include <thrill/api/size.hpp>
 #include <thrill/api/sort.hpp>
 #include <thrill/api/write_binary.hpp>
 #include <thrill/common/cmdline_parser.hpp>
@@ -172,7 +173,7 @@ int main(int argc, char* argv[]) {
                 if (output.size())
                     r.WriteBinary(output);
                 else
-                    r.Execute();
+                    r.Size();
             }
             else {
                 if (use_signed_char) {
@@ -181,7 +182,7 @@ int main(int argc, char* argv[]) {
                     if (output.size())
                         r.WriteBinary(output);
                     else
-                        r.Execute();
+                        r.Size();
                 }
                 else {
                     auto r = ReadBinary<Record>(ctx, input).Sort();
@@ -189,7 +190,7 @@ int main(int argc, char* argv[]) {
                     if (output.size())
                         r.WriteBinary(output);
                     else
-                        r.Execute();
+                        r.Size();
                 }
             }
         });
