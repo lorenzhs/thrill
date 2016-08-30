@@ -40,18 +40,33 @@ namespace api {
 
 namespace checkers {
 
+/*!
+ * Probabilistic checker for sorting algorithms
+ *
+ * \tparam ValueType Type of the elements being sorted
+ *
+ * \tparam CompareFunction Type of the compare function
+ *
+ * \tparam Hash Type of the hash function. Defaults to CRC32-C
+ *
+ * \ingroup api_layer
+ */
 template <typename ValueType, typename CompareFunction,
           typename Hash = common::hash_crc32<ValueType>>
 class SortChecker
 {
     static const bool debug = false;
 public:
-    // using hash_t = decltype(Hash()(ValueType{}));
-
+    /*!
+     * Construct a checker
+     *
+     * \param cmp_ Compare function to use
+     */
     SortChecker(CompareFunction cmp_): cmp(cmp_) {
         reset();
     }
 
+    //! Reset the checker's internal state
     void reset() {
         count_pre = 0;
         count_post = 0;
@@ -60,11 +75,13 @@ public:
         sorted_ = true;
     }
 
+    //! Process an input element (before sorting)
     void add_pre(const ValueType &v) {
         sum_pre += hash(v);
         ++count_pre;
     }
 
+    //! Process an output element (after sorting)
     void add_post(const ValueType &v) {
         if (THRILL_LIKELY(count_post > 0) && cmp(v, last_post)) {
             sLOG1 << "Non-sorted values in output"; // << last_post << v;
@@ -81,6 +98,12 @@ public:
         ++count_post;
     }
 
+    /*!
+     * Verify that the output elements seen at all workers were in globally
+     * sorted order.
+     *
+     * \param ctx Thrill Context to use for communication
+     */
     bool is_sorted(Context &ctx) {
         std::vector<ValueType> send;
 
@@ -106,6 +129,16 @@ public:
         return (unsorted_count == 0);
     }
 
+    /*!
+     * Verify probabilistically whether the output elements at all workers are a
+     * permutation of the input elements.  Success probability depends on the
+     * hash function used.
+     *
+     * This function has one-sided error -- it may wrongly accept an incorrect
+     * output, but will never cry wolf on a correct one.
+     *
+     * \param ctx Thrill Context to use for communication
+     */
     bool is_likely_permutation(Context &ctx) {
         std::array<uint64_t, 4> sum{{count_pre, count_post, sum_pre, sum_post}};
         sum = ctx.net.AllReduce(sum, common::ComponentSum<decltype(sum)>());
@@ -121,18 +154,27 @@ public:
     }
 
 
+    /*!
+     * Check correctness of the sorting procedure.  See `is_sorted` and
+     * `is_likely_permutation` for more details.
+     *
+     * \param ctx Thrill Context to use for communication
+     */
     bool check(Context &ctx) {
         return is_sorted(ctx) && is_likely_permutation(ctx);
     }
-
-    auto get_pre() const { return sum_pre; }
-    auto get_post() const { return sum_post; }
 protected:
+    //! Number of items seen in input and output
     uint64_t count_pre, count_post;
+    //! Sum of hash values in input and output
     uint64_t sum_pre, sum_post;
+    //! First and last element seen in output (used to verify global sortedness)
     ValueType first_post, last_post;
+    //! Hash function
     Hash hash;
+    //! Element comparison function
     CompareFunction cmp;
+    //! Whether the local output was in sorted order
     bool sorted_;
 };
 
@@ -206,6 +248,7 @@ public:
 
     void PreOp(const ValueType& input) {
         if (check) {
+            // let the checker hash the item
             local_checker_.add_pre(input);
         }
         unsorted_writer_.Put(input);
@@ -237,7 +280,9 @@ public:
         local_items_ = unsorted_file_.num_items();
 
         if (check) {
-            auto reader = unsorted_file_.GetKeepReader(false);
+            // Getting the samples doesn't require reading the entire file
+            // (random access), but the checker needs to hash every element
+            auto reader = unsorted_file_.GetKeepReader();
             for (size_t i = 0; i < local_items_; ++i) {
                 local_checker_.add_pre(reader.template Next<ValueType>());
             }
@@ -325,6 +370,7 @@ public:
         else if (files_.size() == 1) {
             local_size = files_[0].num_items();
             if (check) {
+                // Push the file to the checker, item by item
                 auto reader = files_[0].GetKeepReader();
                 while (reader.HasNext()) {
                     local_checker_.add_post(reader.template Next<ValueType>());
@@ -396,6 +442,7 @@ public:
             }
         }
 
+        // Do the checking
         if (check) {
             local_checker_.check(context_);
         }
