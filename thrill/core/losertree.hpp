@@ -894,7 +894,7 @@ public:
 template <bool Stable, typename ValueType, typename Comparator>
 struct LoserTreeTraits<
     Stable, ValueType, Comparator,
-    typename std::enable_if<sizeof(ValueType) <= 2* sizeof(size_t)>::type>{
+    typename std::enable_if<!(sizeof(ValueType) > 2* sizeof(size_t))>::type>{
     using Type = LoserTreeCopy<Stable, ValueType, Comparator>;
 };
 
@@ -909,7 +909,7 @@ public:
 template <bool Stable, typename ValueType, typename Comparator>
 struct LoserTreeTraitsUnguarded<
     Stable, ValueType, Comparator,
-    typename std::enable_if<sizeof(ValueType) <= 2* sizeof(size_t)>::type>{
+    typename std::enable_if<!(sizeof(ValueType) > 2* sizeof(size_t))>::type>{
     using Type = LoserTreeCopyUnguarded<Stable, ValueType, Comparator>;
 };
 
