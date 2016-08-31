@@ -76,18 +76,29 @@ public:
     }
 
     //! Process an input element (before sorting)
-    void add_pre(const ValueType &v) {
+    inline void add_pre(const ValueType &v) {
         sum_pre += hash(v);
         ++count_pre;
     }
 
-    //! Process an output element (after sorting)
-    void add_post(const ValueType &v) {
+    /*!
+     * Process an output element (after sorting)
+     *
+     * \param v Element to process
+     *
+     * \param definitely_not_last When true, avoids copying the element
+     * unnecessarily. If true for the last element, behaviour is undefined.
+     */
+    __attribute__((always_inline))
+    void add_post(const ValueType &v,
+                         const bool definitely_not_last = false) {
         if (THRILL_LIKELY(count_post > 0) && cmp(v, last_post)) {
             sLOG1 << "Non-sorted values in output"; // << last_post << v;
             sorted_ = false;
         }
-        last_post = v;
+        if (!definitely_not_last) {
+            last_post = v;
+        }
 
         // Init "first" (= minimum)
         if (THRILL_UNLIKELY(count_post == 0)) {
@@ -372,8 +383,11 @@ public:
             if (check) {
                 // Push the file to the checker, item by item
                 auto reader = files_[0].GetKeepReader();
-                while (reader.HasNext()) {
-                    local_checker_.add_post(reader.template Next<ValueType>());
+                bool has_next = reader.HasNext();
+                while (has_next) {
+                    auto next = reader.template Next<ValueType>();
+                    has_next = reader.HasNext();
+                    local_checker_.add_post(next, has_next);
                 }
             }
             this->PushFile(files_[0], consume);
@@ -434,9 +448,11 @@ public:
             auto puller = core::make_multiway_merge_tree<ValueType>(
                 seq.begin(), seq.end(), compare_function_);
 
-            while (puller.HasNext()) {
+            bool has_next = puller.HasNext();
+            while (has_next) {
                 auto next = puller.Next();
-                if (check) local_checker_.add_post(next);
+                auto has_next = puller.HasNext();
+                if (check) local_checker_.add_post(next, has_next);
                 this->PushItem(next);
                 local_size++;
             }
