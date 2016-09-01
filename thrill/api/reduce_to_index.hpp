@@ -23,6 +23,7 @@
 #include <thrill/common/meta.hpp>
 #include <thrill/common/porting.hpp>
 #include <thrill/core/reduce_by_index_post_phase.hpp>
+#include <thrill/core/reduce_checker.hpp>
 #include <thrill/core/reduce_pre_phase.hpp>
 
 #include <functional>
@@ -75,6 +76,8 @@ class ReduceToIndexNode final : public DOpNode<ValueType>
     using PrePhaseOutput =
               typename common::If<VolatileKey, KeyValuePair, Value>::type;
 
+    using Checker = typename core::ReduceChecker<Key, Value, ReduceFunction>;
+
     static constexpr bool use_mix_stream_ = ReduceConfig::use_mix_stream_;
     static constexpr bool use_post_thread_ = ReduceConfig::use_post_thread_;
 
@@ -83,12 +86,22 @@ private:
     class Emitter
     {
     public:
-        explicit Emitter(ReduceToIndexNode* node) : node_(node) { }
-        void operator () (const ValueType& item) const
-        { return node_->PushItem(item); }
+        explicit Emitter(ReduceToIndexNode* node, Checker &checker)
+            : node_(node), checker_(checker) { }
+
+        void operator () (const ValueType& item) const {
+            checker_.add_post(item);
+            return node_->PushItem(item);
+        }
+
+        void operator () (const ValueType& item, const KeyValuePair& pair) const {
+            checker_.add_post(pair);
+            return node_->PushItem(item);
+        }
 
     private:
         ReduceToIndexNode* node_;
+        Checker &checker_;
     };
 
 public:
@@ -118,7 +131,7 @@ public:
               config, core::ReduceByIndex<Key>(0, result_size)),
           post_phase_(
               context_, Super::id(),
-              key_extractor, reduce_function, Emitter(this), checker_,
+              key_extractor, reduce_function, Emitter(this, checker_),
               config, core::ReduceByIndex<Key>(), neutral_element)
     {
         // Hook PreOp: Locally hash elements of the current DIA onto buckets and

@@ -52,7 +52,9 @@ static void TestAddMyStructByHash(Context& ctx) {
     // collect all items
     std::vector<MyStruct> result;
 
-    auto emit_fn = [&result](const MyStruct& in) {
+    auto emit_fn = [&result](const MyStruct& in,
+                             // needed for checker, unfortunately
+                             const std::pair<size_t, MyStruct>& = {}) {
                        result.emplace_back(in);
                    };
 
@@ -61,8 +63,7 @@ static void TestAddMyStructByHash(Context& ctx) {
               decltype(key_ex), decltype(red_fn), decltype(emit_fn), false,
               core::DefaultReduceConfigSelect<table_impl> >;
 
-    core::ReduceChecker<size_t, MyStruct, decltype(red_fn)> checker;
-    Phase phase(ctx, 0, key_ex, red_fn, emit_fn, checker);
+    Phase phase(ctx, 0, key_ex, red_fn, emit_fn);
     phase.Initialize(/* limit_memory_bytes */ 64 * 1024);
 
     for (size_t i = 0; i < test_size; ++i) {
@@ -164,7 +165,9 @@ static void TestAddMyStructByIndex(Context& ctx) {
     // collect all items
     std::vector<MyStruct> result;
 
-    auto emit_fn = [&result](const MyStruct& in) {
+    auto emit_fn = [&result](const MyStruct& in,
+                             // needed for checker, unfortunately
+                             const std::pair<size_t, MyStruct>& = {}) {
                        result.emplace_back(in);
                    };
 
@@ -173,8 +176,7 @@ static void TestAddMyStructByIndex(Context& ctx) {
               decltype(key_ex), decltype(red_fn), decltype(emit_fn), false,
               core::DefaultReduceConfigSelect<table_impl> >;
 
-    core::ReduceChecker<size_t, MyStruct, decltype(red_fn)> checker;
-    Phase phase(ctx, 0, key_ex, red_fn, emit_fn, checker,
+    Phase phase(ctx, 0, key_ex, red_fn, emit_fn,
                 typename Phase::ReduceConfig(),
                 core::ReduceByIndex<size_t>(0, mod_size),
                 /* neutral_element */ MyStruct { 0, 0 });
@@ -245,7 +247,9 @@ static void TestAddMyStructByIndexWithHoles(Context& ctx) {
     // collect all items
     std::vector<MyStruct> result;
 
-    auto emit_fn = [&result](const MyStruct& in) {
+    auto emit_fn = [&result](const MyStruct& in,
+                             // needed for checker, unfortunately
+                             const std::pair<size_t, MyStruct>& = {}) {
                        result.emplace_back(in);
                    };
 
@@ -254,8 +258,7 @@ static void TestAddMyStructByIndexWithHoles(Context& ctx) {
               decltype(key_ex), decltype(red_fn), decltype(emit_fn), false,
               core::DefaultReduceConfigSelect<table_impl> >;
 
-    core::ReduceChecker<size_t, MyStruct, decltype(red_fn)> checker;
-    Phase phase(ctx, 0, key_ex, red_fn, emit_fn, checker,
+    Phase phase(ctx, 0, key_ex, red_fn, emit_fn,
                 typename Phase::ReduceConfig(),
                 core::ReduceByIndex<size_t>(0, mod_size),
                 /* neutral_element */ MyStruct { 0, 0 });

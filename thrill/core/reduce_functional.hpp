@@ -158,7 +158,8 @@ class ReducePostPhaseEmitterSwitch<
 {
 public:
     static void Put(const KeyValuePair& p, Emitter& emit) {
-        emit(p.second);
+        // Emit the pair for the checker
+        emit(p.second, p);
     }
 };
 

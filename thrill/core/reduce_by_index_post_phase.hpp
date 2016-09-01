@@ -17,7 +17,6 @@
 #include <thrill/api/context.hpp>
 #include <thrill/common/logger.hpp>
 #include <thrill/core/reduce_bucket_hash_table.hpp>
-#include <thrill/core/reduce_checker.hpp>
 #include <thrill/core/reduce_functional.hpp>
 #include <thrill/core/reduce_probing_hash_table.hpp>
 #include <thrill/data/file.hpp>
@@ -83,8 +82,6 @@ public:
               KeyExtractor, ReduceFunction, PhaseEmitter,
               !SendPair, ReduceConfig, IndexFunction, EqualToFunction>::type;
 
-    using Checker = ReduceChecker<Key, Value, ReduceFunction>;
-
     /*!
      * A data structure which takes an arbitrary value and extracts a key using
      * a key extractor function from that value. Afterwards, the value is hashed
@@ -96,7 +93,6 @@ public:
         const KeyExtractor& key_extractor,
         const ReduceFunction& reduce_function,
         const Emitter& emitter,
-        Checker& checker,
         const ReduceConfig& config = ReduceConfig(),
         const IndexFunction& index_function = IndexFunction(),
         const Value& neutral_element = Value(),
@@ -108,7 +104,6 @@ public:
                  /* num_partitions */ 32, /* TODO(tb): parameterize */
                  config, false,
                  index_function, equal_to_function),
-          checker_(checker),
           neutral_element_(neutral_element) { }
 
     //! non-copyable: delete copy-constructor
@@ -407,8 +402,6 @@ private:
 
     //! the first-level hash table implementation
     Table table_;
-
-    Checker &checker_;
 
     //! neutral element to fill holes in output
     Value neutral_element_;

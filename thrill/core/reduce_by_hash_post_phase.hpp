@@ -19,7 +19,6 @@
 #include <thrill/api/context.hpp>
 #include <thrill/common/logger.hpp>
 #include <thrill/core/reduce_bucket_hash_table.hpp>
-#include <thrill/core/reduce_checker.hpp>
 #include <thrill/core/reduce_functional.hpp>
 #include <thrill/core/reduce_old_probing_hash_table.hpp>
 #include <thrill/core/reduce_probing_hash_table.hpp>
@@ -88,8 +87,6 @@ public:
               KeyExtractor, ReduceFunction, PhaseEmitter,
               !SendPair, ReduceConfig, IndexFunction, EqualToFunction>::type;
 
-    using Checker = ReduceChecker<Key, Value, ReduceFunction>;
-
     /*!
      * A data structure which takes an arbitrary value and extracts a key using
      * a key extractor function from that value. Afterwards, the value is hashed
@@ -100,7 +97,6 @@ public:
         const KeyExtractor& key_extractor,
         const ReduceFunction& reduce_function,
         const Emitter& emit,
-        Checker& checker,
         const ReduceConfig& config = ReduceConfig(),
         const IndexFunction& index_function = IndexFunction(),
         const EqualToFunction& equal_to_function = EqualToFunction())
@@ -110,8 +106,7 @@ public:
                  key_extractor, reduce_function, emitter_,
                  /* num_partitions */ 32, /* TODO(tb): parameterize */
                  config, /* immediate_flush */ false,
-                 index_function, equal_to_function),
-          checker_(checker) { }
+                 index_function, equal_to_function) { }
 
     //! non-copyable: delete copy-constructor
     ReduceByHashPostPhase(const ReduceByHashPostPhase&) = delete;
@@ -169,7 +164,6 @@ public:
                         [this, writer](
                             const size_t& partition_id, const KeyValuePair& p) {
                             if (DoCache) writer->Put(p);
-                            checker_.add_post(p);
                             emitter_.Emit(partition_id, p);
                         });
                 }
@@ -251,7 +245,6 @@ public:
                             [this, writer](
                                 const size_t& partition_id, const KeyValuePair& p) {
                                 if (DoCache) writer->Put(p);
-                                checker_.add_post(p);
                                 emitter_.Emit(partition_id, p);
                             });
                     }
@@ -287,9 +280,7 @@ public:
             // previous PushData() has stored data in cache_
             data::File::Reader reader = cache_->GetReader(consume);
             while (reader.HasNext()) {
-                auto next = reader.Next<KeyValuePair>();
-                checker_.add_post(next);
-                emitter_.Emit(next);
+                emitter_.Emit(reader.Next<KeyValuePair>());
             }
         }
     }
@@ -322,8 +313,6 @@ private:
 
     //! File for storing data in-case we need multiple re-reduce levels.
     data::FilePtr cache_;
-
-    Checker &checker_;
 };
 
 } // namespace core
