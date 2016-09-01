@@ -114,11 +114,11 @@ public:
           result_size_(result_size),
           pre_phase_(
               context_, Super::id(), context_.num_workers(),
-              key_extractor, reduce_function, emitters_,
+              key_extractor, reduce_function, emitters_, checker_,
               config, core::ReduceByIndex<Key>(0, result_size)),
           post_phase_(
               context_, Super::id(),
-              key_extractor, reduce_function, Emitter(this),
+              key_extractor, reduce_function, Emitter(this), checker_,
               config, core::ReduceByIndex<Key>(), neutral_element)
     {
         // Hook PreOp: Locally hash elements of the current DIA onto buckets and
@@ -240,6 +240,8 @@ private:
     core::ReduceByIndexPostPhase<
         ValueType, Key, Value, KeyExtractor, ReduceFunction, Emitter, SendPair,
         ReduceConfig> post_phase_;
+
+    core::ReduceChecker<Key, Value, ReduceFunction> checker_;
 
     bool reduced_ = false;
 };

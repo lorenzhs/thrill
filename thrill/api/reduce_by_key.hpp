@@ -110,10 +110,10 @@ public:
                     mix_stream_->GetWriters() : cat_stream_->GetWriters()),
           pre_phase_(
               context_, Super::id(), parent.ctx().num_workers(),
-              key_extractor, reduce_function, emitters_, config),
+              key_extractor, reduce_function, emitters_, checker_, config),
           post_phase_(
               context_, Super::id(), key_extractor, reduce_function,
-              Emitter(this), config)
+              Emitter(this), checker_, config)
     {
         // Hook PreOp: Locally hash elements of the current DIA onto buckets and
         // reduce each bucket to a single value, afterwards send data to another
@@ -174,6 +174,7 @@ public:
             reduced_ = true;
         }
         post_phase_.PushData(consume);
+        checker_.check(context_);
     }
 
     //! process the inbound data in the post reduce phase
@@ -220,6 +221,8 @@ private:
     core::ReduceByHashPostPhase<
         ValueType, Key, Value, KeyExtractor, ReduceFunction, Emitter, SendPair,
         ReduceConfig> post_phase_;
+
+    core::ReduceChecker<Key, Value, ReduceFunction> checker_;
 
     bool reduced_ = false;
 };
