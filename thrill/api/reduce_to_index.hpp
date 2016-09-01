@@ -104,6 +104,45 @@ private:
         Checker &checker_;
     };
 
+
+    //! PreOp to insert elements into PrePhase
+    template <typename V, typename PrePhase, typename Checker,
+              typename KeyIsValue = void>
+    struct ReducePreOp {
+        ReducePreOp(PrePhase &pre_phase, const KeyExtractor&, Checker &checker)
+            : pre_phase_(pre_phase), checker_(checker) {}
+        auto operator()(const ValueType& input) {
+            checker_.add_pre(input);
+            return pre_phase_.Insert(input);
+        }
+    private:
+        PrePhase &pre_phase_;
+        Checker &checker_;
+    };
+
+    //! PreOp to insert elements into PrePhase, handling the case where either
+    //! Key or Value is equal to ValueType
+    template <typename V, typename PrePhase, typename Checker>
+    struct ReducePreOp<V, PrePhase, Checker,
+                       typename std::enable_if_t<(
+        std::is_same<std::decay_t<V>, Key>::value ||
+        std::is_same<std::decay_t<V>, Value>::value)> > {
+        ReducePreOp(PrePhase &pre_phase, const KeyExtractor &key_extractor,
+                    Checker &checker)
+            : pre_phase_(pre_phase),
+              key_extractor_(key_extractor),
+              checker_(checker) {}
+        auto operator()(const ValueType& input) {
+            checker_.add_pre(key_extractor_(input), input);
+            return pre_phase_.Insert(input);
+        }
+    private:
+        PrePhase &pre_phase_;
+        const KeyExtractor &key_extractor_;
+        Checker &checker_;
+    };
+
+
 public:
     /*!
      * Constructor for a ReduceToIndexNode. Sets the parent, stack,
@@ -127,7 +166,7 @@ public:
           result_size_(result_size),
           pre_phase_(
               context_, Super::id(), context_.num_workers(),
-              key_extractor, reduce_function, emitters_, checker_,
+              key_extractor, reduce_function, emitters_,
               config, core::ReduceByIndex<Key>(0, result_size)),
           post_phase_(
               context_, Super::id(),
@@ -137,9 +176,12 @@ public:
         // Hook PreOp: Locally hash elements of the current DIA onto buckets and
         // reduce each bucket to a single value, afterwards send data to another
         // worker given by the shuffle algorithm.
-        auto pre_op_fn = [this](const ValueType& input) {
+        auto pre_op_fn = ReducePreOp<ValueType, decltype(pre_phase_), decltype(checker_)>
+            (pre_phase_, key_extractor, checker_);
+/*[this](const ValueType& input) {
+                             checker_.add_pre(input);
                              return pre_phase_.Insert(input);
-                         };
+                             };*/
 
         // close the function stack with our pre op and register it at parent
         // node for output

@@ -74,8 +74,7 @@ static void TestAddMyStructByHash(Context& ctx) {
               /* VolatileKey */ false,
               MyReduceConfig<table_impl> >;
 
-    core::ReduceChecker<size_t, MyStruct, decltype(red_fn)> checker;
-    Phase phase(ctx, 0, num_partitions, key_ex, red_fn, emitters, checker);
+    Phase phase(ctx, 0, num_partitions, key_ex, red_fn, emitters);
 
     phase.Initialize(/* limit_memory_bytes */ 1024 * 1024);
 
@@ -163,10 +162,9 @@ static void TestAddMyStructByIndex(Context& ctx) {
               MyReduceConfig<table_impl>,
               core::ReduceByIndex<size_t> >;
 
-    core::ReduceChecker<size_t, MyStruct, decltype(red_fn)> checker;
     Phase phase(ctx, 0,
                 num_partitions,
-                key_ex, red_fn, emitters, checker,
+                key_ex, red_fn, emitters,
                 typename Phase::ReduceConfig(),
                 core::ReduceByIndex<size_t>(0, mod_size));
 

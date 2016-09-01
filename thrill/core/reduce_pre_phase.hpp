@@ -18,7 +18,6 @@
 
 #include <thrill/common/logger.hpp>
 #include <thrill/core/reduce_bucket_hash_table.hpp>
-#include <thrill/core/reduce_checker.hpp>
 #include <thrill/core/reduce_functional.hpp>
 #include <thrill/core/reduce_old_probing_hash_table.hpp>
 #include <thrill/core/reduce_probing_hash_table.hpp>
@@ -124,8 +123,6 @@ public:
               KeyExtractor, ReduceFunction, Emitter,
               VolatileKey, ReduceConfig, IndexFunction, EqualToFunction>::type;
 
-    using Checker = ReduceChecker<Key, Value, ReduceFunction>;
-
     /*!
      * A data structure which takes an arbitrary value and extracts a key using
      * a key extractor function from that value. Afterwards, the value is hashed
@@ -136,7 +133,6 @@ public:
                    KeyExtractor key_extractor,
                    ReduceFunction reduce_function,
                    std::vector<data::DynBlockWriter>& emit,
-                   Checker& checker,
                    const ReduceConfig& config = ReduceConfig(),
                    const IndexFunction& index_function = IndexFunction(),
                    const EqualToFunction& equal_to_function = EqualToFunction())
@@ -144,8 +140,7 @@ public:
           table_(ctx, dia_id,
                  key_extractor, reduce_function, emit_,
                  num_partitions, config, /* immediate_flush */ true,
-                 index_function, equal_to_function),
-          checker_(checker) {
+                 index_function, equal_to_function) {
         sLOG << "creating ReducePrePhase with" << emit.size() << "output emitters";
 
         assert(num_partitions == emit.size());
@@ -161,12 +156,10 @@ public:
     }
 
     void Insert(const Value& p) {
-        checker_.add_pre(table_.key_extractor()(p), p);
         return table_.Insert(p);
     }
 
     void Insert(const KeyValuePair& kv) {
-        checker_.add_pre(kv);
         return table_.Insert(kv);
     }
 
@@ -210,8 +203,6 @@ private:
 
     //! the first-level hash table implementation
     Table table_;
-
-    Checker &checker_;
 };
 
 } // namespace core
