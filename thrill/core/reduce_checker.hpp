@@ -21,6 +21,7 @@
 #include <thrill/common/defines.hpp>
 #include <thrill/common/function_traits.hpp>
 #include <thrill/common/hash.hpp>
+#include <thrill/common/logger.hpp>
 #include <thrill/core/reduce_functional.hpp>
 
 namespace thrill {
@@ -37,7 +38,7 @@ class ReduceCheckerMinireduction {
 
     using KeyValuePair = std::pair<Key, Value>;
     //! hash value type
-    using hash_t = typename common::FunctionTraits<hash_fn>::result_type;
+    using hash_t = decltype(hash_fn()(Key{}));
     //! Bits in hash value
     static constexpr size_t hash_bits = 8 * sizeof(hash_t);
     static_assert(bucket_bits <= hash_bits,
@@ -53,10 +54,14 @@ class ReduceCheckerMinireduction {
     using reduction_t = std::array<Value, num_buckets>;
 
 public:
+    ReduceCheckerMinireduction() {
+        reset();
+    }
+
     //! Reset minireduction to initial state
     void reset() {
         for (size_t i = 0; i < num_parallel; ++i) {
-            std::fill(_reductions[i].begin(), _reductions[i].end(), Value{0});
+            std::fill(_reductions[i].begin(), _reductions[i].end(), Value{});
         }
     }
 
@@ -71,9 +76,26 @@ public:
 
     //! Compare for equality
     template <typename Other>
-    bool operator==(const Other & /*other*/) const {
-        return true; // TODO
+    bool operator==(const Other &other) const {
+        LOG1 << "minired() operator==";
+        // check dimensions
+        if (num_buckets != other.num_buckets) return false;
+        if (num_parallel != other.num_parallel) return false;
+        // check all buckets for equality
+        for (size_t i = 0; i < num_parallel; ++i) {
+            for (size_t j = 0; j < num_buckets; ++j) {
+                if (_reductions[i][j] != other._reductions[i][j])
+                    return false;
+            }
+        }
+        return true;
     }
+
+    void all_reduce(api::Context &ctx) {
+        _reductions = ctx.net.AllReduce(_reductions,
+            common::ComponentSum<decltype(_reductions), ReduceFunction>(reduce));
+    }
+
 private:
     constexpr size_t extract_bucket(const hash_t &hash, size_t idx) {
         assert(idx < num_parallel);
@@ -102,7 +124,7 @@ public:
     void add_pre(const KeyValuePair&) {}
     void add_post(const Key&, const Value&) {}
     void add_post(const KeyValuePair&) {}
-    bool check(api::Context&) const { return true; }
+    bool check(api::Context&) { return true; }
 };
 
 /*!
@@ -115,21 +137,26 @@ class ReduceChecker<Key, Value, ReduceFunction,
     using KeyValuePair = std::pair<Key, Value>;
 public:
     void add_pre(const Key &key, const Value &value) {
-        mini_pre.add(key, value);
+        mini_pre.push(key, value);
     }
     void add_pre(const KeyValuePair &kv) {
-        mini_pre.add(kv.first, kv.second);
+        mini_pre.push(kv.first, kv.second);
     }
 
     void add_post(const Key &key, const Value &value) {
-        mini_post.add(key, value);
+        mini_post.push(key, value);
     }
     void add_post(const KeyValuePair &kv) {
-        mini_post.add(kv.first, kv.second);
+        mini_post.push(kv.first, kv.second);
     }
 
-    bool check(api::Context & /*ctx*/) const {
-        return mini_pre == mini_post;
+    bool check(api::Context & ctx) {
+        LOG1 << "Checking reduction...";
+        mini_pre.all_reduce(ctx);
+        mini_post.all_reduce(ctx);
+        bool success = (mini_pre == mini_post);
+        LOG1 << "check(): " << (success ? "yay" : "NAY");
+        return success;
     }
 private:
     _detail::ReduceCheckerMinireduction<Key, Value, ReduceFunction>

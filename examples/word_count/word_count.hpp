@@ -23,6 +23,13 @@
 #include <string>
 #include <utility>
 
+namespace std {
+template <typename S, typename T>
+ostream &operator << (ostream &os, const pair<S,T> &p) {
+    return os << "(" << p.first << ", " << p.second << ")";
+}
+}
+
 namespace examples {
 namespace word_count {
 
