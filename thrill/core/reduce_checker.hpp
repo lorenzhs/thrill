@@ -113,6 +113,8 @@ private:
 };
 } // namespace _detail
 
+//! Whether to check reductions (when applicable)
+static constexpr bool check_reductions = true;
 
 //! Reduce checker - no-op for unsupported reduce functions
 template<typename Key, typename Value, typename ReduceFunction,
@@ -132,7 +134,8 @@ public:
  */
 template<typename Key, typename Value, typename ReduceFunction>
 class ReduceChecker<Key, Value, ReduceFunction,
-                    typename std::enable_if_t<reduce_checkable_v<ReduceFunction>>>
+                    typename std::enable_if_t<check_reductions &&
+                                              reduce_checkable_v<ReduceFunction>>>
 {
     using KeyValuePair = std::pair<Key, Value>;
 public:
