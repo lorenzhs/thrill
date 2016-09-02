@@ -31,7 +31,7 @@ namespace _detail {
 //! Reduce checker minireduction helper
 template <typename Key, typename Value, typename ReduceFunction,
           typename hash_fn = common::hash_crc32<Key>,
-          size_t bucket_bits = 2>
+          size_t bucket_bits = 3>
 class ReduceCheckerMinireduction {
     static_assert(reduce_checkable_v<ReduceFunction>,
                   "Reduce function isn't checkable");
@@ -53,6 +53,8 @@ class ReduceCheckerMinireduction {
 
     using reduction_t = std::array<Value, num_buckets>;
 
+    //! Enable extra debug output by setting this to true
+    static constexpr bool extra_verbose = false;
 public:
     ReduceCheckerMinireduction() {
         reset();
@@ -77,7 +79,6 @@ public:
     //! Compare for equality
     template <typename Other>
     bool operator==(const Other &other) const {
-        LOG1 << "minired() operator==";
         // check dimensions
         if (num_buckets != other.num_buckets) return false;
         if (num_parallel != other.num_parallel) return false;
@@ -94,6 +95,17 @@ public:
     void all_reduce(api::Context &ctx) {
         _reductions = ctx.net.AllReduce(_reductions,
             common::ComponentSum<decltype(_reductions), ReduceFunction>(reduce));
+
+        if (extra_verbose && ctx.net.my_rank() == 0) {
+            for (size_t i = 0; i < num_parallel; ++i) {
+                std::stringstream s;
+                s << "Run " << i << ": ";
+                for (size_t j = 0; j < num_buckets; ++j) {
+                    s << _reductions[i][j] << " ";
+                }
+                LOG1 << s.str();
+            }
+        }
     }
 
 private:
@@ -154,11 +166,10 @@ public:
     }
 
     bool check(api::Context & ctx) {
-        LOG1 << "Checking reduction...";
         mini_pre.all_reduce(ctx);
         mini_post.all_reduce(ctx);
         bool success = (mini_pre == mini_post);
-        LOG1 << "check(): " << (success ? "yay" : "NAY");
+        LOGC(ctx.my_rank() == 0) << "check(): " << (success ? "yay" : "NAY");
         return success;
     }
 private:
