@@ -53,14 +53,8 @@ auto WordCount(const DIA<std::string, InputStack>&input) {
         });
 
     return word_pairs.ReduceByKey(
-        [](const WordCountPair& in) -> std::string {
-            /* reduction key: the word string */
-            return in.first;
-        },
-        [](const WordCountPair& a, const WordCountPair& b) -> WordCountPair {
-            /* associative reduction operator: add counters */
-            return WordCountPair(a.first, a.second + b.second);
-        });
+        common::TupleGet<0, WordCountPair>(),
+        common::TupleReduceIndex<1, WordCountPair /*, std::plus<size_t> */>());
 }
 
 /******************************************************************************/
@@ -83,11 +77,7 @@ auto FastWordCount(const DIA<std::string, InputStack>&input) {
                 });
         });
 
-    return word_pairs.ReducePair(
-        [](const size_t& a, const size_t& b) {
-                /* associative reduction operator: add counters */
-            return a + b;
-        });
+    return word_pairs.ReducePair(std::plus<size_t>());
 }
 
 } // namespace word_count

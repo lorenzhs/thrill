@@ -54,6 +54,30 @@ struct NoOperation<void>{
     void operator () (...) const noexcept { }
 };
 
+//! Wrapper around std::get to extract Index-th element on operator().  Useful
+//! as KeyExtractor in reductions.
+template <size_t Index, typename T>
+struct TupleGet {
+    auto operator()(const T& tuple) const {
+        return std::get<Index>(tuple);
+    }
+};
+
+//! Reduce tuples by applying an operation to the Index-th coordinate. All other
+//! coordinates are copied from the first tuple (/ assumed to be equal in both)
+template <size_t Index, typename Tuple,
+          typename Op = std::plus<std::tuple_element_t<Index, Tuple> > >
+struct TupleReduceIndex {
+    Tuple operator()(const Tuple& t1, const Tuple& t2) const {
+        Tuple ret = t1;
+        // std::get returns a reference, so this works
+        std::get<Index>(ret) = op(std::get<Index>(t1), std::get<Index>(t2));
+        return ret;
+    }
+private:
+    Op op;
+};
+
 // thanks to http://stackoverflow.com/a/7127988
 template <typename T>
 struct is_std_pair : public std::false_type { };
