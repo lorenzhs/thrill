@@ -14,6 +14,7 @@
 
 #include <thrill/api/generate.hpp>
 #include <thrill/api/read_lines.hpp>
+#include <thrill/api/size.hpp>
 #include <thrill/api/write_lines.hpp>
 #include <thrill/common/cmdline_parser.hpp>
 #include <thrill/common/logger.hpp>
@@ -48,7 +49,7 @@ static void RunWordCount(
         .WriteLines(output);
     }
     else {
-        word_pairs.Execute();
+        word_pairs.Size();
     }
 }
 
@@ -69,7 +70,7 @@ static void RunFastWordCount(
         .WriteLines(output);
     }
     else {
-        word_pairs.Execute();
+        word_pairs.Size();
     }
 }
 
