@@ -17,6 +17,7 @@
 #define THRILL_CORE_REDUCE_FUNCTIONAL_HEADER
 
 #include <thrill/common/defines.hpp>
+#include <thrill/common/functional.hpp>
 #include <thrill/common/hash.hpp>
 #include <thrill/common/math.hpp>
 
@@ -146,6 +147,13 @@ private:
 
 /******************************************************************************/
 
+namespace _detail {
+//! Check whether an emitter that takes both the value and the key-value-pair
+//! exists - these are for the checker
+auto has_checker = common::is_valid(
+    [](auto&& emit, auto && p) -> decltype(emit(p.second, p)) {});
+} // namespace _detail
+
 //! template specialization switch class to output key+value if SendPair and
 //! only value if not SendPair.
 template <
@@ -157,9 +165,22 @@ class ReducePostPhaseEmitterSwitch<
         KeyValuePair, ValueType, Emitter, false>
 {
 public:
-    static void Put(const KeyValuePair& p, Emitter& emit) {
+    //! Put value and key-value-pair for checker emitter
+    template <typename E = Emitter>
+    static void Put(const KeyValuePair& p, E& emit,
+                    typename std::enable_if<decltype(
+                        _detail::has_checker(emit, p))::value>::type* = 0) {
         // Emit the pair for the checker
         emit(p.second, p);
+    }
+
+    //! Put value only (no checker emitter)
+    template <typename E = Emitter>
+    static void Put(const KeyValuePair& p, E& emit,
+                    typename std::enable_if<!decltype(
+                        _detail::has_checker(emit, p))::value>::type* = 0) {
+        // Emit the pair for the checker
+        emit(p.second);
     }
 };
 

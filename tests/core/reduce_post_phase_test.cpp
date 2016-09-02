@@ -52,9 +52,7 @@ static void TestAddMyStructByHash(Context& ctx) {
     // collect all items
     std::vector<MyStruct> result;
 
-    auto emit_fn = [&result](const MyStruct& in,
-                             // needed for checker, unfortunately
-                             const std::pair<size_t, MyStruct>& = {}) {
+    auto emit_fn = [&result](const MyStruct& in) {
                        result.emplace_back(in);
                    };
 
@@ -165,9 +163,7 @@ static void TestAddMyStructByIndex(Context& ctx) {
     // collect all items
     std::vector<MyStruct> result;
 
-    auto emit_fn = [&result](const MyStruct& in,
-                             // needed for checker, unfortunately
-                             const std::pair<size_t, MyStruct>& = {}) {
+    auto emit_fn = [&result](const MyStruct& in) {
                        result.emplace_back(in);
                    };
 
@@ -247,9 +243,7 @@ static void TestAddMyStructByIndexWithHoles(Context& ctx) {
     // collect all items
     std::vector<MyStruct> result;
 
-    auto emit_fn = [&result](const MyStruct& in,
-                             // needed for checker, unfortunately
-                             const std::pair<size_t, MyStruct>& = {}) {
+    auto emit_fn = [&result](const MyStruct& in) {
                        result.emplace_back(in);
                    };
 

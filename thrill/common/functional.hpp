@@ -228,6 +228,49 @@ template <size_t Length>
 struct make_index_sequence : public make_index_sequence_helper<Length>::type
 { };
 
+
+/******************************************************************************/
+
+//! is_valid, adapted from boost.hana <boost/hana/type.hpp>.
+//! Checks whether an expression is valid C++. Slightly magic.
+namespace _detail {
+template <typename F, typename ...Args, typename = decltype(
+    std::declval<F&&>()(std::declval<Args&&>()...)
+    )>
+constexpr auto is_valid_impl(int) { return std::true_type(); }
+
+template <typename F, typename ...Args>
+constexpr auto is_valid_impl(...) { return std::false_type(); }
+
+template <typename F>
+struct is_valid_fun {
+    template <typename ...Args>
+    constexpr auto operator()(Args&& ...) const
+    { return is_valid_impl<F, Args&&...>(int{}); }
+};
+} // namespace _detail
+
+struct is_valid_t {
+    template <typename F>
+    constexpr auto operator()(F&&) const
+    { return _detail::is_valid_fun<F&&>{}; }
+
+    template <typename F, typename ...Args>
+    constexpr auto operator()(F&&, Args&&...) const
+    { return _detail::is_valid_impl<F&&, Args&&...>(int{}); }
+};
+
+/*!
+ * Check whether an expression is valid C++, using SFINAE tricks.
+ *
+ * Usage example:
+ * auto is_callable = is_valid([](auto&& x) -> decltype(x()) {});
+ * template <typename F> void foo(F && f,
+ *     typename std::enable_if<decltype(is_callable(f))::value>::type* = 0)
+ * { f(); }
+ */
+constexpr is_valid_t is_valid{};
+
 } // namespace common
 } // namespace thrill
 
