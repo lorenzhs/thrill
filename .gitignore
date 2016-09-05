@@ -1,8 +1,14 @@
 # build
-build/**
+build/
+build-*/
 doxygen-html/**
 doxygen_sqlite3.db
 __pycache__
+
+# GNU global files
+GPATH
+GRTAGS
+GTAGS
 
 # Compiled Object files
 *.slo
