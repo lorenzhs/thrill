@@ -157,6 +157,7 @@ thrill_build_test(data/multiplexer_test)
 thrill_build_test(data/serialization_cereal_test)
 thrill_build_test(data/serialization_test)
 
+thrill_build_test(core/reduce_checker_test)
 thrill_build_test(core/reduce_hash_table_test)
 thrill_build_test(core/reduce_post_phase_test)
 thrill_build_test(core/reduce_pre_phase_test)
