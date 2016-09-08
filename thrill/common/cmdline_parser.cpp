@@ -29,14 +29,14 @@ namespace common {
 
 //! base class of all options and parameters
 struct CmdlineParser::Argument {
-    //! single letter short option, or 0 is none
-    char        key_;
     //! long option key or name for parameters
     std::string longkey_;
     //! option type description, e.g. "<#>" to indicate numbers
     std::string keytype_;
     //! longer description, which will be wrapped
     std::string desc_;
+    //! single letter short option, or 0 is none
+    char        key_;
     //! required, process() fails if the option/parameter is not found.
     bool        required_;
     //! found during processing of command line
@@ -48,8 +48,8 @@ struct CmdlineParser::Argument {
     Argument(char key, const std::string& longkey,
              const std::string& keytype,
              const std::string& desc, bool required)
-        : key_(key), longkey_(longkey), keytype_(keytype),
-          desc_(desc), required_(required), found_(false),
+        : longkey_(longkey), keytype_(keytype), desc_(desc),
+          key_(key), required_(required), found_(false),
           repeated_(false)
     { }
 
