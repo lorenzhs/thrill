@@ -257,7 +257,7 @@ private:
         : data_(data), size_(size), owns_data_(owns_data) { }
 
     //! Pointer to data
-    const char* data_ = 0;
+    const char* data_ = nullptr;
     //! Size of data
     size_t size_ = 0;
     //! True, if this FastString has ownership of data
