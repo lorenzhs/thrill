@@ -92,10 +92,11 @@ public:
     __attribute__((always_inline))
     void add_post(const ValueType &v,
                          const bool definitely_not_last = false) {
-        if (THRILL_LIKELY(count_post > 0) && cmp(v, last_post)) {
-            sLOG1 << "Non-sorted values in output"; // << last_post << v;
+        if (THRILL_LIKELY(count_post > 0) && cmp(v, *last_ptr)) {
+            sLOG1 << "Non-sorted values in output"; // << *last_ptr << v;
             sorted_ = false;
         }
+        last_ptr = &v;
         if (!definitely_not_last) {
             last_post = v;
         }
@@ -181,6 +182,8 @@ protected:
     uint64_t sum_pre, sum_post;
     //! First and last element seen in output (used to verify global sortedness)
     ValueType first_post, last_post;
+    //! Pointer to last_post, basically
+    const ValueType *last_ptr;
     //! Hash function
     Hash hash;
     //! Element comparison function
@@ -451,7 +454,7 @@ public:
             bool has_next = puller.HasNext();
             while (has_next) {
                 auto next = puller.Next();
-                auto has_next = puller.HasNext();
+                has_next = puller.HasNext();
                 if (check) local_checker_.add_post(next, has_next);
                 this->PushItem(next);
                 local_size++;

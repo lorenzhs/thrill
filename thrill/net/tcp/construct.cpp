@@ -42,14 +42,14 @@ public:
      * Initializes this Manager and initializes all Groups.  When this method
      * returns, the network system is ready to use.
      *
-     * \param my_rank_ The rank of the worker that owns this Manager.
+     * \param my_rank The rank of the worker that owns this Manager.
      * \param endpoints The ordered list of all endpoints, including the local worker,
      * where the endpoint at position i corresponds to the worker with id i.
      */
-    void Initialize(size_t my_rank_,
+    void Initialize(size_t my_rank,
                     const std::vector<std::string>& endpoints) {
 
-        this->my_rank_ = my_rank_;
+        my_rank_ = my_rank;
         die_unless(my_rank_ < endpoints.size());
 
         LOG << "Client " << my_rank_ << " starting: " << endpoints[my_rank_];

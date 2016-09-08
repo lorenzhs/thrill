@@ -31,8 +31,8 @@ TEST(ConcurrentBoundedQueue, ParallelPushPopAscIntegerAndCalculateTotalSum) {
 
     for (size_t i = 0; i != num_threads; ++i) {
         pool.Enqueue([&queue]() {
-                         for (size_t i = 0; i != num_pushes; ++i) {
-                             queue.push(i);
+                         for (size_t j = 0; j != num_pushes; ++j) {
+                             queue.push(j);
                          }
                      });
     }

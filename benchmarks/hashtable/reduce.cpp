@@ -47,8 +47,8 @@ int main(int argc, char* argv[]) {
                  in.Size();
 
                  common::StatsTimerStart timer;
-                 in.ReduceByKey([](const size_t& in) {
-                                    return in;
+                 in.ReduceByKey([](const size_t& elem) {
+                                    return elem;
                                 }, [](const size_t& in1, const size_t& in2) {
                                     (void)in2;
                                     return in1;

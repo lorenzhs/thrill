@@ -626,14 +626,14 @@ TEST(Operations, WindowCorrectResults) {
 
             auto window = integers.Window(
                 window_size, [=](size_t rank,
-                                 const common::RingBuffer<size_t>& window) {
+                                 const common::RingBuffer<size_t>& window_) {
 
                     // check received window
-                    die_unequal(window_size, window.size());
+                    die_unequal(window_size, window_.size());
 
-                    for (size_t i = 0; i < window.size(); ++i) {
-                        sLOG << rank + i << window[i];
-                        die_unequal((rank + i) * (rank + i), window[i]);
+                    for (size_t i = 0; i < window_.size(); ++i) {
+                        sLOG << rank + i << window_[i];
+                        die_unequal((rank + i) * (rank + i), window_[i]);
                     }
 
                     // return rank to check completeness
@@ -680,26 +680,26 @@ TEST(Operations, WindowCorrectResultsPartialWindows) {
             auto window = integers.Window(
                 window_size,
                 [=](size_t rank,
-                    const common::RingBuffer<size_t>& window) {
+                    const common::RingBuffer<size_t>& window_) {
                     // check received window
-                    die_unequal(window_size, window.size());
+                    die_unequal(window_size, window_.size());
 
-                    for (size_t i = 0; i < window.size(); ++i) {
-                        sLOG << rank + i << window[i];
-                        die_unequal((rank + i) * (rank + i), window[i]);
+                    for (size_t i = 0; i < window_.size(); ++i) {
+                        sLOG << rank + i << window_[i];
+                        die_unequal((rank + i) * (rank + i), window_[i]);
                     }
 
                     // return rank to check completeness
                     return Integer(rank);
                 },
                 [=](size_t rank,
-                    const common::RingBuffer<size_t>& window) {
+                    const common::RingBuffer<size_t>& window_) {
                     // check received window
-                    die_unless(window.size() < window_size);
+                    die_unless(window_.size() < window_size);
 
-                    for (size_t i = 0; i < window.size(); ++i) {
-                        sLOG << rank + i << window[i];
-                        die_unequal((rank + i) * (rank + i), window[i]);
+                    for (size_t i = 0; i < window_.size(); ++i) {
+                        sLOG << rank + i << window_[i];
+                        die_unequal((rank + i) * (rank + i), window_[i]);
                     }
 
                     // return rank to check completeness
@@ -751,18 +751,18 @@ TEST(Operations, DisjointWindowCorrectResults) {
 
             auto window = integers.Window(
                 DisjointTag, window_size,
-                [](size_t rank, const std::vector<size_t>& window) {
+                [](size_t rank, const std::vector<size_t>& window_) {
 
-                    sLOG << "rank" << rank << "window.size()" << window.size()
+                    sLOG << "rank" << rank << "window.size()" << window_.size()
                          << test_size - (test_size % window_size);
 
                     // check received window
-                    die_unless(window_size == window.size() ||
+                    die_unless(window_size == window_.size() ||
                                rank == test_size - (test_size % window_size));
 
-                    for (size_t i = 0; i < window.size(); ++i) {
-                        sLOG << rank + i << window[i];
-                        die_unequal((rank + i) * (rank + i), window[i]);
+                    for (size_t i = 0; i < window_.size(); ++i) {
+                        sLOG << rank + i << window_[i];
+                        die_unequal((rank + i) * (rank + i), window_[i]);
                     }
 
                     // return rank to check completeness

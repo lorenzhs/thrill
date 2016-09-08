@@ -109,7 +109,9 @@ if(NOT MSVC)
   endif()
   # enable extra warnings on clang
   if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wdeprecated")
+    # Only enable -Wshadow in clang, gcc enables it to folded lambdas as well,
+    # resulting in a lot of false positives
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wdeprecated -Wshadow")
     #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wabstract-vbase-init")
   endif()
 

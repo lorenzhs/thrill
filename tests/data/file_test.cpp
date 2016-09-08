@@ -345,13 +345,15 @@ TEST_F(File, SeekReadSlicesOfFiles) {
 
     ASSERT_EQ(1000u, file.num_items());
 
-    // read complete File
-    data::File::KeepReader fr = file.GetKeepReader();
-    for (size_t i = 0; i < 1000; ++i) {
-        ASSERT_TRUE(fr.HasNext());
-        ASSERT_EQ(i, fr.Next<size_t>());
+    {
+        // read complete File
+        data::File::KeepReader fr = file.GetKeepReader();
+        for (size_t i = 0; i < 1000; ++i) {
+            ASSERT_TRUE(fr.HasNext());
+            ASSERT_EQ(i, fr.Next<size_t>());
+        }
+        ASSERT_FALSE(fr.HasNext());
     }
-    ASSERT_FALSE(fr.HasNext());
 
     // read items 95-144
     auto check_range =

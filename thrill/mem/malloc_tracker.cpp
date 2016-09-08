@@ -161,9 +161,9 @@ ATTRIBUTE_NO_SANITIZE
 static void update_memprofile(size_t float_current, size_t base_current);
 
 ATTRIBUTE_NO_SANITIZE
-void update_peak(size_t float_curr, size_t base_curr) {
-    if (float_curr + base_curr > peak_bytes)
-        peak_bytes = float_curr + base_curr;
+void update_peak(size_t float_current, size_t base_current) {
+    if (float_current + base_current > peak_bytes)
+        peak_bytes = float_current + base_current;
 }
 
 //! add allocation to statistics

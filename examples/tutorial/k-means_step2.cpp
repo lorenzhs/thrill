@@ -54,14 +54,14 @@ std::ostream& operator << (std::ostream& os, const ClosestCenter& cc) {
 void Process(thrill::Context& ctx) {
 
     std::default_random_engine rng(std::random_device { } ());
-    std::uniform_real_distribution<double> dist(0.0, 1000.0);
+    std::uniform_real_distribution<double> gen(0.0, 1000.0);
 
     // generate 100 random points using uniform distribution
     auto points =
         Generate(
             ctx, /* size */ 100,
             [&](const size_t&) {
-                return Point { dist(rng), dist(rng) };
+                return Point { gen(rng), gen(rng) };
             })
         .Cache();
 

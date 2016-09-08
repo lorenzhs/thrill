@@ -388,8 +388,8 @@ public:
     void FlushPartition(size_t partition_id, bool consume, bool grow) {
         FlushPartitionEmit(
             partition_id, consume, grow,
-            [this](const size_t& partition_id, const KeyValuePair& p) {
-                this->emitter_.Emit(partition_id, p);
+            [this](const size_t& partition_id_, const KeyValuePair& p) {
+                this->emitter_.Emit(partition_id_, p);
             });
     }
 

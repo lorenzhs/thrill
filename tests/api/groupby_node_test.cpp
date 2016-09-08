@@ -42,8 +42,8 @@ TEST(GroupByNode, CompileAndSum) {
                 [](auto& r, size_t /* key */) {
                     size_t res = 0;
                     while (r.HasNext()) {
-                        size_t n = r.Next();
-                        res += n;
+                        size_t next = r.Next();
+                        res += next;
                     }
                     return res;
                 };

@@ -346,8 +346,8 @@ static inline void Initialize() {
         const char* argv[] = { "thrill", nullptr };
 
         int provided;
-        int r = MPI_Init_thread(&argc, reinterpret_cast<char***>(&argv),
-                                MPI_THREAD_SERIALIZED, &provided);
+        r = MPI_Init_thread(&argc, reinterpret_cast<char***>(&argv),
+                            MPI_THREAD_SERIALIZED, &provided);
         if (r != MPI_SUCCESS)
             throw Exception("Error during MPI_Init_thread()", r);
 

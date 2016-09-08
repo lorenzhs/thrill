@@ -251,14 +251,14 @@ private:
 
         SysFileBlockSource(const FileInfo& fileinfo,
                            Context& ctx,
-                           size_t& stats_total_bytes,
-                           size_t& stats_total_reads)
+                           size_t& stats_total_bytes_ref,
+                           size_t& stats_total_reads_ref)
             : context_(ctx),
               sysfile_(core::SysFile::OpenForRead(fileinfo.path)),
               remain_size_(fileinfo.size()),
               is_compressed_(fileinfo.is_compressed),
-              stats_total_bytes_(stats_total_bytes),
-              stats_total_reads_(stats_total_reads) {
+              stats_total_bytes_(stats_total_bytes_ref),
+              stats_total_reads_(stats_total_reads_ref) {
             if (fileinfo.begin != 0 && !is_compressed_) {
                 // seek to beginning
                 size_t p = sysfile_.lseek(static_cast<off_t>(fileinfo.begin));

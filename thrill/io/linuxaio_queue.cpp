@@ -178,7 +178,7 @@ void LinuxaioQueue::PostRequests() {
             // request is finally posted
 
             {
-                std::unique_lock<std::mutex> lock(posted_mtx_);
+                std::unique_lock<std::mutex> inner_lock(posted_mtx_);
                 posted_requests_.push_back(req);
                 num_posted_requests_.signal();
             }

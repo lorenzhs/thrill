@@ -419,9 +419,9 @@ public:
         const CompareFunction& cmp) const {
         if (K_ <= 4096) {
             thrill::common::radix_sort_CI<MaxDepth>(
-                begin, end, K_, cmp, [](auto begin, auto end, auto) {
+                begin, end, K_, cmp, [](auto begin_, auto end_, auto) {
                             // sub sorter: sort StringFragments by rank
-                    std::sort(begin, end, [](const Type& a, const Type& b) {
+                    std::sort(begin_, end_, [](const Type& a, const Type& b) {
                                   return a.sort_rank() < b.sort_rank();
                               });
                 });

@@ -102,8 +102,8 @@ void RequestDeleter::operator () (Request* req) const {
         mem::GPool().destroy(r);
     }
 #if THRILL_HAVE_LINUXAIO_FILE
-    else if (LinuxaioRequest* r = dynamic_cast<LinuxaioRequest*>(req)) {
-        mem::GPool().destroy(r);
+    else if (LinuxaioRequest* lr = dynamic_cast<LinuxaioRequest*>(req)) {
+        mem::GPool().destroy(lr);
     }
 #endif
     else {

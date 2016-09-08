@@ -269,8 +269,8 @@ void Multiplexer::OnMultiplexerHeader(Connection& s, net::Buffer&& buffer) {
 
             dispatcher_.AsyncRead(
                 s, header.size, std::move(bytes),
-                [this, header, stream](Connection& s, PinnedByteBlockPtr&& bytes) {
-                    OnCatStreamBlock(s, header, stream, std::move(bytes));
+                [this, header, stream](Connection& s_, PinnedByteBlockPtr&& bytes_) {
+                    OnCatStreamBlock(s_, header, stream, std::move(bytes_));
                 });
         }
     }
@@ -298,8 +298,8 @@ void Multiplexer::OnMultiplexerHeader(Connection& s, net::Buffer&& buffer) {
 
             dispatcher_.AsyncRead(
                 s, header.size, std::move(bytes),
-                [this, header, stream](Connection& s, PinnedByteBlockPtr&& bytes) mutable {
-                    OnMixStreamBlock(s, header, stream, std::move(bytes));
+                [this, header, stream](Connection& s_, PinnedByteBlockPtr&& bytes_) mutable {
+                    OnMixStreamBlock(s_, header, stream, std::move(bytes_));
                 });
         }
     }

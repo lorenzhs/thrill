@@ -93,8 +93,8 @@ bool CheckSA(const InputDIA& input, const SuffixArrayDIA& suffix_array) {
                 }
             })
         .Zip(input,
-             [](const std::pair<Index, Index>& isa_pair, const Char& ch) {
-                 return Index3 { isa_pair.first, isa_pair.second, ch };
+             [](const std::pair<Index, Index>& pair, const Char& ch) {
+                 return Index3 { pair.first, pair.second, ch };
              })
         // and sort to (i, ISA[SA[i]+1], T[SA[i]])
         .Sort([](const Index3& a, const Index3& b) {

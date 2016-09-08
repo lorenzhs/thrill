@@ -46,10 +46,10 @@ static void RunPageRankEdgePerLine(
     // ...
     auto input =
         ReadLines(ctx, input_path)
-        .Map([](const std::string& input) {
+        .Map([](const std::string& line) {
                  // parse "source\ttarget\n" lines
                  char* endptr;
-                 unsigned long src = std::strtoul(input.c_str(), &endptr, 10);
+                 unsigned long src = std::strtoul(line.c_str(), &endptr, 10);
                  die_unless(endptr && *endptr == '\t' &&
                             "Could not parse src tgt line");
                  unsigned long tgt = std::strtoul(endptr + 1, &endptr, 10);

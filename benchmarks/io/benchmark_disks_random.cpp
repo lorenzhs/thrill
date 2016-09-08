@@ -33,12 +33,12 @@ using namespace thrill; // NOLINT
 #define MiB (1024 * 1024)
 
 struct PrintNumber {
-    int n;
+    int n_;
 
-    explicit PrintNumber(int n) : n(n) { }
+    explicit PrintNumber(int n) : n_(n) { }
 
     void operator () (io::Request*, bool /* success */) {
-        // std::cout << n << " " << std::flush;
+        // std::cout << n_ << " " << std::flush;
     }
 };
 

@@ -67,11 +67,11 @@ public:
 
 private:
     //! Current iterator position.
-    RandomAccessIterator current;
+    RandomAccessIterator current_;
     //! End iterator of the sequence.
-    RandomAccessIterator end;
+    RandomAccessIterator end_;
     //! Comparator.
-    Comparator& comp;
+    Comparator& comp_;
 
 public:
     /*!
@@ -83,7 +83,7 @@ public:
      */
     guarded_iterator(RandomAccessIterator begin, RandomAccessIterator end,
                      Comparator& comp)
-        : current(begin), end(end), comp(comp)
+        : current_(begin), end_(end), comp_(comp)
     { }
 
     /*!
@@ -91,7 +91,7 @@ public:
      * \return This.
      */
     self_type& operator ++ () {
-        ++current;
+        ++current_;
         return *this;
     }
 
@@ -100,7 +100,7 @@ public:
      * \return Referenced element.
      */
     value_type& operator * () {
-        return *current;
+        return *current_;
     }
 
     /*!
@@ -108,7 +108,7 @@ public:
      * \return Wrapped iterator.
      */
     RandomAccessIterator& iterator() {
-        return current;
+        return current_;
     }
 
     /*!
@@ -118,11 +118,11 @@ public:
      * \return \c True if less.
      */
     friend bool operator < (self_type& bi1, self_type& bi2) {
-        if (bi1.current == bi1.end)                   // bi1 is sup
-            return bi2.current == bi2.end;            // bi2 is not sup
-        if (bi2.current == bi2.end)                   // bi2 is sup
+        if (bi1.current_ == bi1.end_)                   // bi1 is sup
+            return bi2.current_ == bi2.end_;            // bi2 is not sup
+        if (bi2.current_ == bi2.end_)                   // bi2 is sup
             return true;
-        return bi1.comp(*bi1, *bi2);                  // normal compare
+        return bi1.comp_(*bi1, *bi2);                  // normal compare
     }
 
     /*!
@@ -132,11 +132,11 @@ public:
      * \return \c True if less equal.
      */
     friend bool operator <= (self_type& bi1, self_type& bi2) {
-        if (bi2.current == bi2.end)                   //bi1 is sup
-            return bi1.current != bi1.end;            //bi2 is not sup
-        if (bi1.current == bi1.end)                   //bi2 is sup
+        if (bi2.current_ == bi2.end_)                   //bi1 is sup
+            return bi1.current_ != bi1.end_;            //bi2 is not sup
+        if (bi1.current_ == bi1.end_)                   //bi2 is sup
             return false;
-        return !bi1.comp(*bi2, *bi1);                 //normal compare
+        return !bi1.comp_(*bi2, *bi1);                 //normal compare
     }
 };
 
@@ -152,9 +152,9 @@ public:
 
 private:
     //! Current iterator position.
-    RandomAccessIterator current;
+    RandomAccessIterator current_;
     //! Comparator.
-    Comparator& comp;
+    Comparator& comp_;
 
 public:
     /*!
@@ -166,7 +166,7 @@ public:
     unguarded_iterator(RandomAccessIterator begin,
                        RandomAccessIterator /* end */,
                        Comparator& comp)
-        : current(begin), comp(comp)
+        : current_(begin), comp_(comp)
     { }
 
     /*!
@@ -174,7 +174,7 @@ public:
      * \return This.
      */
     self_type& operator ++ () {
-        ++current;
+        ++current_;
         return *this;
     }
 
@@ -183,7 +183,7 @@ public:
      * \return Referenced element.
      */
     value_type& operator * () {
-        return *current;
+        return *current_;
     }
 
     /*!
@@ -191,7 +191,7 @@ public:
      * \return Wrapped iterator.
      */
     RandomAccessIterator& iterator() {
-        return current;
+        return current_;
     }
 
     /*!
@@ -201,7 +201,7 @@ public:
      * \return \c True if less.
      */
     friend bool operator < (self_type& bi1, self_type& bi2) {
-        return bi1.comp(*bi1, *bi2);            // normal compare, unguarded
+        return bi1.comp_(*bi1, *bi2);            // normal compare, unguarded
     }
 
     /*!
@@ -211,7 +211,7 @@ public:
      * \return \c True if less equal.
      */
     friend bool operator <= (self_type& bi1, self_type& bi2) {
-        return !bi1.comp(*bi2, *bi1);           // normal compare, unguarded
+        return !bi1.comp_(*bi2, *bi1);           // normal compare, unguarded
     }
 };
 
@@ -880,8 +880,8 @@ multiway_merge_bubble(RandomAccessIteratorIterator seqs_begin,
 
     if (Stable)
     {
-        for (int k = 0; k < nrp - 1; ++k)
-            for (int pi = nrp - 1; pi > k; --pi)
+        for (int l = 0; l < nrp - 1; ++l)
+            for (int pi = nrp - 1; pi > l; --pi)
                 if (comp(pl[pi], pl[pi - 1]) ||
                     (!comp(pl[pi - 1], pl[pi]) && source[pi] < source[pi - 1]))
                 {
@@ -891,8 +891,8 @@ multiway_merge_bubble(RandomAccessIteratorIterator seqs_begin,
     }
     else
     {
-        for (int k = 0; k < nrp - 1; ++k)
-            for (int pi = nrp - 1; pi > k; --pi)
+        for (int l = 0; l < nrp - 1; ++l)
+            for (int pi = nrp - 1; pi > l; --pi)
                 if (comp(pl[pi], pl[pi - 1]))
                 {
                     std::swap(pl[pi - 1], pl[pi]);

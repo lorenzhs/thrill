@@ -63,13 +63,13 @@ public:
     //! Reset minireduction to initial state
     void reset() {
         for (size_t i = 0; i < num_parallel; ++i) {
-            std::fill(_reductions[i].begin(), _reductions[i].end(), Value{});
+            std::fill(reductions_[i].begin(), reductions_[i].end(), Value{});
         }
     }
 
     //! Add a single item with Key key and Value value
     void push(const Key &key, const Value &value) {
-        hash_t h = hash(key);
+        hash_t h = hash_(key);
         for (size_t idx = 0; idx < num_parallel; ++idx) {
             size_t bucket = extract_bucket(h, idx);
             update_bucket(idx, bucket, value);
@@ -85,7 +85,7 @@ public:
         // check all buckets for equality
         for (size_t i = 0; i < num_parallel; ++i) {
             for (size_t j = 0; j < num_buckets; ++j) {
-                if (_reductions[i][j] != other._reductions[i][j])
+                if (reductions_[i][j] != other.reductions_[i][j])
                     return false;
             }
         }
@@ -93,15 +93,15 @@ public:
     }
 
     void all_reduce(api::Context &ctx) {
-        _reductions = ctx.net.AllReduce(_reductions,
-            common::ComponentSum<decltype(_reductions), ReduceFunction>(reduce));
+        reductions_ = ctx.net.AllReduce(reductions_,
+            common::ComponentSum<decltype(reductions_), ReduceFunction>(reduce));
 
         if (extra_verbose && ctx.net.my_rank() == 0) {
             for (size_t i = 0; i < num_parallel; ++i) {
                 std::stringstream s;
                 s << "Run " << i << ": ";
                 for (size_t j = 0; j < num_buckets; ++j) {
-                    s << _reductions[i][j] << " ";
+                    s << reductions_[i][j] << " ";
                 }
                 LOG1 << s.str();
             }
@@ -116,17 +116,17 @@ private:
 
     void update_bucket(const size_t idx, const size_t bucket,
                        const Value &value) {
-        _reductions[idx][bucket] = reduce(_reductions[idx][bucket], value);
+        reductions_[idx][bucket] = reduce(reductions_[idx][bucket], value);
     }
 
-    std::array<reduction_t, num_parallel> _reductions;
-    hash_fn hash;
+    std::array<reduction_t, num_parallel> reductions_;
+    hash_fn hash_;
     ReduceFunction reduce;
 };
 } // namespace _detail
 
 //! Whether to check reductions (when applicable)
-static constexpr bool check_reductions = true;
+static constexpr bool checkreductions_ = true;
 
 //! Reduce checker - no-op for unsupported reduce functions
 template<typename Key, typename Value, typename ReduceFunction,
@@ -146,7 +146,7 @@ public:
  */
 template<typename Key, typename Value, typename ReduceFunction>
 class ReduceChecker<Key, Value, ReduceFunction,
-                    typename std::enable_if_t<check_reductions &&
+                    typename std::enable_if_t<checkreductions_ &&
                                               reduce_checkable_v<ReduceFunction>>>
 {
     using KeyValuePair = std::pair<Key, Value>;
