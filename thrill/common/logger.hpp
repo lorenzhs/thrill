@@ -6,6 +6,7 @@
  * Part of Project Thrill - http://project-thrill.org
  *
  * Copyright (C) 2015 Timo Bingmann <tb@panthema.net>
+ * Copyright (C) 2016 Lorenz Hübschle-Schneider <lorenz@4z2.de>
  *
  * All rights reserved. Published under the BSD-2 license in the LICENSE file.
  ******************************************************************************/
@@ -22,6 +23,37 @@
 
 namespace thrill {
 namespace common {
+
+namespace log {
+// ANSI escape codes
+constexpr auto reset(){ return "\33[0m"; }
+constexpr auto bold(){ return "\33[1m"; }
+constexpr auto underline(){ return "\33[4m"; }
+constexpr auto reverse(){ return "\33[7m"; }
+constexpr auto erase_line(){ return "\33[K"; }
+constexpr auto clear_screen(){ return "\33[2J"; }
+
+// foreground colours
+constexpr auto fg_black(){ return "\33[30m"; }
+constexpr auto fg_red(){ return "\33[31m"; }
+constexpr auto fg_green(){ return "\33[32m"; }
+constexpr auto fg_yellow(){ return "\33[33m"; }
+constexpr auto fg_blue(){ return "\33[34m"; }
+constexpr auto fg_magenta(){ return "\33[35m"; }
+constexpr auto fg_cyan(){ return "\33[36m"; }
+constexpr auto fg_white(){ return "\33[37m"; }
+
+// background colours
+constexpr auto bg_black(){ return "\33[40m"; }
+constexpr auto bg_red(){ return "\33[41m"; }
+constexpr auto bg_green(){ return "\33[42m"; }
+constexpr auto bg_yellow(){ return "\33[43m"; }
+constexpr auto bg_blue(){ return "\33[44m"; }
+constexpr auto bg_magenta(){ return "\33[45m"; }
+constexpr auto bg_cyan(){ return "\33[46m"; }
+constexpr auto bg_white(){ return "\33[47m"; }
+}
+
 
 //! memory manager singleton for Logger
 extern mem::Manager g_logger_mem_manager;

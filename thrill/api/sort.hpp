@@ -127,9 +127,11 @@ public:
         int unsorted_count = sorted_ ? 0 : 1;
         unsorted_count = ctx.net.AllReduce(unsorted_count);
 
-        sLOGC(ctx.my_rank() == 0 && unsorted_count > 0)
-            << unsorted_count << "of" << ctx.num_workers()
-            << "PEs have output that isn't sorted";
+        LOGC(ctx.my_rank() == 0 && unsorted_count > 0)
+            << common::log::fg_red() << common::log::bold()
+            << unsorted_count << " of " << ctx.num_workers()
+            << " PEs have output that isn't sorted"
+            << common::log::reset();
 
         return (unsorted_count == 0);
     }
@@ -149,11 +151,18 @@ public:
         sum = ctx.net.AllReduce(sum, common::ComponentSum<decltype(sum)>());
 
         const bool success = (sum[0] == sum[1]) && (sum[2] == sum[3]);
-        sLOGC(debug && ctx.my_rank() == 0)
-            << "check() permutation:"
-            << sum[0] << "pre-items," << sum[1] << "post-items;"
-            << (success  ? "success." : "FAILURE!!!")
-            << "global pre-sum:" << sum[2] << "global post-sum:" << sum[3];
+
+        LOGC(!success && ctx.my_rank() == 0)
+            << common::log::fg_red() << common::log::bold()
+            << "check() permutation: " << sum[0] << " pre-items, "
+            << sum[1] << " post-items; check FAILED!!!!! Global pre-sum: "
+            << sum[2] << " global post-sum: " << sum[3]
+            << common::log::reset();
+
+        LOGC(success && debug && ctx.my_rank() == 0)
+            << "check() permutation: " << sum[0] << " pre-items, "
+            << sum[1] << " post-items; check successful. Global pre-sum: "
+            << sum[2] << " global post-sum: " << sum[3];
 
         return success;
     }
