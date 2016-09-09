@@ -85,21 +85,14 @@ public:
      * Process an output element (after sorting)
      *
      * \param v Element to process
-     *
-     * \param definitely_not_last When true, avoids copying the element
-     * unnecessarily. If true for the last element, behaviour is undefined.
      */
     __attribute__((always_inline))
-    void add_post(const ValueType &v,
-                         const bool definitely_not_last = false) {
-        if (THRILL_LIKELY(count_post > 0) && cmp(v, *last_ptr)) {
-            sLOG1 << "Non-sorted values in output"; // << *last_ptr << v;
+    void add_post(const ValueType &v) {
+        if (THRILL_LIKELY(count_post > 0) && cmp(v, last_post)) {
+            sLOG1 << "Non-sorted values in output"; // << last_post << v;
             sorted_ = false;
         }
-        last_ptr = &v;
-        if (!definitely_not_last) {
-            last_post = v;
-        }
+        last_post = v;
 
         // Init "first" (= minimum)
         if (THRILL_UNLIKELY(count_post == 0)) {
@@ -182,8 +175,6 @@ protected:
     uint64_t sum_pre, sum_post;
     //! First and last element seen in output (used to verify global sortedness)
     ValueType first_post, last_post;
-    //! Pointer to last_post, basically
-    const ValueType *last_ptr;
     //! Hash function
     Hash hash;
     //! Element comparison function
@@ -386,11 +377,8 @@ public:
             if (check) {
                 // Push the file to the checker, item by item
                 auto reader = files_[0].GetKeepReader();
-                bool has_next = reader.HasNext();
-                while (has_next) {
-                    auto next = reader.template Next<ValueType>();
-                    has_next = reader.HasNext();
-                    local_checker_.add_post(next, has_next);
+                while (reader.HasNext()) {
+                    local_checker_.add_post(reader.template Next<ValueType>());
                 }
             }
             this->PushFile(files_[0], consume);
@@ -451,11 +439,9 @@ public:
             auto puller = core::make_multiway_merge_tree<ValueType>(
                 seq.begin(), seq.end(), compare_function_);
 
-            bool has_next = puller.HasNext();
-            while (has_next) {
+            while (puller.HasNext()) {
                 auto next = puller.Next();
-                has_next = puller.HasNext();
-                if (check) local_checker_.add_post(next, has_next);
+                if (check) local_checker_.add_post(next);
                 this->PushItem(next);
                 local_size++;
             }
