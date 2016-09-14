@@ -739,6 +739,25 @@ private:
             data_writers[j].Close();
     }
 
+    //! Deliberate manipulation of the sort result so that the checker has
+    //! something to check
+    void Manipulate(std::vector<ValueType> &vec) {
+        // vec is (a piece of) the local output
+        // TODO: randomly do/don't manipulate
+        if (vec.size() == 0) {
+            vec.emplace_back();
+        } else if (vec.size() == 1) {
+            vec[0] = ValueType(); // set to default
+        } else if (vec.size() <= 4) {
+            // Set second element equal to first
+            vec[1] = vec[0];
+        } else {
+            // Set mid elements equal
+            auto mid = vec.size() / 2;
+            vec[mid] = vec[mid - 1];
+        }
+    }
+
     void SortAndWriteToFile(
         std::vector<ValueType>& vec, std::deque<data::File>& files) {
 
@@ -931,10 +950,14 @@ private:
                 vec.push_back(reader.template Next<ValueType>());
             }
             else {
+                Manipulate(vec);
                 SortAndWriteToFile(vec, files_);
             }
         }
 
+        // call Manipulate before the check so it can potentially insert an
+        // element into an otherwise empty output
+        Manipulate(vec);
         if (vec.size())
             SortAndWriteToFile(vec, files_);
 
