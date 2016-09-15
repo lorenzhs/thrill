@@ -297,7 +297,7 @@ private:
         ValueType, Key, Value, KeyExtractor, ReduceFunction, Emitter, SendPair,
         ReduceConfig> post_phase_;
 
-    core::ReduceChecker<Key, Value, ReduceFunction> checker_;
+    Checker checker_;
 
     bool reduced_ = false;
 };

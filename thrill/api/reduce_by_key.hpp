@@ -271,7 +271,7 @@ private:
 
     const KeyExtractor &key_extractor_;
 
-    core::ReduceChecker<Key, Value, ReduceFunction> checker_;
+    Checker checker_;
 
     bool reduced_ = false;
 };
