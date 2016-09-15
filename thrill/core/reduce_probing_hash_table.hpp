@@ -427,6 +427,9 @@ public:
         KeyValuePair* iter = items_ + partition_id * num_buckets_per_partition_;
         KeyValuePair* pend = iter + partition_size_[partition_id];
 
+        // XXX TODO here's a good place for manipulations that the checker then
+        // has to catch
+
         for ( ; iter != pend; ++iter)
         {
             if (iter->first != Key()) {
