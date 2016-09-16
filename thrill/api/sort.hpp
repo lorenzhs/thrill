@@ -192,8 +192,41 @@ protected:
     bool sorted_;
 };
 
-}
+/*!
+ * Dummy no-op sort manipulator
+ */
+template <typename ValueType>
+class SortManipulatorDummy {
+public:
+    template <typename Ignored>
+    void operator()(Ignored) {}
+};
 
+/*!
+ * Test sort manipulator with some trivial modifications
+ */
+template <typename ValueType>
+class SortManipulator {
+public:
+    void operator()(std::vector<ValueType> &vec) {
+        // vec is (a piece of) the local output
+        // TODO: randomly do/don't manipulate
+        if (vec.size() == 0) {
+            vec.emplace_back();
+        } else if (vec.size() == 1) {
+            vec[0] = ValueType(); // set to default
+        } else if (vec.size() <= 4) {
+            // Set second element equal to first
+            vec[1] = vec[0];
+        } else {
+            // Set mid elements equal
+            auto mid = vec.size() / 2;
+            vec[mid] = vec[mid - 1];
+        }
+    }
+};
+
+}
 
 /*!
  * A DIANode which performs a Sort operation. Sort sorts a DIA according to a
@@ -208,7 +241,8 @@ protected:
  *
  * \ingroup api_layer
  */
-template <typename ValueType, typename CompareFunction, typename SortAlgorithm>
+template <typename ValueType, typename CompareFunction, typename SortAlgorithm,
+          typename Manipulator = checkers::SortManipulatorDummy<ValueType> >
 class SortNode final : public DOpNode<ValueType>
 {
     static constexpr bool debug = false;
@@ -496,6 +530,8 @@ private:
     size_t local_items_ = 0;
 
     checkers::SortChecker<ValueType, CompareFunction> local_checker_;
+    //! Manipulator to fudge the result, so that the checker has something to do
+    Manipulator manipulator_;
 
     //! Sample vector: pairs of (sample,local index)
     std::vector<SampleIndexPair> samples_;
@@ -739,25 +775,6 @@ private:
             data_writers[j].Close();
     }
 
-    //! Deliberate manipulation of the sort result so that the checker has
-    //! something to check
-    void Manipulate(std::vector<ValueType> &vec) {
-        // vec is (a piece of) the local output
-        // TODO: randomly do/don't manipulate
-        if (vec.size() == 0) {
-            vec.emplace_back();
-        } else if (vec.size() == 1) {
-            vec[0] = ValueType(); // set to default
-        } else if (vec.size() <= 4) {
-            // Set second element equal to first
-            vec[1] = vec[0];
-        } else {
-            // Set mid elements equal
-            auto mid = vec.size() / 2;
-            vec[mid] = vec[mid - 1];
-        }
-    }
-
     void SortAndWriteToFile(
         std::vector<ValueType>& vec, std::deque<data::File>& files) {
 
@@ -950,14 +967,14 @@ private:
                 vec.push_back(reader.template Next<ValueType>());
             }
             else {
-                Manipulate(vec);
+                manipulator_(vec);
                 SortAndWriteToFile(vec, files_);
             }
         }
 
         // call Manipulate before the check so it can potentially insert an
         // element into an otherwise empty output
-        Manipulate(vec);
+        manipulator_(vec);
         if (vec.size())
             SortAndWriteToFile(vec, files_);
 
