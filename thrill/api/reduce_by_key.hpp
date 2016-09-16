@@ -60,7 +60,8 @@ class DefaultReduceConfig : public core::DefaultReduceConfig
 template <typename ValueType,
           typename KeyExtractor, typename ReduceFunction,
           typename ReduceConfig,
-          const bool VolatileKey, const bool SendPair>
+          const bool VolatileKey, const bool SendPair,
+          typename Manipulator = core::checkers::ReduceManipulatorDummy>
 class ReduceNode final : public DOpNode<ValueType>
 {
     static constexpr bool debug = false;
@@ -75,7 +76,7 @@ class ReduceNode final : public DOpNode<ValueType>
     using PrePhaseOutput =
               typename common::If<VolatileKey, KeyValuePair, Value>::type;
 
-    using Checker = typename core::ReduceChecker<Key, Value, ReduceFunction>;
+    using Checker = typename core::checkers::ReduceChecker<Key, Value, ReduceFunction>;
 
     static constexpr bool use_mix_stream_ = ReduceConfig::use_mix_stream_;
     static constexpr bool use_post_thread_ = ReduceConfig::use_post_thread_;
@@ -157,10 +158,10 @@ public:
                     mix_stream_->GetWriters() : cat_stream_->GetWriters()),
           pre_phase_(
               context_, Super::id(), parent.ctx().num_workers(),
-              key_extractor, reduce_function, emitters_, config),
+              key_extractor, reduce_function, emitters_, manipulator_, config),
           post_phase_(
               context_, Super::id(), key_extractor, reduce_function,
-              Emitter(this, checker_), config),
+              Emitter(this, checker_), manipulator_, config),
           key_extractor_(key_extractor)
     {
         // Hook PreOp: Locally hash elements of the current DIA onto buckets and
@@ -262,16 +263,17 @@ private:
     std::thread thread_;
 
     core::ReducePrePhase<
-        ValueType, Key, Value, KeyExtractor, ReduceFunction, VolatileKey,
-        ReduceConfig> pre_phase_;
+        ValueType, Key, Value, KeyExtractor, ReduceFunction, Manipulator,
+        VolatileKey, ReduceConfig> pre_phase_;
 
     core::ReduceByHashPostPhase<
-        ValueType, Key, Value, KeyExtractor, ReduceFunction, Emitter, SendPair,
-        ReduceConfig> post_phase_;
+        ValueType, Key, Value, KeyExtractor, ReduceFunction, Emitter,
+        Manipulator,SendPair, ReduceConfig> post_phase_;
 
     const KeyExtractor &key_extractor_;
 
     Checker checker_;
+    Manipulator manipulator_;
 
     bool reduced_ = false;
 };

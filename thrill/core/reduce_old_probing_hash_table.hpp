@@ -68,18 +68,20 @@ namespace core {
  */
 template <typename ValueType, typename Key, typename Value,
           typename KeyExtractor, typename ReduceFunction, typename Emitter,
+          typename Manipulator,
           const bool VolatileKey,
           typename ReduceConfig_,
           typename IndexFunction,
           typename EqualToFunction = std::equal_to<Key> >
 class ReduceOldProbingHashTable
     : public ReduceTable<ValueType, Key, Value,
-                         KeyExtractor, ReduceFunction, Emitter,
+                         KeyExtractor, ReduceFunction, Emitter, Manipulator,
                          VolatileKey, ReduceConfig_,
                          IndexFunction, EqualToFunction>
 {
     using Super = ReduceTable<ValueType, Key, Value,
                               KeyExtractor, ReduceFunction, Emitter,
+                              Manipulator,
                               VolatileKey, ReduceConfig_, IndexFunction,
                               EqualToFunction>;
     using Super::debug;
@@ -96,13 +98,14 @@ public:
         const KeyExtractor& key_extractor,
         const ReduceFunction& reduce_function,
         Emitter& emitter,
+        Manipulator& manipulator,
         size_t num_partitions,
         const ReduceConfig& config = ReduceConfig(),
         bool immediate_flush = false,
         const IndexFunction& index_function = IndexFunction(),
         const EqualToFunction& equal_to_function = EqualToFunction())
         : Super(ctx, dia_id,
-                key_extractor, reduce_function, emitter,
+                key_extractor, reduce_function, emitter, manipulator,
                 num_partitions, config, immediate_flush,
                 index_function, equal_to_function) {
 
@@ -431,18 +434,18 @@ private:
 
 template <typename ValueType, typename Key, typename Value,
           typename KeyExtractor, typename ReduceFunction,
-          typename Emitter, const bool VolatileKey,
+          typename Emitter, typename Manipulator, const bool VolatileKey,
           typename ReduceConfig, typename IndexFunction,
           typename EqualToFunction>
 class ReduceTableSelect<
         ReduceTableImpl::OLD_PROBING,
-        ValueType, Key, Value, KeyExtractor, ReduceFunction,
-        Emitter, VolatileKey, ReduceConfig, IndexFunction, EqualToFunction>
+        ValueType, Key, Value, KeyExtractor, ReduceFunction, Emitter,
+        Manipulator, VolatileKey, ReduceConfig, IndexFunction, EqualToFunction>
 {
 public:
     using type = ReduceOldProbingHashTable<
               ValueType, Key, Value, KeyExtractor, ReduceFunction,
-              Emitter, VolatileKey, ReduceConfig,
+              Emitter, Manipulator, VolatileKey, ReduceConfig,
               IndexFunction, EqualToFunction>;
 };
 

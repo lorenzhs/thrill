@@ -10,6 +10,7 @@
  ******************************************************************************/
 
 #include <thrill/core/reduce_pre_phase.hpp>
+#include <thrill/core/reduce_checker.hpp>
 
 #include <gtest/gtest.h>
 
@@ -56,6 +57,8 @@ static void TestAddMyStructByHash(Context& ctx) {
                       };
                   };
 
+    core::checkers::ReduceManipulatorDummy manipulator;
+
     // collect all items
     const size_t num_partitions = 13;
 
@@ -70,11 +73,11 @@ static void TestAddMyStructByHash(Context& ctx) {
     // process items with phase
     using Phase = core::ReducePrePhase<
               MyStruct, size_t, MyStruct,
-              decltype(key_ex), decltype(red_fn),
+              decltype(key_ex), decltype(red_fn), decltype(manipulator),
               /* VolatileKey */ false,
               MyReduceConfig<table_impl> >;
 
-    Phase phase(ctx, 0, num_partitions, key_ex, red_fn, emitters);
+    Phase phase(ctx, 0, num_partitions, key_ex, red_fn, emitters, manipulator);
 
     phase.Initialize(/* limit_memory_bytes */ 1024 * 1024);
 
@@ -143,6 +146,8 @@ static void TestAddMyStructByIndex(Context& ctx) {
                       };
                   };
 
+    core::checkers::ReduceManipulatorDummy manipulator;
+
     // collect all items
     const size_t num_partitions = 13;
 
@@ -157,14 +162,14 @@ static void TestAddMyStructByIndex(Context& ctx) {
     // process items with phase
     using Phase = core::ReducePrePhase<
               MyStruct, size_t, MyStruct,
-              decltype(key_ex), decltype(red_fn),
+              decltype(key_ex), decltype(red_fn), decltype(manipulator),
               /* VolatileKey */ false,
               MyReduceConfig<table_impl>,
               core::ReduceByIndex<size_t> >;
 
     Phase phase(ctx, 0,
                 num_partitions,
-                key_ex, red_fn, emitters,
+                key_ex, red_fn, emitters, manipulator,
                 typename Phase::ReduceConfig(),
                 core::ReduceByIndex<size_t>(0, mod_size));
 

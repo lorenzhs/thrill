@@ -58,7 +58,8 @@ class DefaultReduceToIndexConfig : public core::DefaultReduceConfig
 template <typename ValueType,
           typename KeyExtractor, typename ReduceFunction,
           typename ReduceConfig,
-          bool VolatileKey, bool SendPair>
+          bool VolatileKey, bool SendPair,
+          typename Manipulator = core::checkers::ReduceManipulatorDummy>
 class ReduceToIndexNode final : public DOpNode<ValueType>
 {
     static constexpr bool debug = false;
@@ -76,7 +77,7 @@ class ReduceToIndexNode final : public DOpNode<ValueType>
     using PrePhaseOutput =
               typename common::If<VolatileKey, KeyValuePair, Value>::type;
 
-    using Checker = typename core::ReduceChecker<Key, Value, ReduceFunction>;
+    using Checker = typename core::checkers::ReduceChecker<Key, Value, ReduceFunction>;
 
     static constexpr bool use_mix_stream_ = ReduceConfig::use_mix_stream_;
     static constexpr bool use_post_thread_ = ReduceConfig::use_post_thread_;
@@ -166,12 +167,12 @@ public:
           result_size_(result_size),
           pre_phase_(
               context_, Super::id(), context_.num_workers(),
-              key_extractor, reduce_function, emitters_,
+              key_extractor, reduce_function, emitters_, manipulator_,
               config, core::ReduceByIndex<Key>(0, result_size)),
           post_phase_(
               context_, Super::id(),
               key_extractor, reduce_function, Emitter(this, checker_),
-              config, core::ReduceByIndex<Key>(), neutral_element)
+              manipulator_, config, core::ReduceByIndex<Key>(), neutral_element)
     {
         // Hook PreOp: Locally hash elements of the current DIA onto buckets and
         // reduce each bucket to a single value, afterwards send data to another
@@ -290,14 +291,15 @@ private:
     std::thread thread_;
 
     core::ReducePrePhase<
-        ValueType, Key, Value, KeyExtractor, ReduceFunction, VolatileKey,
-        ReduceConfig, core::ReduceByIndex<Key> > pre_phase_;
+        ValueType, Key, Value, KeyExtractor, ReduceFunction, Manipulator,
+        VolatileKey, ReduceConfig, core::ReduceByIndex<Key> > pre_phase_;
 
     core::ReduceByIndexPostPhase<
-        ValueType, Key, Value, KeyExtractor, ReduceFunction, Emitter, SendPair,
-        ReduceConfig> post_phase_;
+        ValueType, Key, Value, KeyExtractor, ReduceFunction, Emitter,
+        Manipulator, SendPair, ReduceConfig> post_phase_;
 
     Checker checker_;
+    Manipulator manipulator_;
 
     bool reduced_ = false;
 };

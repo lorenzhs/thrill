@@ -66,7 +66,7 @@ public:
 
 template <typename ValueType, typename Key, typename Value,
           typename KeyExtractor, typename ReduceFunction, typename Emitter,
-          const bool SendPair = false,
+          typename Manipulator, const bool SendPair = false,
           typename ReduceConfig_ = DefaultReduceConfig,
           typename IndexFunction = ReduceByHash<Key>,
           typename EqualToFunction = std::equal_to<Key> >
@@ -84,7 +84,7 @@ public:
     using Table = typename ReduceTableSelect<
               ReduceConfig::table_impl_,
               ValueType, Key, Value,
-              KeyExtractor, ReduceFunction, PhaseEmitter,
+              KeyExtractor, ReduceFunction, PhaseEmitter, Manipulator,
               !SendPair, ReduceConfig, IndexFunction, EqualToFunction>::type;
 
     /*!
@@ -97,13 +97,14 @@ public:
         const KeyExtractor& key_extractor,
         const ReduceFunction& reduce_function,
         const Emitter& emit,
+        Manipulator& manipulator,
         const ReduceConfig& config = ReduceConfig(),
         const IndexFunction& index_function = IndexFunction(),
         const EqualToFunction& equal_to_function = EqualToFunction())
         : config_(config),
           emitter_(emit),
           table_(ctx, dia_id,
-                 key_extractor, reduce_function, emitter_,
+                 key_extractor, reduce_function, emitter_, manipulator,
                  /* num_partitions */ 32, /* TODO(tb): parameterize */
                  config, /* immediate_flush */ false,
                  index_function, equal_to_function) { }
@@ -196,6 +197,7 @@ public:
             Table subtable(
                 table_.ctx(), table_.dia_id(),
                 table_.key_extractor(), table_.reduce_function(), emitter_,
+                table_.manipulator(),
                 /* num_partitions */ 32, config_, /* immediate_flush */ false,
                 IndexFunction(iteration, table_.index_function()),
                 table_.equal_to_function());

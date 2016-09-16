@@ -10,6 +10,7 @@
 
 #include <thrill/core/reduce_by_hash_post_phase.hpp>
 #include <thrill/core/reduce_by_index_post_phase.hpp>
+#include <thrill/core/reduce_checker.hpp>
 
 #include <gtest/gtest.h>
 
@@ -56,12 +57,15 @@ static void TestAddMyStructByHash(Context& ctx) {
                        result.emplace_back(in);
                    };
 
+    core::checkers::ReduceManipulatorDummy manipulator;
+
     using Phase = core::ReduceByHashPostPhase<
               MyStruct, size_t, MyStruct,
-              decltype(key_ex), decltype(red_fn), decltype(emit_fn), false,
+              decltype(key_ex), decltype(red_fn), decltype(emit_fn),
+              decltype(manipulator), false,
               core::DefaultReduceConfigSelect<table_impl> >;
 
-    Phase phase(ctx, 0, key_ex, red_fn, emit_fn);
+    Phase phase(ctx, 0, key_ex, red_fn, emit_fn, manipulator);
     phase.Initialize(/* limit_memory_bytes */ 64 * 1024);
 
     for (size_t i = 0; i < test_size; ++i) {
@@ -167,12 +171,15 @@ static void TestAddMyStructByIndex(Context& ctx) {
                        result.emplace_back(in);
                    };
 
+    core::checkers::ReduceManipulatorDummy manipulator;
+
     using Phase = core::ReduceByIndexPostPhase<
               MyStruct, size_t, MyStruct,
-              decltype(key_ex), decltype(red_fn), decltype(emit_fn), false,
+              decltype(key_ex), decltype(red_fn), decltype(emit_fn),
+              decltype(manipulator), false,
               core::DefaultReduceConfigSelect<table_impl> >;
 
-    Phase phase(ctx, 0, key_ex, red_fn, emit_fn,
+    Phase phase(ctx, 0, key_ex, red_fn, emit_fn, manipulator,
                 typename Phase::ReduceConfig(),
                 core::ReduceByIndex<size_t>(0, mod_size),
                 /* neutral_element */ MyStruct { 0, 0 });
@@ -247,12 +254,15 @@ static void TestAddMyStructByIndexWithHoles(Context& ctx) {
                        result.emplace_back(in);
                    };
 
+    core::checkers::ReduceManipulatorDummy manipulator;
+
     using Phase = core::ReduceByIndexPostPhase<
               MyStruct, size_t, MyStruct,
-              decltype(key_ex), decltype(red_fn), decltype(emit_fn), false,
+              decltype(key_ex), decltype(red_fn), decltype(emit_fn),
+              decltype(manipulator), false,
               core::DefaultReduceConfigSelect<table_impl> >;
 
-    Phase phase(ctx, 0, key_ex, red_fn, emit_fn,
+    Phase phase(ctx, 0, key_ex, red_fn, emit_fn, manipulator,
                 typename Phase::ReduceConfig(),
                 core::ReduceByIndex<size_t>(0, mod_size),
                 /* neutral_element */ MyStruct { 0, 0 });

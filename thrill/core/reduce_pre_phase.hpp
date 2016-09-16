@@ -103,10 +103,10 @@ public:
 
 template <typename ValueType, typename Key, typename Value,
           typename KeyExtractor, typename ReduceFunction,
-          const bool VolatileKey,
+          typename Manipulator, const bool VolatileKey,
           typename ReduceConfig_ = DefaultReduceConfig,
           typename IndexFunction = ReduceByHash<Key>,
-          typename EqualToFunction = std::equal_to<Key> >
+          typename EqualToFunction = std::equal_to<Key>>
 class ReducePrePhase
 {
     static constexpr bool debug = false;
@@ -120,7 +120,7 @@ public:
     using Table = typename ReduceTableSelect<
               ReduceConfig::table_impl_,
               ValueType, Key, Value,
-              KeyExtractor, ReduceFunction, Emitter,
+              KeyExtractor, ReduceFunction, Emitter, Manipulator,
               VolatileKey, ReduceConfig, IndexFunction, EqualToFunction>::type;
 
     /*!
@@ -133,12 +133,13 @@ public:
                    KeyExtractor key_extractor,
                    ReduceFunction reduce_function,
                    std::vector<data::DynBlockWriter>& emit,
+                   Manipulator& manipulator,
                    const ReduceConfig& config = ReduceConfig(),
                    const IndexFunction& index_function = IndexFunction(),
                    const EqualToFunction& equal_to_function = EqualToFunction())
         : emit_(emit),
           table_(ctx, dia_id,
-                 key_extractor, reduce_function, emit_,
+                 key_extractor, reduce_function, emit_, manipulator,
                  num_partitions, config, /* immediate_flush */ true,
                  index_function, equal_to_function) {
         sLOG << "creating ReducePrePhase with" << emit.size() << "output emitters";

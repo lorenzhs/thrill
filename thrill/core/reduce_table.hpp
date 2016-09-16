@@ -94,7 +94,7 @@ public:
  */
 template <typename ValueType, typename Key, typename Value,
           typename KeyExtractor, typename ReduceFunction, typename Emitter,
-          const bool VolatileKey,
+          typename Manipulator, const bool VolatileKey,
           typename ReduceConfig_, typename IndexFunction,
           typename EqualToFunction = std::equal_to<Key> >
 class ReduceTable
@@ -110,6 +110,7 @@ public:
         const KeyExtractor& key_extractor,
         const ReduceFunction& reduce_function,
         Emitter& emitter,
+        Manipulator& manipulator,
         size_t num_partitions,
         const ReduceConfig& config,
         bool immediate_flush,
@@ -119,6 +120,7 @@ public:
           key_extractor_(key_extractor),
           reduce_function_(reduce_function),
           emitter_(emitter),
+          manipulator_(manipulator),
           index_function_(index_function),
           equal_to_function_(equal_to_function),
           num_partitions_(num_partitions),
@@ -166,6 +168,9 @@ public:
 
     //! Returns emitter_
     const Emitter& emitter() const { return emitter_; }
+
+    //! Returns manipulator_
+    Manipulator& manipulator() { return manipulator_; }
 
     //! Returns index_function_
     const IndexFunction& index_function() const { return index_function_; }
@@ -250,6 +255,8 @@ protected:
     //! Emitter object to receive items outputted to next phase.
     Emitter& emitter_;
 
+    Manipulator& manipulator_;
+
     //! Index Calculation functions: Hash or ByIndex.
     IndexFunction index_function_;
 
@@ -303,7 +310,7 @@ protected:
 template <ReduceTableImpl ImplSelect,
           typename ValueType, typename Key, typename Value,
           typename KeyExtractor, typename ReduceFunction,
-          typename Emitter,
+          typename Emitter, typename Manipulator,
           const bool VolatileKey = false,
           typename ReduceConfig = DefaultReduceConfig,
           typename IndexFunction = ReduceByHash<Key>,

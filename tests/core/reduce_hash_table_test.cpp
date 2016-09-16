@@ -10,6 +10,7 @@
  ******************************************************************************/
 
 #include <thrill/core/reduce_bucket_hash_table.hpp>
+#include <thrill/core/reduce_checker.hpp>
 #include <thrill/core/reduce_old_probing_hash_table.hpp>
 #include <thrill/core/reduce_probing_hash_table.hpp>
 
@@ -60,7 +61,7 @@ template <
     template <
         typename ValueType, typename Key, typename Value,
         typename KeyExtractor, typename ReduceFunction, typename Emitter,
-        const bool VolatileKey,
+        typename Manipulator, const bool VolatileKey,
         typename ReduceConfig = core::DefaultReduceConfig,
         typename IndexFunction = core::ReduceByHash<Key>,
         typename EqualToFunction = std::equal_to<Key> >
@@ -79,14 +80,17 @@ void TestAddMyStructModulo(Context& ctx) {
 
     using Collector = TableCollector<std::pair<size_t, MyStruct> >;
 
+    using Manipulator = core::checkers::ReduceManipulatorDummy;
+
     Collector collector(13);
+    Manipulator manipulator;
 
     using Table = HashTable<
               MyStruct, size_t, MyStruct,
               decltype(key_ex), decltype(red_fn), Collector,
-              /* VolatileKey */ false, MyReduceConfig>;
+              Manipulator, /* VolatileKey */ false, MyReduceConfig>;
 
-    Table table(ctx, 0, key_ex, red_fn, collector,
+    Table table(ctx, 0, key_ex, red_fn, collector, manipulator,
                 /* num_partitions */ 13,
                 typename Table::ReduceConfig(),
                 /* immediate_flush */ true);

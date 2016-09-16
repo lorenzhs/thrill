@@ -12,6 +12,7 @@
 #include <thrill/common/cmdline_parser.hpp>
 #include <thrill/common/stats_timer.hpp>
 #include <thrill/core/reduce_by_hash_post_phase.hpp>
+#include <thrill/core/reduce_checker.hpp>
 #include <thrill/data/block_writer.hpp>
 #include <thrill/data/discard_sink.hpp>
 #include <thrill/data/file.hpp>
@@ -48,6 +49,8 @@ void RunBenchmark(api::Context& ctx, core::DefaultReduceConfig& base_config) {
                       return in1;
                   };
 
+    core::checkers::ReduceManipulatorDummy manipulator;
+
     auto emit_fn = [](const KeyPair&) { };
 
     uint64_t num_items = size / sizeof(KeyPair);
@@ -62,10 +65,9 @@ void RunBenchmark(api::Context& ctx, core::DefaultReduceConfig& base_config) {
     core::ReduceByHashPostPhase<
         Key, Key, Key,
         decltype(key_ex), decltype(red_fn), decltype(emit_fn),
-        /* SendPair */ true,
+        decltype(manipulator), /* SendPair */ true,
         core::DefaultReduceConfigSelect<table_impl> >
-    phase(ctx, 0, key_ex, red_fn, emit_fn,
-          config);
+    phase(ctx, 0, key_ex, red_fn, emit_fn, manipulator, config);
 
     common::StatsTimerStart timer;
 

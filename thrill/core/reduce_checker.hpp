@@ -125,6 +125,8 @@ private:
 };
 } // namespace _detail
 
+namespace checkers {
+
 //! Whether to check reductions (when applicable)
 static constexpr bool checkreductions_ = true;
 
@@ -177,6 +179,17 @@ private:
         mini_pre, mini_post;
 };
 
+/*!
+ * Dummy No-Op Reduce Manipulator
+ */
+struct ReduceManipulatorDummy {
+    template <typename It>
+    std::pair<It, It> operator()(It begin, It end) {
+        return std::make_pair(begin, end);
+    }
+};
+
+} // namespace checkers
 } // namespace core
 } // namespace thrill
 
