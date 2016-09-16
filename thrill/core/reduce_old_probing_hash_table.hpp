@@ -368,6 +368,9 @@ public:
         KeyValueIterator end =
             items_.begin() + (partition_id + 1) * num_buckets_per_partition_;
 
+        // XXX manipulator
+        std::tie(iter, end) = this->manipulator_(iter, end);
+
         for ( ; iter != end; ++iter)
         {
             if (iter->first != Key()) {

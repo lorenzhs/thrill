@@ -179,12 +179,68 @@ private:
         mini_pre, mini_post;
 };
 
-/*!
- * Dummy No-Op Reduce Manipulator
- */
+
+//! Debug manipulators?
+static constexpr bool debug = false;
+
+//! Dummy No-Op Reduce Manipulator
 struct ReduceManipulatorDummy {
     template <typename It>
     std::pair<It, It> operator()(It begin, It end) {
+        return std::make_pair(begin, end);
+    }
+};
+
+//! Drops first element
+struct ReduceManipulatorDropFirst {
+    template <typename It>
+    std::pair<It, It> operator()(It begin, It end) {
+        if (begin < end) {
+            LOG << "Manipulating " << end-begin << " elements, dropping " << *begin;
+            return std::make_pair(begin + 1, end);
+        } else {
+            return std::make_pair(begin, end);
+        }
+    }
+};
+
+//! Increments value of first element
+struct ReduceManipulatorIncFirst {
+    template <typename It>
+    std::pair<It, It> operator()(It begin, It end) {
+        if (begin < end) {
+            sLOG << "Manipulating" << end-begin << "elements, incrementing"
+                 << *begin;
+            begin->second++;
+        }
+        return std::make_pair(begin, end);
+    }
+};
+
+//! Increments key of first element
+struct ReduceManipulatorIncFirstKey {
+    template <typename It>
+    std::pair<It, It> operator()(It begin, It end) {
+        if (begin < end) {
+            sLOG << "Manipulating" << end-begin << "elements, incrementing key"
+                 << *begin;
+            begin->first++;
+        }
+        return std::make_pair(begin, end);
+    }
+};
+
+//! Switches values of first and second element
+struct ReduceManipulatorSwitchValues {
+    template <typename It>
+    std::pair<It, It> operator()(It begin, It end) {
+        if (begin + 1 < end) {
+            sLOG << "Manipulating" << end-begin << "elements, switching values:"
+                 << *begin << *(begin+1);
+            auto tmp = begin->second;
+            begin->second = (begin+1)->second;
+            (begin+1)->second = tmp;
+        }
         return std::make_pair(begin, end);
     }
 };

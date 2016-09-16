@@ -504,8 +504,11 @@ public:
 
             while (current != nullptr)
             {
-                for (KeyValuePair* bi = current->items;
-                     bi != current->items + current->size; ++bi)
+                KeyValuePair* bi = current->items,
+                    *bend = current->items + current->size;
+
+                std::tie(bi, bend) = this->manipulator_(bi, bend);
+                for (; bi != bend; ++bi)
                 {
                     emit(partition_id, *bi);
                 }
