@@ -195,7 +195,6 @@ protected:
 /*!
  * Dummy no-op sort manipulator
  */
-template <typename ValueType>
 class SortManipulatorDummy {
 public:
     template <typename Ignored>
@@ -242,7 +241,7 @@ public:
  * \ingroup api_layer
  */
 template <typename ValueType, typename CompareFunction, typename SortAlgorithm,
-          typename Manipulator = checkers::SortManipulatorDummy<ValueType> >
+          typename Manipulator = checkers::SortManipulatorDummy>
 class SortNode final : public DOpNode<ValueType>
 {
     static constexpr bool debug = false;
