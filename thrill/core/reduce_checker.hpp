@@ -196,7 +196,8 @@ struct ReduceManipulatorDropFirst {
     template <typename It>
     std::pair<It, It> operator()(It begin, It end) {
         if (begin < end) {
-            LOG << "Manipulating " << end-begin << " elements, dropping " << *begin;
+            sLOG << "Manipulating" << end-begin << "elements, dropping first";
+            //<< *begin;
             return std::make_pair(begin + 1, end);
         } else {
             return std::make_pair(begin, end);
@@ -209,8 +210,9 @@ struct ReduceManipulatorIncFirst {
     template <typename It>
     std::pair<It, It> operator()(It begin, It end) {
         if (begin < end) {
-            sLOG << "Manipulating" << end-begin << "elements, incrementing"
-                 << *begin;
+            sLOG << "Manipulating" << end-begin
+                 << "elements, incrementing first";
+            //<< *begin;
             begin->second++;
         }
         return std::make_pair(begin, end);
@@ -222,8 +224,8 @@ struct ReduceManipulatorIncFirstKey {
     template <typename It>
     std::pair<It, It> operator()(It begin, It end) {
         if (begin < end) {
-            sLOG << "Manipulating" << end-begin << "elements, incrementing key"
-                 << *begin;
+            sLOG << "Manipulating" << end-begin << "elements, incrementing key";
+            //<< *begin;
             begin->first++;
         }
         return std::make_pair(begin, end);
@@ -235,8 +237,8 @@ struct ReduceManipulatorSwitchValues {
     template <typename It>
     std::pair<It, It> operator()(It begin, It end) {
         if (begin + 1 < end) {
-            sLOG << "Manipulating" << end-begin << "elements, switching values:"
-                 << *begin << *(begin+1);
+            sLOG << "Manipulating" << end-begin << "elements, switching values";
+            // << *begin << *(begin+1);
             auto tmp = begin->second;
             begin->second = (begin+1)->second;
             (begin+1)->second = tmp;
