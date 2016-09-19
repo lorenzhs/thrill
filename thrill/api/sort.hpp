@@ -76,7 +76,8 @@ public:
     }
 
     //! Process an input element (before sorting)
-    inline void add_pre(const ValueType &v) {
+    THRILL_ATTRIBUTE_ALWAYS_INLINE
+    void add_pre(const ValueType &v) {
         sum_pre += hash(v);
         ++count_pre;
     }
@@ -86,7 +87,7 @@ public:
      *
      * \param v Element to process
      */
-    __attribute__((always_inline))
+    THRILL_ATTRIBUTE_ALWAYS_INLINE
     void add_post(const ValueType &v) {
         if (THRILL_LIKELY(count_post > 0) && cmp(v, last_post)) {
             sLOG1 << "Non-sorted values in output"; // << last_post << v;

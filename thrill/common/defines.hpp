@@ -75,9 +75,9 @@ namespace common {
 // __attribute__ ((always_inline))
 
 #if defined(__GNUC__) || defined(__clang__)
-#define THRILL_ATTRIBUTE_ALWAYS_INLINE __attribute__ ((always_inline))
+#define THRILL_ATTRIBUTE_ALWAYS_INLINE __attribute__ ((always_inline)) inline
 #else
-#define THRILL_ATTRIBUTE_ALWAYS_INLINE
+#define THRILL_ATTRIBUTE_ALWAYS_INLINE inline
 #endif
 
 /******************************************************************************/
