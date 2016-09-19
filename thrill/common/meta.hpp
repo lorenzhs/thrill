@@ -59,6 +59,7 @@ namespace common {
 /******************************************************************************/
 // Tuple Applier: takes a std::tuple<> and applies a variadic template function
 // to it. Hence, this expands the content of the tuple as the arguments.
+// C++17 has this as std::apply
 
 template <typename Functor, typename Tuple, std::size_t ... Is>
 auto ApplyTupleImpl(Functor && f, Tuple && t, common::index_sequence<Is ...>) {
@@ -296,6 +297,57 @@ auto VariadicMapEnumerate(Functor && f)
     return VariadicMapEnumerateImpl<Begin, End - Begin, Functor>::Map(
         std::forward<Functor>(f));
 }
+
+/******************************************************************************/
+//! Chain multiple manipulators for extra fun. Manipulators modify the input,
+//! but don't return anything.
+template<typename ... Manipulators>
+struct ManipulatorStack {};
+
+template<typename Manipulator>
+struct ManipulatorStack<Manipulator> {
+    template <typename ... Input>
+    void operator()(Input& ... input) { manip(input...); }
+protected:
+    Manipulator manip;
+};
+
+template<typename Manipulator, typename ... Next>
+struct ManipulatorStack<Manipulator, Next...> {
+    template <typename ... Input>
+    void operator()(Input& ... input) {
+        manip(input...);
+        next(input...);
+    }
+protected:
+    Manipulator manip;
+    ManipulatorStack<Next...> next;
+};
+
+//! Manipulator stack that returns something, which is then passed to the next
+//! manipulator
+template<typename ... Manipulators>
+struct ManipulatorStackPass {};
+
+template<typename Manipulator>
+struct ManipulatorStackPass<Manipulator> {
+    template <typename ... Input>
+    auto operator()(Input ... input) { return manip(input...); }
+protected:
+    Manipulator manip;
+};
+
+
+template<typename Manipulator, typename ... Next>
+struct ManipulatorStackPass<Manipulator, Next...> {
+    template <typename ... Input>
+    auto operator()(Input ... input) {
+        return ApplyTuple(next, manip(input...));
+    }
+protected:
+    Manipulator manip;
+    ManipulatorStackPass<Next...> next;
+};
 
 } // namespace common
 } // namespace thrill
