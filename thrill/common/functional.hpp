@@ -317,6 +317,74 @@ struct is_valid_t {
  */
 constexpr is_valid_t is_valid{};
 
+
+// helper for 'apply' that invokes func on args
+template<typename Func, typename Args, std::size_t ... I >
+auto _apply_helper(Func && func, Args && args, std::index_sequence<I...>) {
+    return std::forward<Func>(func)(std::get<I>(std::forward<Args>(args))...);
+}
+
+//! Apply operator - "return func(params...)".  Like a counterpart to std::tie.
+//! In C++17, this is available as 'std::apply'.
+template<typename Func, typename Args>
+auto apply(Func &&func, Args &&args) {
+    return _apply_helper(
+        std::forward<Func>(func), std::forward<Args>(args),
+        std::make_index_sequence<std::tuple_size<std::decay_t<Args> >::value>{});
+}
+
+//! Chain multiple manipulators for extra fun. Manipulators modify the input,
+//! but don't return anything.
+template<typename ... Manipulators>
+struct ManipulatorStack {};
+
+template<typename Manipulator>
+struct ManipulatorStack<Manipulator> {
+    template <typename ... Input>
+    void operator()(Input& ... input) { manip(input...); }
+protected:
+    Manipulator manip;
+};
+
+template<typename Manipulator, typename ... Next>
+struct ManipulatorStack<Manipulator, Next...> {
+    template <typename ... Input>
+    void operator()(Input& ... input) {
+        manip(input...);
+        next(input...);
+    }
+protected:
+    Manipulator manip;
+    ManipulatorStack<Next...> next;
+};
+
+
+//! Manipulator stack that returns something, which is then passed to the next
+//! manipulator
+template<typename ... Manipulators>
+struct ManipulatorStackPass {};
+
+template<typename Manipulator>
+struct ManipulatorStackPass<Manipulator> {
+    template <typename ... Input>
+    auto operator()(Input ... input) { return manip(input...); }
+protected:
+    Manipulator manip;
+};
+
+
+template<typename Manipulator, typename ... Next>
+struct ManipulatorStackPass<Manipulator, Next...> {
+    template <typename ... Input>
+    auto operator()(Input ... input) {
+        auto tmp = manip(input...);
+        return apply(next, tmp);
+    }
+protected:
+    Manipulator manip;
+    ManipulatorStackPass<Next...> next;
+};
+
 } // namespace common
 } // namespace thrill
 
