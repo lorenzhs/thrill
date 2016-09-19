@@ -235,7 +235,31 @@ struct SortManipulatorResetToDefault {
     }
 };
 
-}
+//! Chain multiple manipulators for extra fun
+template<typename ... Manipulators>
+struct SortManipulatorStack {};
+
+template<typename Manipulator>
+struct SortManipulatorStack<Manipulator> {
+    template <typename Input>
+    void operator()(Input &input) { manip(input); }
+protected:
+    Manipulator manip;
+};
+
+template<typename Manipulator, typename ... Next>
+struct SortManipulatorStack<Manipulator, Next...> {
+    template <typename Input>
+    void operator()(Input &input) {
+        manip(input);
+        next(input);
+    }
+protected:
+    Manipulator manip;
+    SortManipulatorStack<Next...> next;
+};
+
+} // namespace checkers
 
 /*!
  * A DIANode which performs a Sort operation. Sort sorts a DIA according to a
