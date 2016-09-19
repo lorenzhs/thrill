@@ -193,36 +193,45 @@ protected:
     bool sorted_;
 };
 
-/*!
- * Dummy no-op sort manipulator
- */
-class SortManipulatorDummy {
-public:
+//! Dummy no-op sort manipulator
+struct SortManipulatorDummy {
     template <typename Ignored>
     void operator()(Ignored) {}
 };
 
-/*!
- * Test sort manipulator with some trivial modifications
- */
-template <typename ValueType>
-class SortManipulator {
-public:
+//! Drop last element from vector
+struct SortManipulatorDropLast {
+    template <typename ValueType>
     void operator()(std::vector<ValueType> &vec) {
-        // vec is (a piece of) the local output
-        // TODO: randomly do/don't manipulate
-        if (vec.size() == 0) {
+        if (vec.size() > 0)
+            vec.pop_back();
+    }
+};
+
+//! Add a default-constructed element to empty vectors
+struct SortManipulatorAddToEmpty {
+    template <typename ValueType>
+    void operator()(std::vector<ValueType> &vec) {
+        if (vec.size() == 0)
             vec.emplace_back();
-        } else if (vec.size() == 1) {
-            vec[0] = ValueType(); // set to default
-        } else if (vec.size() <= 4) {
-            // Set second element equal to first
+    }
+};
+
+//! Set second element equal to first
+struct SortManipulatorSetEqual {
+    template <typename ValueType>
+    void operator()(std::vector<ValueType> &vec) {
+        if (vec.size() >= 2) {
             vec[1] = vec[0];
-        } else {
-            // Set mid elements equal
-            auto mid = vec.size() / 2;
-            vec[mid] = vec[mid - 1];
         }
+    }
+};
+
+//! Reset first element to default-constructed value
+struct SortManipulatorResetToDefault {
+    template <typename ValueType>
+    void operator()(std::vector<ValueType> &vec) {
+        if (vec.size() > 0) vec[0] = ValueType();
     }
 };
 
