@@ -189,6 +189,7 @@ struct ReduceManipulatorDummy {
     std::pair<It, It> operator()(It begin, It end) {
         return std::make_pair(begin, end);
     }
+    bool made_changes() const { return false; }
 };
 
 //! Drops first element
@@ -198,11 +199,15 @@ struct ReduceManipulatorDropFirst {
         if (begin < end) {
             sLOG << "Manipulating" << end-begin << "elements, dropping first";
             //<< *begin;
+            made_changes_ = true;
             return std::make_pair(begin + 1, end);
         } else {
             return std::make_pair(begin, end);
         }
     }
+    bool made_changes() const { return made_changes_; }
+protected:
+    bool made_changes_ = false;
 };
 
 //! Increments value of first element
@@ -214,9 +219,13 @@ struct ReduceManipulatorIncFirst {
                  << "elements, incrementing first";
             //<< *begin;
             begin->second++;
+            made_changes_ = true;
         }
         return std::make_pair(begin, end);
     }
+    bool made_changes() const { return made_changes_; }
+protected:
+    bool made_changes_ = false;
 };
 
 //! Increments key of first element
@@ -227,24 +236,32 @@ struct ReduceManipulatorIncFirstKey {
             sLOG << "Manipulating" << end-begin << "elements, incrementing key";
             //<< *begin;
             begin->first++;
+            made_changes_ = true;
         }
         return std::make_pair(begin, end);
     }
+    bool made_changes() const { return made_changes_; }
+protected:
+    bool made_changes_ = false;
 };
 
 //! Switches values of first and second element
 struct ReduceManipulatorSwitchValues {
     template <typename It>
     std::pair<It, It> operator()(It begin, It end) {
-        if (begin + 1 < end) {
+        if (begin + 1 < end && begin->second != (begin+1)->second) {
             sLOG << "Manipulating" << end-begin << "elements, switching values";
             // << *begin << *(begin+1);
             auto tmp = begin->second;
             begin->second = (begin+1)->second;
             (begin+1)->second = tmp;
+            made_changes_ = true;
         }
         return std::make_pair(begin, end);
     }
+    bool made_changes() const { return made_changes_; }
+protected:
+    bool made_changes_ = false;
 };
 
 } // namespace checkers

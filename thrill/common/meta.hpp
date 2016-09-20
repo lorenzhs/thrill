@@ -333,6 +333,8 @@ template<typename Manipulator>
 struct ManipulatorStackPass<Manipulator> {
     template <typename ... Input>
     auto operator()(Input ... input) { return manip(input...); }
+
+    bool made_changes() const { return manip.made_changes(); }
 protected:
     Manipulator manip;
 };
@@ -343,6 +345,12 @@ struct ManipulatorStackPass<Manipulator, Next...> {
     template <typename ... Input>
     auto operator()(Input ... input) {
         return ApplyTuple(next, manip(input...));
+    }
+
+    // Input was changes if any manipulator made a change.
+    // Let's ignore the case where the changes cancel out...
+    bool made_changes() const {
+        return manip.made_changes() || next.made_changes();
     }
 protected:
     Manipulator manip;

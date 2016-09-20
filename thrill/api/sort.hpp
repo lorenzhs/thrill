@@ -197,42 +197,63 @@ protected:
 struct SortManipulatorDummy {
     template <typename Ignored>
     void operator()(Ignored) {}
+    bool made_changes() const { return false; }
 };
 
 //! Drop last element from vector
 struct SortManipulatorDropLast {
     template <typename ValueType>
     void operator()(std::vector<ValueType> &vec) {
-        if (vec.size() > 0)
+        if (vec.size() > 0) {
             vec.pop_back();
+            made_changes_ = true;
+        }
     }
+    bool made_changes() const { return made_changes_; }
+protected:
+    bool made_changes_ = false;
 };
 
 //! Add a default-constructed element to empty vectors
 struct SortManipulatorAddToEmpty {
     template <typename ValueType>
     void operator()(std::vector<ValueType> &vec) {
-        if (vec.size() == 0)
+        if (vec.size() == 0) {
             vec.emplace_back();
+            made_changes_ = true;
+        }
     }
+    bool made_changes() const { return made_changes_; }
+protected:
+    bool made_changes_ = false;
 };
 
 //! Set second element equal to first
 struct SortManipulatorSetEqual {
     template <typename ValueType>
     void operator()(std::vector<ValueType> &vec) {
-        if (vec.size() >= 2) {
+        if (vec.size() >= 2 && vec[0] != vec[1]) {
             vec[1] = vec[0];
+            made_changes_ = true;
         }
     }
+    bool made_changes() const { return made_changes_; }
+protected:
+    bool made_changes_ = false;
 };
 
 //! Reset first element to default-constructed value
 struct SortManipulatorResetToDefault {
     template <typename ValueType>
     void operator()(std::vector<ValueType> &vec) {
-        if (vec.size() > 0) vec[0] = ValueType();
+        if (vec.size() > 0 && vec[0] != ValueType()) {
+            vec[0] = ValueType();
+            made_changes_ = true;
+        }
     }
+    bool made_changes() const { return made_changes_; }
+protected:
+    bool made_changes_ = false;
 };
 
 } // namespace checkers
