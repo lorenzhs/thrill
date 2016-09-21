@@ -14,6 +14,7 @@
 #ifndef THRILL_CORE_SORT_CHECKER_HEADER
 #define THRILL_CORE_SORT_CHECKER_HEADER
 
+#include <thrill/api/context.hpp>
 #include <thrill/common/defines.hpp>
 #include <thrill/common/hash.hpp>
 #include <thrill/common/logger.hpp>
@@ -95,7 +96,7 @@ public:
      *
      * \param ctx Thrill Context to use for communication
      */
-    bool is_sorted(Context &ctx) {
+    bool is_sorted(api::Context &ctx) {
         std::vector<ValueType> send;
 
         if (count_post > 0) {
@@ -132,7 +133,7 @@ public:
      *
      * \param ctx Thrill Context to use for communication
      */
-    bool is_likely_permutation(Context &ctx) {
+    bool is_likely_permutation(api::Context &ctx) {
         std::array<uint64_t, 4> sum{{count_pre, count_post, sum_pre, sum_post}};
         sum = ctx.net.AllReduce(sum, common::ComponentSum<decltype(sum)>());
 
@@ -160,7 +161,7 @@ public:
      *
      * \param ctx Thrill Context to use for communication
      */
-    bool check(Context &ctx) {
+    bool check(api::Context &ctx) {
         return is_sorted(ctx) && is_likely_permutation(ctx);
     }
 protected:
