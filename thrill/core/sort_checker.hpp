@@ -25,7 +25,6 @@ namespace thrill {
 namespace core {
 namespace checkers {
 
-
 /*!
  * Probabilistic checker for sorting algorithms
  *
@@ -38,17 +37,18 @@ namespace checkers {
  * \ingroup api_layer
  */
 template <typename ValueType, typename CompareFunction,
-          typename Hash = common::hash_crc32<ValueType>>
+          typename Hash = common::hash_crc32<ValueType> >
 class SortChecker
 {
     static const bool debug = false;
+
 public:
     /*!
      * Construct a checker
      *
      * \param cmp_ Compare function to use
      */
-    SortChecker(CompareFunction cmp_): cmp(cmp_) {
+    explicit SortChecker(CompareFunction cmp_) : cmp(cmp_) {
         reset();
     }
 
@@ -63,7 +63,7 @@ public:
 
     //! Process an input element (before sorting)
     THRILL_ATTRIBUTE_ALWAYS_INLINE
-    void add_pre(const ValueType &v) {
+    void add_pre(const ValueType& v) {
         sum_pre += hash(v);
         ++count_pre;
     }
@@ -74,7 +74,7 @@ public:
      * \param v Element to process
      */
     THRILL_ATTRIBUTE_ALWAYS_INLINE
-    void add_post(const ValueType &v) {
+    void add_post(const ValueType& v) {
         if (THRILL_LIKELY(count_post > 0) && cmp(v, last_post)) {
             sLOG1 << "Non-sorted values in output"; // << last_post << v;
             sorted_ = false;
@@ -96,7 +96,7 @@ public:
      *
      * \param ctx Thrill Context to use for communication
      */
-    bool is_sorted(api::Context &ctx) {
+    bool is_sorted(api::Context& ctx) {
         std::vector<ValueType> send;
 
         if (count_post > 0) {
@@ -133,7 +133,7 @@ public:
      *
      * \param ctx Thrill Context to use for communication
      */
-    bool is_likely_permutation(api::Context &ctx) {
+    bool is_likely_permutation(api::Context& ctx) {
         std::array<uint64_t, 4> sum{{count_pre, count_post, sum_pre, sum_post}};
         sum = ctx.net.AllReduce(sum, common::ComponentSum<decltype(sum)>());
 
@@ -154,16 +154,16 @@ public:
         return success;
     }
 
-
     /*!
      * Check correctness of the sorting procedure.  See `is_sorted` and
      * `is_likely_permutation` for more details.
      *
      * \param ctx Thrill Context to use for communication
      */
-    bool check(api::Context &ctx) {
+    bool check(api::Context& ctx) {
         return is_sorted(ctx) && is_likely_permutation(ctx);
     }
+
 protected:
     //! Number of items seen in input and output
     uint64_t count_pre, count_post;
@@ -182,20 +182,21 @@ protected:
 //! Dummy no-op sort manipulator
 struct SortManipulatorDummy {
     template <typename Ignored>
-    void operator()(Ignored) {}
+    void operator () (Ignored) { }
     bool made_changes() const { return false; }
 };
 
 //! Drop last element from vector
 struct SortManipulatorDropLast {
     template <typename ValueType>
-    void operator()(std::vector<ValueType> &vec) {
+    void operator () (std::vector<ValueType>& vec) {
         if (vec.size() > 0) {
             vec.pop_back();
             made_changes_ = true;
         }
     }
     bool made_changes() const { return made_changes_; }
+
 protected:
     bool made_changes_ = false;
 };
@@ -203,13 +204,14 @@ protected:
 //! Add a default-constructed element to empty vectors
 struct SortManipulatorAddToEmpty {
     template <typename ValueType>
-    void operator()(std::vector<ValueType> &vec) {
+    void operator () (std::vector<ValueType>& vec) {
         if (vec.size() == 0) {
             vec.emplace_back();
             made_changes_ = true;
         }
     }
     bool made_changes() const { return made_changes_; }
+
 protected:
     bool made_changes_ = false;
 };
@@ -217,13 +219,14 @@ protected:
 //! Set second element equal to first
 struct SortManipulatorSetEqual {
     template <typename ValueType>
-    void operator()(std::vector<ValueType> &vec) {
+    void operator () (std::vector<ValueType>& vec) {
         if (vec.size() >= 2 && vec[0] != vec[1]) {
             vec[1] = vec[0];
             made_changes_ = true;
         }
     }
     bool made_changes() const { return made_changes_; }
+
 protected:
     bool made_changes_ = false;
 };
@@ -231,17 +234,17 @@ protected:
 //! Reset first element to default-constructed value
 struct SortManipulatorResetToDefault {
     template <typename ValueType>
-    void operator()(std::vector<ValueType> &vec) {
+    void operator () (std::vector<ValueType>& vec) {
         if (vec.size() > 0 && vec[0] != ValueType()) {
             vec[0] = ValueType();
             made_changes_ = true;
         }
     }
     bool made_changes() const { return made_changes_; }
+
 protected:
     bool made_changes_ = false;
 };
-
 
 } // namespace checkers
 } // namespace core
