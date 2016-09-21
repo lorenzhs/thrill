@@ -30,8 +30,7 @@ namespace core {
 namespace _detail {
 //! Reduce checker minireduction helper
 template <typename Key, typename Value, typename ReduceFunction,
-          typename hash_fn = common::hash_crc32<Key>,
-          size_t bucket_bits = 3>
+          typename hash_fn = common::hash_crc32<Key>, size_t bucket_bits = 3>
 class ReduceCheckerMinireduction
 {
     static_assert(reduce_checkable_v<ReduceFunction>,
@@ -58,9 +57,7 @@ class ReduceCheckerMinireduction
     static constexpr bool extra_verbose = false;
 
 public:
-    ReduceCheckerMinireduction() {
-        reset();
-    }
+    ReduceCheckerMinireduction() { reset(); }
 
     //! Reset minireduction to initial state
     void reset() {
@@ -80,23 +77,23 @@ public:
 
     //! Compare for equality
     template <typename Other>
-    bool operator == (const Other& other) const {
+    bool operator==(const Other& other) const {
         // check dimensions
         if (num_buckets != other.num_buckets) return false;
         if (num_parallel != other.num_parallel) return false;
         // check all buckets for equality
         for (size_t i = 0; i < num_parallel; ++i) {
             for (size_t j = 0; j < num_buckets; ++j) {
-                if (reductions_[i][j] != other.reductions_[i][j])
-                    return false;
+                if (reductions_[i][j] != other.reductions_[i][j]) return false;
             }
         }
         return true;
     }
 
     void all_reduce(api::Context& ctx) {
-        reductions_ = ctx.net.AllReduce(reductions_,
-            common::ComponentSum<decltype(reductions_), ReduceFunction>(reduce));
+        reductions_ =
+        ctx.net.AllReduce(reductions_,
+                          common::ComponentSum<decltype(reductions_), ReduceFunction>(reduce));
 
         if (extra_verbose && ctx.net.my_rank() == 0) {
             for (size_t i = 0; i < num_parallel; ++i) {
@@ -116,8 +113,7 @@ private:
         return (hash >> (idx * bucket_bits)) & bucket_mask;
     }
 
-    void update_bucket(const size_t idx, const size_t bucket,
-                       const Value& value) {
+    void update_bucket(const size_t idx, const size_t bucket, const Value& value) {
         reductions_[idx][bucket] = reduce(reductions_[idx][bucket], value);
     }
 
@@ -131,20 +127,19 @@ private:
 namespace checkers {
 
 //! Whether to check reductions (when applicable)
-static constexpr bool checkreductions_ = true;
+static constexpr bool check_reductions_ = true;
 
 //! Reduce checker - no-op for unsupported reduce functions
-template <typename Key, typename Value, typename ReduceFunction,
-          typename Enable = void>
+template <typename Key, typename Value, typename ReduceFunction, typename Enable = void>
 class ReduceChecker
 {
     using KeyValuePair = std::pair<Key, Value>;
 
 public:
-    void add_pre(const Key&, const Value&) { }
-    void add_pre(const KeyValuePair&) { }
-    void add_post(const Key&, const Value&) { }
-    void add_post(const KeyValuePair&) { }
+    void add_pre(const Key&, const Value&) {}
+    void add_pre(const KeyValuePair&) {}
+    void add_post(const Key&, const Value&) {}
+    void add_post(const KeyValuePair&) {}
     bool check(api::Context&) { return true; }
 };
 
@@ -153,8 +148,8 @@ public:
  */
 template <typename Key, typename Value, typename ReduceFunction>
 class ReduceChecker<Key, Value, ReduceFunction,
-                    typename std::enable_if_t<checkreductions_&&
-                                              reduce_checkable_v<ReduceFunction> > >
+                    typename std::enable_if_t<check_reductions_ &&
+                                              reduce_checkable_v<ReduceFunction>>>
 {
     using KeyValuePair = std::pair<Key, Value>;
 
@@ -182,8 +177,7 @@ public:
     }
 
 private:
-    _detail::ReduceCheckerMinireduction<Key, Value, ReduceFunction>
-        mini_pre, mini_post;
+    _detail::ReduceCheckerMinireduction<Key, Value, ReduceFunction> mini_pre, mini_post;
 };
 
 //! Debug manipulators?
@@ -192,7 +186,7 @@ static constexpr bool debug = false;
 //! Dummy No-Op Reduce Manipulator
 struct ReduceManipulatorDummy {
     template <typename It>
-    std::pair<It, It> operator () (It begin, It end) {
+    std::pair<It, It> operator()(It begin, It end) {
         return std::make_pair(begin, end);
     }
     bool made_changes() const { return false; }
@@ -201,7 +195,7 @@ struct ReduceManipulatorDummy {
 //! Drops first element
 struct ReduceManipulatorDropFirst {
     template <typename It>
-    std::pair<It, It> operator () (It begin, It end) {
+    std::pair<It, It> operator()(It begin, It end) {
         if (begin < end) {
             sLOG << "Manipulating" << end - begin << "elements, dropping first";
             // << *begin;
@@ -220,11 +214,10 @@ protected:
 //! Increments value of first element
 struct ReduceManipulatorIncFirst {
     template <typename It>
-    std::pair<It, It> operator () (It begin, It end) {
+    std::pair<It, It> operator()(It begin, It end) {
         if (begin < end) {
             sLOG << "Manipulating" << end - begin
-                 << "elements, incrementing first";
-            // << *begin;
+                 << "elements, incrementing first"; // << *begin;
             begin->second++;
             made_changes_ = true;
         }
@@ -239,10 +232,10 @@ protected:
 //! Increments key of first element
 struct ReduceManipulatorIncFirstKey {
     template <typename It>
-    std::pair<It, It> operator () (It begin, It end) {
+    std::pair<It, It> operator()(It begin, It end) {
         if (begin < end) {
-            sLOG << "Manipulating" << end - begin << "elements, incrementing key";
-            // << *begin;
+            sLOG << "Manipulating" << end - begin
+                 << "elements, incrementing key"; // << *begin;
             begin->first++;
             made_changes_ = true;
         }
@@ -257,10 +250,10 @@ protected:
 //! Switches values of first and second element
 struct ReduceManipulatorSwitchValues {
     template <typename It>
-    std::pair<It, It> operator () (It begin, It end) {
+    std::pair<It, It> operator()(It begin, It end) {
         if (begin + 1 < end && begin->second != (begin + 1)->second) {
-            sLOG << "Manipulating" << end - begin << "elements, switching values";
-            // << *begin << *(begin+1);
+            sLOG << "Manipulating" << end - begin
+                 << "elements, switching values"; // << *begin << *(begin+1);
             auto tmp = begin->second;
             begin->second = (begin + 1)->second;
             (begin + 1)->second = tmp;
