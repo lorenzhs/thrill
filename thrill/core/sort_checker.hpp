@@ -36,8 +36,9 @@ namespace checkers {
  *
  * \ingroup api_layer
  */
-template <typename ValueType, typename CompareFunction,
-          typename Hash = common::hash_crc32<ValueType> >
+template <typename ValueType,
+          typename CompareFunction,
+          typename Hash = common::hash_crc32<ValueType>>
 class SortChecker
 {
     static const bool debug = false;
@@ -48,9 +49,7 @@ public:
      *
      * \param cmp_ Compare function to use
      */
-    explicit SortChecker(CompareFunction cmp_) : cmp(cmp_) {
-        reset();
-    }
+    explicit SortChecker(CompareFunction cmp_) : cmp(cmp_) { reset(); }
 
     //! Reset the checker's internal state
     void reset() {
@@ -76,15 +75,13 @@ public:
     THRILL_ATTRIBUTE_ALWAYS_INLINE
     void add_post(const ValueType& v) {
         if (THRILL_LIKELY(count_post > 0) && cmp(v, last_post)) {
-            sLOG1 << "Non-sorted values in output"; // << last_post << v;
+            sLOG1 << "Non-sorted values in output";  // << last_post << v;
             sorted_ = false;
         }
         last_post = v;
 
         // Init "first" (= minimum)
-        if (THRILL_UNLIKELY(count_post == 0)) {
-            first_post = v;
-        }
+        if (THRILL_UNLIKELY(count_post == 0)) { first_post = v; }
 
         sum_post += hash(v);
         ++count_post;
@@ -99,9 +96,7 @@ public:
     bool is_sorted(api::Context& ctx) {
         std::vector<ValueType> send;
 
-        if (count_post > 0) {
-            send.push_back(last_post);
-        }
+        if (count_post > 0) { send.push_back(last_post); }
         auto recv = ctx.net.Predecessor(1, send);
 
         // If any predecessor PE has an item, and we have one,
@@ -114,11 +109,10 @@ public:
         int unsorted_count = sorted_ ? 0 : 1;
         unsorted_count = ctx.net.AllReduce(unsorted_count);
 
-        LOGC(ctx.my_rank() == 0 && unsorted_count > 0)
-            << common::log::fg_red() << common::log::bold()
-            << unsorted_count << " of " << ctx.num_workers()
-            << " PEs have output that isn't sorted"
-            << common::log::reset();
+        LOGC (ctx.my_rank() == 0 && unsorted_count > 0)
+            << common::log::fg_red() << common::log::bold() << unsorted_count
+            << " of " << ctx.num_workers()
+            << " PEs have output that isn't sorted" << common::log::reset();
 
         return (unsorted_count == 0);
     }
@@ -139,17 +133,16 @@ public:
 
         const bool success = (sum[0] == sum[1]) && (sum[2] == sum[3]);
 
-        LOGC(!success && ctx.my_rank() == 0)
+        LOGC (!success && ctx.my_rank() == 0)
             << common::log::fg_red() << common::log::bold()
-            << "check() permutation: " << sum[0] << " pre-items, "
-            << sum[1] << " post-items; check FAILED!!!!! Global pre-sum: "
-            << sum[2] << " global post-sum: " << sum[3]
-            << common::log::reset();
+            << "check() permutation: " << sum[0] << " pre-items, " << sum[1]
+            << " post-items; check FAILED!!!!! Global pre-sum: " << sum[2]
+            << " global post-sum: " << sum[3] << common::log::reset();
 
-        LOGC(success && debug && ctx.my_rank() == 0)
-            << "check() permutation: " << sum[0] << " pre-items, "
-            << sum[1] << " post-items; check successful. Global pre-sum: "
-            << sum[2] << " global post-sum: " << sum[3];
+        LOGC (success&& debug&& ctx.my_rank() == 0)
+            << "check() permutation: " << sum[0] << " pre-items, " << sum[1]
+            << " post-items; check successful. Global pre-sum: " << sum[2]
+            << " global post-sum: " << sum[3];
 
         return success;
     }
@@ -182,14 +175,14 @@ protected:
 //! Dummy no-op sort manipulator
 struct SortManipulatorDummy {
     template <typename Ignored>
-    void operator () (Ignored) { }
+    void operator()(Ignored) {}
     bool made_changes() const { return false; }
 };
 
 //! Drop last element from vector
 struct SortManipulatorDropLast {
     template <typename ValueType>
-    void operator () (std::vector<ValueType>& vec) {
+    void operator()(std::vector<ValueType>& vec) {
         if (vec.size() > 0) {
             vec.pop_back();
             made_changes_ = true;
@@ -204,7 +197,7 @@ protected:
 //! Add a default-constructed element to empty vectors
 struct SortManipulatorAddToEmpty {
     template <typename ValueType>
-    void operator () (std::vector<ValueType>& vec) {
+    void operator()(std::vector<ValueType>& vec) {
         if (vec.size() == 0) {
             vec.emplace_back();
             made_changes_ = true;
@@ -219,7 +212,7 @@ protected:
 //! Set second element equal to first
 struct SortManipulatorSetEqual {
     template <typename ValueType>
-    void operator () (std::vector<ValueType>& vec) {
+    void operator()(std::vector<ValueType>& vec) {
         if (vec.size() >= 2 && vec[0] != vec[1]) {
             vec[1] = vec[0];
             made_changes_ = true;
@@ -234,7 +227,7 @@ protected:
 //! Reset first element to default-constructed value
 struct SortManipulatorResetToDefault {
     template <typename ValueType>
-    void operator () (std::vector<ValueType>& vec) {
+    void operator()(std::vector<ValueType>& vec) {
         if (vec.size() > 0 && vec[0] != ValueType()) {
             vec[0] = ValueType();
             made_changes_ = true;
@@ -246,10 +239,10 @@ protected:
     bool made_changes_ = false;
 };
 
-} // namespace checkers
-} // namespace core
-} // namespace thrill
+}  // namespace checkers
+}  // namespace core
+}  // namespace thrill
 
-#endif // !THRILL_CORE_SORT_CHECKER_HEADER
+#endif  // !THRILL_CORE_SORT_CHECKER_HEADER
 
 /******************************************************************************/

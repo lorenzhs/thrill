@@ -32,6 +32,7 @@ ConstructorInitializerIndentWidth: 4
 ContinuationIndentWidth: 0
 Cpp11BracedListStyle: true
 DerivePointerBinding: false
+ForEachMacros: ['LOG', 'LOGC', 'LOG1', 'LOG0']
 IncludeCategories:
   - Regex:           '^<(cereal|gtest|highwayhash)/)'
     Priority:        1
