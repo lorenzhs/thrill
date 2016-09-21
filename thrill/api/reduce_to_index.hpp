@@ -305,7 +305,8 @@ private:
 };
 
 template <typename ValueType, typename Stack>
-template <typename KeyExtractor, typename ReduceFunction, typename ReduceConfig>
+template <typename KeyExtractor, typename ReduceFunction, typename Manipulator,
+          typename ReduceConfig>
 auto DIA<ValueType, Stack>::ReduceToIndex(
     const KeyExtractor &key_extractor,
     const ReduceFunction &reduce_function,
@@ -352,7 +353,7 @@ auto DIA<ValueType, Stack>::ReduceToIndex(
 
     using ReduceNode = ReduceToIndexNode<
               DOpResult, KeyExtractor, ReduceFunction,
-              ReduceConfig, /* VolatileKey */ false, false>;
+              ReduceConfig, /* VolatileKey */ false, false, Manipulator>;
 
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReduceToIndex", key_extractor, reduce_function,
@@ -362,7 +363,8 @@ auto DIA<ValueType, Stack>::ReduceToIndex(
 }
 
 template <typename ValueType, typename Stack>
-template <typename KeyExtractor, typename ReduceFunction, typename ReduceConfig>
+template <typename KeyExtractor, typename ReduceFunction, typename Manipulator,
+          typename ReduceConfig>
 auto DIA<ValueType, Stack>::ReduceToIndex(
     struct VolatileKeyTag const &,
     const KeyExtractor &key_extractor,
@@ -410,7 +412,7 @@ auto DIA<ValueType, Stack>::ReduceToIndex(
 
     using ReduceNode = ReduceToIndexNode<
               DOpResult, KeyExtractor, ReduceFunction,
-              ReduceConfig, /* VolatileKey */ true, false>;
+              ReduceConfig, /* VolatileKey */ true, false, Manipulator>;
 
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReduceToIndex", key_extractor, reduce_function,

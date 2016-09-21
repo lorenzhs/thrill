@@ -279,7 +279,8 @@ private:
 };
 
 template <typename ValueType, typename Stack>
-template <typename KeyExtractor, typename ReduceFunction, typename ReduceConfig>
+template <typename KeyExtractor, typename ReduceFunction, typename Manipulator,
+          typename ReduceConfig>
 auto DIA<ValueType, Stack>::ReduceByKey(
     const KeyExtractor &key_extractor,
     const ReduceFunction &reduce_function,
@@ -318,7 +319,7 @@ auto DIA<ValueType, Stack>::ReduceByKey(
 
     using ReduceNode = api::ReduceNode<
               DOpResult, KeyExtractor, ReduceFunction,
-              ReduceConfig, /* VolatileKey */ false, false>;
+              ReduceConfig, /* VolatileKey */ false, false, Manipulator>;
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReduceByKey", key_extractor, reduce_function, reduce_config);
 
@@ -326,7 +327,8 @@ auto DIA<ValueType, Stack>::ReduceByKey(
 }
 
 template <typename ValueType, typename Stack>
-template <typename KeyExtractor, typename ReduceFunction, typename ReduceConfig>
+template <typename KeyExtractor, typename ReduceFunction, typename Manipulator,
+          typename ReduceConfig>
 auto DIA<ValueType, Stack>::ReduceByKey(
     struct VolatileKeyTag const &,
     const KeyExtractor &key_extractor,
@@ -366,7 +368,8 @@ auto DIA<ValueType, Stack>::ReduceByKey(
 
     using ReduceNode = api::ReduceNode<
               DOpResult, KeyExtractor,
-              ReduceFunction, ReduceConfig, /* VolatileKey */ true, false>;
+              ReduceFunction, ReduceConfig, /* VolatileKey */ true, false,
+              Manipulator>;
 
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReduceByKey", key_extractor, reduce_function, reduce_config);
@@ -375,7 +378,7 @@ auto DIA<ValueType, Stack>::ReduceByKey(
 }
 
 template <typename ValueType, typename Stack>
-template <typename ReduceFunction, typename ReduceConfig>
+template <typename ReduceFunction, typename Manipulator, typename ReduceConfig>
 auto DIA<ValueType, Stack>::ReducePair(
     const ReduceFunction &reduce_function,
     const ReduceConfig &reduce_config) const {
@@ -412,7 +415,7 @@ auto DIA<ValueType, Stack>::ReducePair(
 
     using ReduceNode = api::ReduceNode<
               ValueType, std::function<Key(Value)>, ReduceFunction,
-              ReduceConfig, /* VolatileKey */ true, true>;
+              ReduceConfig, /* VolatileKey */ true, true, Manipulator>;
 
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReducePair", [](Value value) {
