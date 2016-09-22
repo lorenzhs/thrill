@@ -53,7 +53,7 @@ namespace api {
  * \ingroup api_layer
  */
 template <typename ValueType, typename CompareFunction, typename SortAlgorithm,
-          typename Manipulator = checkers::SortManipulatorDummy>
+          typename Manipulator>
 class SortNode final : public DOpNode<ValueType>
 {
     static constexpr bool debug = false;

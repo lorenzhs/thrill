@@ -58,9 +58,8 @@ class DefaultReduceToIndexConfig : public core::DefaultReduceConfig
  */
 template <typename ValueType,
           typename KeyExtractor, typename ReduceFunction,
-          typename ReduceConfig,
-          bool VolatileKey, bool SendPair,
-          typename Manipulator = checkers::ReduceManipulatorDummy>
+          typename ReduceConfig, typename Manipulator,
+          bool VolatileKey, bool SendPair>
 class ReduceToIndexNode final : public DOpNode<ValueType>
 {
     static constexpr bool debug = false;
@@ -356,7 +355,7 @@ auto DIA<ValueType, Stack>::ReduceToIndex(
 
     using ReduceNode = ReduceToIndexNode<
               DOpResult, KeyExtractor, ReduceFunction,
-              ReduceConfig, /* VolatileKey */ false, false, Manipulator>;
+              ReduceConfig, Manipulator, /* VolatileKey */ false, false>;
 
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReduceToIndex", key_extractor, reduce_function,
@@ -415,7 +414,7 @@ auto DIA<ValueType, Stack>::ReduceToIndex(
 
     using ReduceNode = ReduceToIndexNode<
               DOpResult, KeyExtractor, ReduceFunction,
-              ReduceConfig, /* VolatileKey */ true, false, Manipulator>;
+              ReduceConfig, Manipulator, /* VolatileKey */ true, false>;
 
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReduceToIndex", key_extractor, reduce_function,

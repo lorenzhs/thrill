@@ -60,9 +60,8 @@ class DefaultReduceConfig : public core::DefaultReduceConfig
  */
 template <typename ValueType,
           typename KeyExtractor, typename ReduceFunction,
-          typename ReduceConfig,
-          const bool VolatileKey, const bool SendPair,
-          typename Manipulator = checkers::ReduceManipulatorDummy>
+          typename ReduceConfig, typename Manipulator,
+          const bool VolatileKey, const bool SendPair>
 class ReduceNode final : public DOpNode<ValueType>
 {
     static constexpr bool debug = false;
@@ -270,7 +269,7 @@ private:
 
     core::ReduceByHashPostPhase<
         ValueType, Key, Value, KeyExtractor, ReduceFunction, Emitter,
-        Manipulator,SendPair, ReduceConfig> post_phase_;
+        Manipulator, SendPair, ReduceConfig> post_phase_;
 
     const KeyExtractor &key_extractor_;
 
@@ -322,7 +321,7 @@ auto DIA<ValueType, Stack>::ReduceByKey(
 
     using ReduceNode = api::ReduceNode<
               DOpResult, KeyExtractor, ReduceFunction,
-              ReduceConfig, /* VolatileKey */ false, false, Manipulator>;
+              ReduceConfig, Manipulator, /* VolatileKey */ false, false>;
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReduceByKey", key_extractor, reduce_function, reduce_config);
 
@@ -371,8 +370,8 @@ auto DIA<ValueType, Stack>::ReduceByKey(
 
     using ReduceNode = api::ReduceNode<
               DOpResult, KeyExtractor,
-              ReduceFunction, ReduceConfig, /* VolatileKey */ true, false,
-              Manipulator>;
+              ReduceFunction, ReduceConfig, Manipulator,
+              /* VolatileKey */ true, false>;
 
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReduceByKey", key_extractor, reduce_function, reduce_config);
@@ -418,7 +417,7 @@ auto DIA<ValueType, Stack>::ReducePair(
 
     using ReduceNode = api::ReduceNode<
               ValueType, std::function<Key(Value)>, ReduceFunction,
-              ReduceConfig, /* VolatileKey */ true, true, Manipulator>;
+              ReduceConfig, Manipulator, /* VolatileKey */ true, true  >;
 
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReducePair", [](Value value) {
