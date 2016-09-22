@@ -239,6 +239,43 @@ protected:
     bool made_changes_ = false;
 };
 
+//! Duplicate the last element of the first (local) block
+struct SortManipulatorDuplicateLast {
+    template <typename ValueType>
+    void operator()(std::vector<ValueType>& vec) {
+        if (!made_changes_ && vec.size() > 0) {
+            vec.push_back(vec.back());
+            made_changes_ = true;
+        }
+    }
+    bool made_changes() const { return made_changes_; }
+
+protected:
+    bool made_changes_ = false;
+};
+
+//! Move the last element of the first (local) block to the beginning of the
+//! second block, if one exists. Otherwise the element is dropped.
+template <typename ValueType>
+struct SortManipulatorMoveToNextBlock {
+    void operator()(std::vector<ValueType>& vec) {
+        if (!made_changes_ && vec.size() > 0) {
+            tmp_ = vec.back();
+            vec.pop_back();
+            has_stored_ = true;
+            made_changes_ = true;
+        } else if (has_stored_) {
+            vec.insert(vec.begin(), tmp_);
+            has_stored_ = false;
+        }
+    }
+    bool made_changes() const { return made_changes_; }
+
+protected:
+    bool made_changes_ = false, has_stored_ = false;
+    ValueType tmp_;
+};
+
 }  // namespace checkers
 }  // namespace thrill
 
