@@ -19,7 +19,14 @@
 namespace thrill {
 namespace checkers {
 
-/******************************************************************************/
+//! Provides common manipulator functionality - don't use this, derive from it
+struct ManipulatorBase {
+    bool made_changes() const { return made_changes_; }
+protected:
+    bool made_changes_ = false;
+};
+
+
 //! Chain multiple manipulators for extra fun. Manipulators modify the input,
 //! but don't return anything.
 template<typename ... Manipulators>

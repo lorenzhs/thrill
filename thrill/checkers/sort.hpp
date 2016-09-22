@@ -180,7 +180,7 @@ struct SortManipulatorDummy {
 };
 
 //! Drop last element from vector
-struct SortManipulatorDropLast {
+    struct SortManipulatorDropLast : public ManipulatorBase {
     template <typename ValueType>
     void operator()(std::vector<ValueType>& vec) {
         if (vec.size() > 1) { // don't leave it empty
@@ -188,14 +188,10 @@ struct SortManipulatorDropLast {
             made_changes_ = true;
         }
     }
-    bool made_changes() const { return made_changes_; }
-
-protected:
-    bool made_changes_ = false;
 };
 
 //! Add a default-constructed element to empty vectors
-struct SortManipulatorAddToEmpty {
+struct SortManipulatorAddToEmpty : public ManipulatorBase {
     template <typename ValueType>
     void operator()(std::vector<ValueType>& vec) {
         if (vec.size() == 0) {
@@ -203,14 +199,10 @@ struct SortManipulatorAddToEmpty {
             made_changes_ = true;
         }
     }
-    bool made_changes() const { return made_changes_; }
-
-protected:
-    bool made_changes_ = false;
 };
 
 //! Set second element equal to first
-struct SortManipulatorSetEqual {
+struct SortManipulatorSetEqual : public ManipulatorBase {
     template <typename ValueType>
     void operator()(std::vector<ValueType>& vec) {
         if (vec.size() >= 2 && vec[0] != vec[1]) {
@@ -218,14 +210,10 @@ struct SortManipulatorSetEqual {
             made_changes_ = true;
         }
     }
-    bool made_changes() const { return made_changes_; }
-
-protected:
-    bool made_changes_ = false;
 };
 
 //! Reset first element to default-constructed value
-struct SortManipulatorResetToDefault {
+struct SortManipulatorResetToDefault : public ManipulatorBase {
     template <typename ValueType>
     void operator()(std::vector<ValueType>& vec) {
         if (vec.size() > 0 && vec[0] != ValueType()) {
@@ -233,14 +221,10 @@ struct SortManipulatorResetToDefault {
             made_changes_ = true;
         }
     }
-    bool made_changes() const { return made_changes_; }
-
-protected:
-    bool made_changes_ = false;
 };
 
 //! Duplicate the last element of the first (local) block
-struct SortManipulatorDuplicateLast {
+struct SortManipulatorDuplicateLast : public ManipulatorBase {
     template <typename ValueType>
     void operator()(std::vector<ValueType>& vec) {
         if (!made_changes_ && vec.size() > 0) {
@@ -248,16 +232,12 @@ struct SortManipulatorDuplicateLast {
             made_changes_ = true;
         }
     }
-    bool made_changes() const { return made_changes_; }
-
-protected:
-    bool made_changes_ = false;
 };
 
 //! Move the last element of the first (local) block to the beginning of the
 //! second block, if one exists. Otherwise the element is dropped.
 template <typename ValueType>
-struct SortManipulatorMoveToNextBlock {
+struct SortManipulatorMoveToNextBlock : public ManipulatorBase {
     void operator()(std::vector<ValueType>& vec) {
         if (!made_changes_ && vec.size() > 0) {
             tmp_ = vec.back();
@@ -269,10 +249,8 @@ struct SortManipulatorMoveToNextBlock {
             has_stored_ = false;
         }
     }
-    bool made_changes() const { return made_changes_; }
-
 protected:
-    bool made_changes_ = false, has_stored_ = false;
+    bool has_stored_ = false;
     ValueType tmp_;
 };
 

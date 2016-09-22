@@ -16,6 +16,7 @@
 
 #include <thrill/api/context.hpp>
 #include <thrill/checkers/functional.hpp>
+#include <thrill/checkers/manipulator.hpp>
 #include <thrill/common/defines.hpp>
 #include <thrill/common/function_traits.hpp>
 #include <thrill/common/hash.hpp>
@@ -192,7 +193,7 @@ struct ReduceManipulatorDummy {
 };
 
 //! Drops first element
-struct ReduceManipulatorDropFirst {
+struct ReduceManipulatorDropFirst : public ManipulatorBase {
     template <typename It>
     std::pair<It, It> operator()(It begin, It end) {
         if (begin < end) {
@@ -204,14 +205,10 @@ struct ReduceManipulatorDropFirst {
             return std::make_pair(begin, end);
         }
     }
-    bool made_changes() const { return made_changes_; }
-
-protected:
-    bool made_changes_ = false;
 };
 
 //! Increments value of first element
-struct ReduceManipulatorIncFirst {
+struct ReduceManipulatorIncFirst : public ManipulatorBase {
     template <typename It>
     std::pair<It, It> operator()(It begin, It end) {
         if (begin < end) {
@@ -222,14 +219,10 @@ struct ReduceManipulatorIncFirst {
         }
         return std::make_pair(begin, end);
     }
-    bool made_changes() const { return made_changes_; }
-
-protected:
-    bool made_changes_ = false;
 };
 
 //! Increments key of first element
-struct ReduceManipulatorIncFirstKey {
+struct ReduceManipulatorIncFirstKey : public ManipulatorBase {
     template <typename It>
     std::pair<It, It> operator()(It begin, It end) {
         if (begin < end) {
@@ -240,14 +233,10 @@ struct ReduceManipulatorIncFirstKey {
         }
         return std::make_pair(begin, end);
     }
-    bool made_changes() const { return made_changes_; }
-
-protected:
-    bool made_changes_ = false;
 };
 
 //! Switches values of first and second element
-struct ReduceManipulatorSwitchValues {
+struct ReduceManipulatorSwitchValues : public ManipulatorBase {
     template <typename It>
     std::pair<It, It> operator()(It begin, It end) {
         if (begin + 1 < end && begin->second != (begin + 1)->second) {
@@ -260,10 +249,6 @@ struct ReduceManipulatorSwitchValues {
         }
         return std::make_pair(begin, end);
     }
-    bool made_changes() const { return made_changes_; }
-
-protected:
-    bool made_changes_ = false;
 };
 
 } // namespace checkers
