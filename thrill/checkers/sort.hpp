@@ -183,7 +183,7 @@ struct SortManipulatorDummy {
 struct SortManipulatorDropLast {
     template <typename ValueType>
     void operator()(std::vector<ValueType>& vec) {
-        if (vec.size() > 0) {
+        if (vec.size() > 1) { // don't leave it empty
             vec.pop_back();
             made_changes_ = true;
         }
