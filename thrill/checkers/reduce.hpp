@@ -35,7 +35,7 @@ template <typename Key, typename Value, typename ReduceFunction,
 class ReduceCheckerMinireduction
 {
     static_assert(reduce_checkable_v<ReduceFunction>,
-                  "Reduce function isn't checkable");
+                  "Reduce function isn't (marked) checkable");
 
     using KeyValuePair = std::pair<Key, Value>;
     //! hash value type
