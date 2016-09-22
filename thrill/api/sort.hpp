@@ -17,6 +17,7 @@
 #include <thrill/api/context.hpp>
 #include <thrill/api/dia.hpp>
 #include <thrill/api/dop_node.hpp>
+#include <thrill/checkers/driver.hpp>
 #include <thrill/checkers/sort.hpp>
 #include <thrill/common/logger.hpp>
 #include <thrill/common/math.hpp>
@@ -73,6 +74,8 @@ class SortNode final : public DOpNode<ValueType>
 
     using SampleIndexPair = std::pair<ValueType, size_t>;
 
+    using Checker = checkers::SortChecker<ValueType, CompareFunction>;
+
     static const bool use_background_thread_ = false;
 
 public:
@@ -87,7 +90,8 @@ public:
           compare_function_(compare_function),
           sort_algorithm_(sort_algorithm),
           parent_stack_empty_(ParentDIA::stack_empty),
-          checker_(compare_function)
+          checker_(compare_function),
+          checking_driver_(checker_, manipulator_)
     {
         // Hook PreOp(s)
         auto pre_op_fn = [this](const ValueType& input) {
@@ -302,7 +306,7 @@ public:
 
         // Do the checking
         if (check) {
-            checker_.check(context_);
+            checking_driver_.check(context_);
         }
 
         timer_pushdata.Stop();
@@ -340,9 +344,10 @@ private:
     size_t local_items_ = 0;
 
     //! Probabilistic correctness checker
-    checkers::SortChecker<ValueType, CompareFunction> checker_;
+    Checker checker_;
     //! Manipulator to fudge the result, so that the checker has something to do
     Manipulator manipulator_;
+    checkers::driver<Checker, Manipulator> checking_driver_;
 
     //! Sample vector: pairs of (sample,local index)
     std::vector<SampleIndexPair> samples_;

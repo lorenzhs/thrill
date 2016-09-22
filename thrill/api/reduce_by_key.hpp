@@ -18,6 +18,7 @@
 
 #include <thrill/api/dia.hpp>
 #include <thrill/api/dop_node.hpp>
+#include <thrill/checkers/driver.hpp>
 #include <thrill/checkers/reduce.hpp>
 #include <thrill/common/functional.hpp>
 #include <thrill/common/logger.hpp>
@@ -162,7 +163,8 @@ public:
           post_phase_(
               context_, Super::id(), key_extractor, reduce_function,
               Emitter(this, checker_), manipulator_, config),
-          key_extractor_(key_extractor)
+          key_extractor_(key_extractor),
+          checking_driver_(checker_, manipulator_)
     {
         // Hook PreOp: Locally hash elements of the current DIA onto buckets and
         // reduce each bucket to a single value, afterwards send data to another
@@ -222,7 +224,7 @@ public:
             reduced_ = true;
         }
         post_phase_.PushData(consume);
-        checker_.check(context_);
+        checking_driver_.check(context_);
     }
 
     //! process the inbound data in the post reduce phase
@@ -274,6 +276,7 @@ private:
 
     Checker checker_;
     Manipulator manipulator_;
+    checkers::driver<Checker, Manipulator> checking_driver_;
 
     bool reduced_ = false;
 };
