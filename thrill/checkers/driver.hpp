@@ -33,8 +33,12 @@ public:
         bool success = checker_.check(ctx);
         bool manipulated = manipulator_.made_changes();
 
-        sLOG << "checking driver: checker" << success
-             << " manipulated" << manipulated;
+        // We need to check whether a manipulation was made on *any* worker
+        int manipulated_count = ctx.net.AllReduce((int)manipulated);
+        manipulated = (manipulated_count > 0);
+
+        sLOGC(ctx.net.my_rank() == 0)
+            << "checking driver: check" << success << "manip" << manipulated;
 
         // If it was manipulated and detected, or not manipulated and passed,
         // then we're good
