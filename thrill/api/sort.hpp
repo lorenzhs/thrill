@@ -17,12 +17,12 @@
 #include <thrill/api/context.hpp>
 #include <thrill/api/dia.hpp>
 #include <thrill/api/dop_node.hpp>
+#include <thrill/checkers/sort.hpp>
 #include <thrill/common/logger.hpp>
 #include <thrill/common/math.hpp>
 #include <thrill/common/porting.hpp>
 #include <thrill/common/qsort.hpp>
 #include <thrill/core/multiway_merge.hpp>
-#include <thrill/core/sort_checker.hpp>
 #include <thrill/data/file.hpp>
 #include <thrill/net/group.hpp>
 
@@ -52,7 +52,7 @@ namespace api {
  * \ingroup api_layer
  */
 template <typename ValueType, typename CompareFunction, typename SortAlgorithm,
-          typename Manipulator = core::checkers::SortManipulatorDummy>
+          typename Manipulator = checkers::SortManipulatorDummy>
 class SortNode final : public DOpNode<ValueType>
 {
     static constexpr bool debug = false;
@@ -87,7 +87,7 @@ public:
           compare_function_(compare_function),
           sort_algorithm_(sort_algorithm),
           parent_stack_empty_(ParentDIA::stack_empty),
-          local_checker_(compare_function)
+          checker_(compare_function)
     {
         // Hook PreOp(s)
         auto pre_op_fn = [this](const ValueType& input) {
@@ -100,14 +100,14 @@ public:
 
     void StartPreOp(size_t /* id */) final {
         timer_preop_.Start();
-        if (check) local_checker_.reset();
+        if (check) checker_.reset();
         unsorted_writer_ = unsorted_file_.GetWriter();
     }
 
     void PreOp(const ValueType& input) {
         if (check) {
             // let the checker hash the item
-            local_checker_.add_pre(input);
+            checker_.add_pre(input);
         }
         unsorted_writer_.Put(input);
         // In this stage we do not know how many elements are there in total.
@@ -142,7 +142,7 @@ public:
             // (random access), but the checker needs to hash every element
             auto reader = unsorted_file_.GetKeepReader();
             for (size_t i = 0; i < local_items_; ++i) {
-                local_checker_.add_pre(reader.template Next<ValueType>());
+                checker_.add_pre(reader.template Next<ValueType>());
             }
         }
 
@@ -231,7 +231,7 @@ public:
                 // Push the file to the checker, item by item
                 auto reader = files_[0].GetKeepReader();
                 while (reader.HasNext()) {
-                    local_checker_.add_post(reader.template Next<ValueType>());
+                    checker_.add_post(reader.template Next<ValueType>());
                 }
             }
             this->PushFile(files_[0], consume);
@@ -294,7 +294,7 @@ public:
 
             while (puller.HasNext()) {
                 auto next = puller.Next();
-                if (check) local_checker_.add_post(next);
+                if (check) checker_.add_post(next);
                 this->PushItem(next);
                 local_size++;
             }
@@ -302,7 +302,7 @@ public:
 
         // Do the checking
         if (check) {
-            local_checker_.check(context_);
+            checker_.check(context_);
         }
 
         timer_pushdata.Stop();
@@ -339,7 +339,8 @@ private:
     //! Number of items on this worker
     size_t local_items_ = 0;
 
-    core::checkers::SortChecker<ValueType, CompareFunction> local_checker_;
+    //! Probabilistic correctness checker
+    checkers::SortChecker<ValueType, CompareFunction> checker_;
     //! Manipulator to fudge the result, so that the checker has something to do
     Manipulator manipulator_;
 

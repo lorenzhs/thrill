@@ -1,5 +1,5 @@
 /*******************************************************************************
- * thrill/core/sort_checker.hpp
+ * thrill/checkers/sort_checker.hpp
  *
  * Probabilistic sort checker
  *
@@ -11,10 +11,11 @@
  ******************************************************************************/
 
 #pragma once
-#ifndef THRILL_CORE_SORT_CHECKER_HEADER
-#define THRILL_CORE_SORT_CHECKER_HEADER
+#ifndef THRILL_CHECKERS_SORT_HEADER
+#define THRILL_CHECKERS_SORT_HEADER
 
 #include <thrill/api/context.hpp>
+#include <thrill/checkers/manipulator.hpp>
 #include <thrill/common/defines.hpp>
 #include <thrill/common/hash.hpp>
 #include <thrill/common/logger.hpp>
@@ -22,7 +23,6 @@
 #include <vector>
 
 namespace thrill {
-namespace core {
 namespace checkers {
 
 /*!
@@ -240,9 +240,8 @@ protected:
 };
 
 }  // namespace checkers
-}  // namespace core
 }  // namespace thrill
 
-#endif  // !THRILL_CORE_SORT_CHECKER_HEADER
+#endif  // !THRILL_CHECKERS_SORT_HEADER
 
 /******************************************************************************/

@@ -196,25 +196,6 @@ public:
     }
 };
 
-/*!
- * Struct that signals whether the ReduceFunction is checkable.
- */
-template <typename ReduceFunction>
-struct reduce_checkable : public std::false_type { };
-
-//! Addition is checkable
-template <typename T>
-struct reduce_checkable<std::plus<T> >: public std::true_type { };
-
-//! Operations on a tuple member are checkable if the operation is
-template <size_t Index, typename Tuple, typename Op>
-struct reduce_checkable<common::TupleReduceIndex<Index, Tuple, Op> >
-    : public reduce_checkable<Op>{ };
-
-//! Convenience helper template for reduce_checkable
-template <typename ReduceFunction>
-constexpr bool reduce_checkable_v = reduce_checkable<ReduceFunction>::value;
-
 } // namespace core
 } // namespace thrill
 

@@ -8,9 +8,9 @@
  * All rights reserved. Published under the BSD-2 license in the LICENSE file.
  ******************************************************************************/
 
+#include <thrill/checkers/reduce.hpp>
 #include <thrill/core/reduce_by_hash_post_phase.hpp>
 #include <thrill/core/reduce_by_index_post_phase.hpp>
-#include <thrill/core/reduce_checker.hpp>
 
 #include <gtest/gtest.h>
 
@@ -57,7 +57,7 @@ static void TestAddMyStructByHash(Context& ctx) {
                        result.emplace_back(in);
                    };
 
-    core::checkers::ReduceManipulatorDummy manipulator;
+    checkers::ReduceManipulatorDummy manipulator;
 
     using Phase = core::ReduceByHashPostPhase<
               MyStruct, size_t, MyStruct,
@@ -171,7 +171,7 @@ static void TestAddMyStructByIndex(Context& ctx) {
                        result.emplace_back(in);
                    };
 
-    core::checkers::ReduceManipulatorDummy manipulator;
+    checkers::ReduceManipulatorDummy manipulator;
 
     using Phase = core::ReduceByIndexPostPhase<
               MyStruct, size_t, MyStruct,
@@ -254,7 +254,7 @@ static void TestAddMyStructByIndexWithHoles(Context& ctx) {
                        result.emplace_back(in);
                    };
 
-    core::checkers::ReduceManipulatorDummy manipulator;
+    checkers::ReduceManipulatorDummy manipulator;
 
     using Phase = core::ReduceByIndexPostPhase<
               MyStruct, size_t, MyStruct,

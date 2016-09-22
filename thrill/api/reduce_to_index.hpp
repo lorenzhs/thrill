@@ -18,12 +18,12 @@
 #include <thrill/api/context.hpp>
 #include <thrill/api/dia.hpp>
 #include <thrill/api/dop_node.hpp>
+#include <thrill/checkers/reduce.hpp>
 #include <thrill/common/functional.hpp>
 #include <thrill/common/logger.hpp>
 #include <thrill/common/meta.hpp>
 #include <thrill/common/porting.hpp>
 #include <thrill/core/reduce_by_index_post_phase.hpp>
-#include <thrill/core/reduce_checker.hpp>
 #include <thrill/core/reduce_pre_phase.hpp>
 
 #include <functional>
@@ -59,7 +59,7 @@ template <typename ValueType,
           typename KeyExtractor, typename ReduceFunction,
           typename ReduceConfig,
           bool VolatileKey, bool SendPair,
-          typename Manipulator = core::checkers::ReduceManipulatorDummy>
+          typename Manipulator = checkers::ReduceManipulatorDummy>
 class ReduceToIndexNode final : public DOpNode<ValueType>
 {
     static constexpr bool debug = false;
@@ -77,7 +77,7 @@ class ReduceToIndexNode final : public DOpNode<ValueType>
     using PrePhaseOutput =
               typename common::If<VolatileKey, KeyValuePair, Value>::type;
 
-    using Checker = typename core::checkers::ReduceChecker<Key, Value, ReduceFunction>;
+    using Checker = typename checkers::ReduceChecker<Key, Value, ReduceFunction>;
 
     static constexpr bool use_mix_stream_ = ReduceConfig::use_mix_stream_;
     static constexpr bool use_post_thread_ = ReduceConfig::use_post_thread_;

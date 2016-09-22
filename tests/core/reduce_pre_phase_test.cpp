@@ -9,8 +9,8 @@
  * All rights reserved. Published under the BSD-2 license in the LICENSE file.
  ******************************************************************************/
 
+#include <thrill/checkers/reduce.hpp>
 #include <thrill/core/reduce_pre_phase.hpp>
-#include <thrill/core/reduce_checker.hpp>
 
 #include <gtest/gtest.h>
 
@@ -57,7 +57,7 @@ static void TestAddMyStructByHash(Context& ctx) {
                       };
                   };
 
-    core::checkers::ReduceManipulatorDummy manipulator;
+    checkers::ReduceManipulatorDummy manipulator;
 
     // collect all items
     const size_t num_partitions = 13;
@@ -146,7 +146,7 @@ static void TestAddMyStructByIndex(Context& ctx) {
                       };
                   };
 
-    core::checkers::ReduceManipulatorDummy manipulator;
+    checkers::ReduceManipulatorDummy manipulator;
 
     // collect all items
     const size_t num_partitions = 13;

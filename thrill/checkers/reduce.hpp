@@ -1,5 +1,5 @@
 /*******************************************************************************
- * thrill/core/reduce_checker.hpp
+ * thrill/checkers/reduce.hpp
  *
  * Probabilistic reduce checker
  *
@@ -11,21 +11,21 @@
  ******************************************************************************/
 
 #pragma once
-#ifndef THRILL_CORE_REDUCE_CHECKER_HEADER
-#define THRILL_CORE_REDUCE_CHECKER_HEADER
+#ifndef THRILL_CHECKERS_REDUCE_HEADER
+#define THRILL_CHECKERS_REDUCE_HEADER
 
 #include <thrill/api/context.hpp>
+#include <thrill/checkers/functional.hpp>
 #include <thrill/common/defines.hpp>
 #include <thrill/common/function_traits.hpp>
 #include <thrill/common/hash.hpp>
 #include <thrill/common/logger.hpp>
-#include <thrill/core/reduce_functional.hpp>
 
 #include <array>
 #include <utility>
 
 namespace thrill {
-namespace core {
+namespace checkers {
 
 namespace _detail {
 //! Reduce checker minireduction helper
@@ -124,7 +124,6 @@ private:
 
 } // namespace _detail
 
-namespace checkers {
 
 //! Whether to check reductions (when applicable)
 static constexpr bool check_reductions_ = true;
@@ -268,9 +267,8 @@ protected:
 };
 
 } // namespace checkers
-} // namespace core
 } // namespace thrill
 
-#endif // !THRILL_CORE_REDUCE_CHECKER_HEADER
+#endif // !THRILL_CHECKERS_REDUCE_HEADER
 
 /******************************************************************************/

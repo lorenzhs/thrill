@@ -21,10 +21,10 @@
 #include <thrill/api/context.hpp>
 #include <thrill/api/dia_node.hpp>
 #include <thrill/api/function_stack.hpp>
+#include <thrill/checkers/reduce.hpp>
+#include <thrill/checkers/sort.hpp>
 #include <thrill/common/function_traits.hpp>
 #include <thrill/common/functional.hpp>
-#include <thrill/core/reduce_checker.hpp>
-#include <thrill/core/sort_checker.hpp>
 
 #include <cassert>
 #include <functional>
@@ -737,7 +737,7 @@ public:
      * \ingroup dia_dops
      */
     template <typename KeyExtractor, typename ReduceFunction,
-              typename Manipulator = core::checkers::ReduceManipulatorDummy,
+              typename Manipulator = checkers::ReduceManipulatorDummy,
               typename ReduceConfig = class DefaultReduceConfig>
     auto ReduceByKey(const KeyExtractor &key_extractor,
                      const ReduceFunction &reduce_function,
@@ -773,7 +773,7 @@ public:
      * \ingroup dia_dops
      */
     template <typename KeyExtractor, typename ReduceFunction,
-              typename Manipulator = core::checkers::ReduceManipulatorDummy,
+              typename Manipulator = checkers::ReduceManipulatorDummy,
               typename ReduceConfig = class DefaultReduceConfig>
     auto ReduceByKey(struct VolatileKeyTag const &,
                      const KeyExtractor &key_extractor,
@@ -803,7 +803,7 @@ public:
      * \ingroup dia_dops
      */
     template <typename ReduceFunction,
-              typename Manipulator = core::checkers::ReduceManipulatorDummy,
+              typename Manipulator = checkers::ReduceManipulatorDummy,
               typename ReduceConfig = class DefaultReduceConfig>
     auto ReducePair(const ReduceFunction &reduce_function,
                     const ReduceConfig& reduce_config = ReduceConfig()) const;
@@ -845,7 +845,7 @@ public:
      * \ingroup dia_dops
      */
     template <typename KeyExtractor, typename ReduceFunction,
-              typename Manipulator = core::checkers::ReduceManipulatorDummy,
+              typename Manipulator = checkers::ReduceManipulatorDummy,
               typename ReduceConfig = class DefaultReduceToIndexConfig>
     auto ReduceToIndex(
         const KeyExtractor &key_extractor,
@@ -892,7 +892,7 @@ public:
      * \ingroup dia_dops
      */
     template <typename KeyExtractor, typename ReduceFunction,
-              typename Manipulator = core::checkers::ReduceManipulatorDummy,
+              typename Manipulator = checkers::ReduceManipulatorDummy,
               typename ReduceConfig = class DefaultReduceToIndexConfig>
     auto ReduceToIndex(
         struct VolatileKeyTag const &,
@@ -1106,7 +1106,7 @@ public:
      * \ingroup dia_dops
      */
     template <typename CompareFunction = std::less<ValueType>,
-              typename Manipulator = core::checkers::SortManipulatorDummy>
+              typename Manipulator = checkers::SortManipulatorDummy>
     auto Sort(const CompareFunction& compare_function = CompareFunction()) const;
 
     /*!
@@ -1124,7 +1124,7 @@ public:
      * \ingroup dia_dops
      */
     template <typename CompareFunction, typename SortFunction,
-              typename Manipulator = core::checkers::SortManipulatorDummy>
+              typename Manipulator = checkers::SortManipulatorDummy>
     auto Sort(const CompareFunction &compare_function,
               const SortFunction &sort_algorithm) const;
 

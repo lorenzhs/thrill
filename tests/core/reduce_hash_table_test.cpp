@@ -9,8 +9,8 @@
  * All rights reserved. Published under the BSD-2 license in the LICENSE file.
  ******************************************************************************/
 
+#include <thrill/checkers/reduce.hpp>
 #include <thrill/core/reduce_bucket_hash_table.hpp>
-#include <thrill/core/reduce_checker.hpp>
 #include <thrill/core/reduce_old_probing_hash_table.hpp>
 #include <thrill/core/reduce_probing_hash_table.hpp>
 
@@ -80,7 +80,7 @@ void TestAddMyStructModulo(Context& ctx) {
 
     using Collector = TableCollector<std::pair<size_t, MyStruct> >;
 
-    using Manipulator = core::checkers::ReduceManipulatorDummy;
+    using Manipulator = checkers::ReduceManipulatorDummy;
 
     Collector collector(13);
     Manipulator manipulator;

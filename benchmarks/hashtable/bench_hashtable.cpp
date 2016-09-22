@@ -9,10 +9,10 @@
  * All rights reserved. Published under the BSD-2 license in the LICENSE file.
  ******************************************************************************/
 
+#include <thrill/checkers/reduce.hpp>
 #include <thrill/common/cmdline_parser.hpp>
 #include <thrill/common/stats_timer.hpp>
 #include <thrill/core/reduce_by_hash_post_phase.hpp>
-#include <thrill/core/reduce_checker.hpp>
 #include <thrill/data/block_writer.hpp>
 #include <thrill/data/discard_sink.hpp>
 #include <thrill/data/file.hpp>
@@ -49,7 +49,7 @@ void RunBenchmark(api::Context& ctx, core::DefaultReduceConfig& base_config) {
                       return in1;
                   };
 
-    core::checkers::ReduceManipulatorDummy manipulator;
+    checkers::ReduceManipulatorDummy manipulator;
 
     auto emit_fn = [](const KeyPair&) { };
 
