@@ -21,10 +21,10 @@ namespace thrill {
 namespace checkers {
 
 template <typename Checker, typename Manipulator>
-class driver {
+class Driver {
     static const bool debug = true;
 public:
-    driver(Checker &checker, Manipulator &manipulator)
+    Driver(Checker &checker, Manipulator &manipulator)
         : checker_(checker)
         , manipulator_(manipulator)
     {}
@@ -37,7 +37,7 @@ public:
         int manipulated_count = ctx.net.AllReduce((int)manipulated);
         manipulated = (manipulated_count > 0);
 
-        sLOGC(ctx.net.my_rank() == 0)
+        sLOGC(debug && ctx.net.my_rank() == 0)
             << "checking driver: check" << success << "manip" << manipulated;
 
         // If it was manipulated and detected, or not manipulated and passed,

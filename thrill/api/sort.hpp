@@ -347,7 +347,7 @@ private:
     Checker checker_;
     //! Manipulator to fudge the result, so that the checker has something to do
     Manipulator manipulator_;
-    checkers::driver<Checker, Manipulator> checking_driver_;
+    checkers::Driver<Checker, Manipulator> checking_driver_;
 
     //! Sample vector: pairs of (sample,local index)
     std::vector<SampleIndexPair> samples_;

@@ -275,7 +275,7 @@ private:
 
     Checker checker_;
     Manipulator manipulator_;
-    checkers::driver<Checker, Manipulator> checking_driver_;
+    checkers::Driver<Checker, Manipulator> checking_driver_;
 
     bool reduced_ = false;
 };
