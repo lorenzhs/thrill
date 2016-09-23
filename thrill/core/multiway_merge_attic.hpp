@@ -118,9 +118,9 @@ public:
      * \return \c True if less.
      */
     friend bool operator < (self_type& bi1, self_type& bi2) {
-        if (bi1.current_ == bi1.end_)                   // bi1 is sup
-            return bi2.current_ == bi2.end_;            // bi2 is not sup
-        if (bi2.current_ == bi2.end_)                   // bi2 is sup
+        if (bi1.current_ == bi1.end_)                  // bi1 is sup
+            return bi2.current_ == bi2.end_;           // bi2 is not sup
+        if (bi2.current_ == bi2.end_)                  // bi2 is sup
             return true;
         return bi1.comp_(*bi1, *bi2);                  // normal compare
     }
@@ -132,9 +132,9 @@ public:
      * \return \c True if less equal.
      */
     friend bool operator <= (self_type& bi1, self_type& bi2) {
-        if (bi2.current_ == bi2.end_)                   //bi1 is sup
-            return bi1.current_ != bi1.end_;            //bi2 is not sup
-        if (bi1.current_ == bi1.end_)                   //bi2 is sup
+        if (bi2.current_ == bi2.end_)                  //bi1 is sup
+            return bi1.current_ != bi1.end_;           //bi2 is not sup
+        if (bi1.current_ == bi1.end_)                  //bi2 is sup
             return false;
         return !bi1.comp_(*bi2, *bi1);                 //normal compare
     }

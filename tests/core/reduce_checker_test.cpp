@@ -53,7 +53,6 @@ TEST(ReduceChecker, ReduceModulo2CorrectResults) {
             }
 
             ASSERT_EQ((size_t)2, out_vec.size());
-
         };
 
     api::RunLocalTests(start_func);

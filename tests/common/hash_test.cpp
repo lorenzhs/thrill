@@ -51,7 +51,7 @@ TEST(Hash, TestCRC32) {
     // the other IETF test vector, 13 zeroes followed by byte values 1 to 0x1f
     memset(&testvec, 0, 13);
     for (size_t i = 1; i <= 0x1f; ++i) {
-        testvec[i+12] = i;
+        testvec[i + 12] = i;
     }
     check_hash(0x5b988D47, testvec);
 

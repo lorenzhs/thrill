@@ -106,7 +106,7 @@ template <typename ValueType, typename Key, typename Value,
           typename Manipulator, const bool VolatileKey,
           typename ReduceConfig_ = DefaultReduceConfig,
           typename IndexFunction = ReduceByHash<Key>,
-          typename EqualToFunction = std::equal_to<Key>>
+          typename EqualToFunction = std::equal_to<Key> >
 class ReducePrePhase
 {
     static constexpr bool debug = false;

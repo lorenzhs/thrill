@@ -58,7 +58,7 @@ struct NoOperation<void>{
 //! as KeyExtractor in reductions.
 template <size_t Index, typename T>
 struct TupleGet {
-    auto operator()(const T& tuple) const {
+    auto operator () (const T& tuple) const {
         return std::get<Index>(tuple);
     }
 };
@@ -68,12 +68,13 @@ struct TupleGet {
 template <size_t Index, typename Tuple,
           typename Op = std::plus<std::tuple_element_t<Index, Tuple> > >
 struct TupleReduceIndex {
-    Tuple operator()(const Tuple& t1, const Tuple& t2) const {
+    Tuple operator () (const Tuple& t1, const Tuple& t2) const {
         Tuple ret = t1;
         // std::get returns a reference, so this works
         std::get<Index>(ret) = op(std::get<Index>(t1), std::get<Index>(t2));
         return ret;
     }
+
 private:
     Op op;
 };
@@ -190,8 +191,8 @@ private:
 template <typename Type, size_t M, size_t N, typename Operation>
 class ComponentSum<std::array<std::array<Type, M>, N>, Operation>
     : public std::binary_function<
-    std::array<std::array<Type, M>, N>, std::array<std::array<Type, M>, N>,
-    std::array<std::array<Type, M>, N> >
+          std::array<std::array<Type, M>, N>, std::array<std::array<Type, M>, N>,
+          std::array<std::array<Type, M>, N> >
 {
 public:
     using ArrayType = std::array<std::array<Type, M>, N>;
@@ -203,6 +204,7 @@ public:
                 out[i][j] = op_(a[i][j], b[i][j]);
         return out;
     }
+
 private:
     Operation op_;
 };
@@ -274,36 +276,36 @@ template <size_t Length>
 struct make_index_sequence : public make_index_sequence_helper<Length>::type
 { };
 
-
 /******************************************************************************/
 
 //! is_valid, adapted from boost.hana <boost/hana/type.hpp>.
 //! Checks whether an expression is valid C++. Slightly magic.
 namespace _detail {
-template <typename F, typename ...Args, typename = decltype(
-    std::declval<F&&>()(std::declval<Args&&>()...)
-    )>
+template <typename F, typename ... Args, typename = decltype(
+              std::declval<F&&>()(std::declval<Args&&>() ...)
+              )>
 constexpr auto is_valid_impl(int) { return std::true_type(); }
 
-template <typename F, typename ...Args>
+template <typename F, typename ... Args>
 constexpr auto is_valid_impl(...) { return std::false_type(); }
 
 template <typename F>
 struct is_valid_fun {
-    template <typename ...Args>
-    constexpr auto operator()(Args&& ...) const
-    { return is_valid_impl<F, Args&&...>(int{}); }
+    template <typename ... Args>
+    constexpr auto operator () (Args&& ...) const
+    { return is_valid_impl < F, Args && ... > (int { }); }
 };
+
 } // namespace _detail
 
 struct is_valid_t {
     template <typename F>
-    constexpr auto operator()(F&&) const
-    { return _detail::is_valid_fun<F&&>{}; }
+    constexpr auto operator () (F&&) const
+    { return _detail::is_valid_fun <F&&> {}; }
 
-    template <typename F, typename ...Args>
-    constexpr auto operator()(F&&, Args&&...) const
-    { return _detail::is_valid_impl<F&&, Args&&...>(int{}); }
+    template <typename F, typename ... Args>
+    constexpr auto operator () (F&&, Args&& ...) const
+    { return _detail::is_valid_impl < F &&, Args && ... > (int { }); }
 };
 
 /*!
@@ -315,7 +317,7 @@ struct is_valid_t {
  *     typename std::enable_if<decltype(is_callable(f))::value>::type* = 0)
  * { f(); }
  */
-constexpr is_valid_t is_valid{};
+constexpr is_valid_t is_valid { };
 
 } // namespace common
 } // namespace thrill

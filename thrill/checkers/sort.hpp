@@ -1,5 +1,5 @@
 /*******************************************************************************
- * thrill/checkers/sort_checker.hpp
+ * thrill/checkers/sort.hpp
  *
  * Probabilistic sort checker
  *
@@ -38,7 +38,7 @@ namespace checkers {
  */
 template <typename ValueType,
           typename CompareFunction,
-          typename Hash = common::hash_crc32<ValueType>>
+          typename Hash = common::hash_crc32<ValueType> >
 class SortChecker
 {
     static const bool debug = false;
@@ -109,7 +109,7 @@ public:
         int unsorted_count = sorted_ ? 0 : 1;
         unsorted_count = ctx.net.AllReduce(unsorted_count);
 
-        LOGC (ctx.my_rank() == 0 && unsorted_count > 0)
+        LOGC(ctx.my_rank() == 0 && unsorted_count > 0)
             << common::log::fg_red() << common::log::bold() << unsorted_count
             << " of " << ctx.num_workers()
             << " PEs have output that isn't sorted" << common::log::reset();
@@ -128,18 +128,18 @@ public:
      * \param ctx Thrill Context to use for communication
      */
     bool is_likely_permutation(api::Context& ctx) {
-        std::array<uint64_t, 4> sum{{count_pre, count_post, sum_pre, sum_post}};
+        std::array<uint64_t, 4> sum { { count_pre, count_post, sum_pre, sum_post } };
         sum = ctx.net.AllReduce(sum, common::ComponentSum<decltype(sum)>());
 
         const bool success = (sum[0] == sum[1]) && (sum[2] == sum[3]);
 
-        LOGC (!success && ctx.my_rank() == 0)
+        LOGC(!success && ctx.my_rank() == 0)
             << common::log::fg_red() << common::log::bold()
             << "check() permutation: " << sum[0] << " pre-items, " << sum[1]
             << " post-items; check FAILED!!!!! Global pre-sum: " << sum[2]
             << " global post-sum: " << sum[3] << common::log::reset();
 
-        LOGC (success&& debug&& ctx.my_rank() == 0)
+        LOGC(success && debug && ctx.my_rank() == 0)
             << "check() permutation: " << sum[0] << " pre-items, " << sum[1]
             << " post-items; check successful. Global pre-sum: " << sum[2]
             << " global post-sum: " << sum[3];
@@ -175,14 +175,14 @@ protected:
 //! Dummy no-op sort manipulator
 struct SortManipulatorDummy {
     template <typename Ignored>
-    void operator()(Ignored) {}
+    void operator () (Ignored) { }
     bool made_changes() const { return false; }
 };
 
 //! Drop last element from vector
-    struct SortManipulatorDropLast : public ManipulatorBase {
+struct SortManipulatorDropLast : public ManipulatorBase {
     template <typename ValueType>
-    void operator()(std::vector<ValueType>& vec) {
+    void operator () (std::vector<ValueType>& vec) {
         if (vec.size() > 1) { // don't leave it empty
             vec.pop_back();
             made_changes_ = true;
@@ -193,7 +193,7 @@ struct SortManipulatorDummy {
 //! Add a default-constructed element to empty vectors
 struct SortManipulatorAddToEmpty : public ManipulatorBase {
     template <typename ValueType>
-    void operator()(std::vector<ValueType>& vec) {
+    void operator () (std::vector<ValueType>& vec) {
         if (vec.size() == 0) {
             vec.emplace_back();
             made_changes_ = true;
@@ -204,7 +204,7 @@ struct SortManipulatorAddToEmpty : public ManipulatorBase {
 //! Set second element equal to first
 struct SortManipulatorSetEqual : public ManipulatorBase {
     template <typename ValueType>
-    void operator()(std::vector<ValueType>& vec) {
+    void operator () (std::vector<ValueType>& vec) {
         if (vec.size() >= 2 && vec[0] != vec[1]) {
             vec[1] = vec[0];
             made_changes_ = true;
@@ -215,7 +215,7 @@ struct SortManipulatorSetEqual : public ManipulatorBase {
 //! Reset first element to default-constructed value
 struct SortManipulatorResetToDefault : public ManipulatorBase {
     template <typename ValueType>
-    void operator()(std::vector<ValueType>& vec) {
+    void operator () (std::vector<ValueType>& vec) {
         if (vec.size() > 0 && vec[0] != ValueType()) {
             vec[0] = ValueType();
             made_changes_ = true;
@@ -226,7 +226,7 @@ struct SortManipulatorResetToDefault : public ManipulatorBase {
 //! Duplicate the last element of the first (local) block
 struct SortManipulatorDuplicateLast : public ManipulatorBase {
     template <typename ValueType>
-    void operator()(std::vector<ValueType>& vec) {
+    void operator () (std::vector<ValueType>& vec) {
         if (!made_changes_ && vec.size() > 0) {
             vec.push_back(vec.back());
             made_changes_ = true;
@@ -238,25 +238,27 @@ struct SortManipulatorDuplicateLast : public ManipulatorBase {
 //! second block, if one exists. Otherwise the element is dropped.
 template <typename ValueType>
 struct SortManipulatorMoveToNextBlock : public ManipulatorBase {
-    void operator()(std::vector<ValueType>& vec) {
+    void operator () (std::vector<ValueType>& vec) {
         if (!made_changes_ && vec.size() > 0) {
             tmp_ = vec.back();
             vec.pop_back();
             has_stored_ = true;
             made_changes_ = true;
-        } else if (has_stored_) {
+        }
+        else if (has_stored_) {
             vec.insert(vec.begin(), tmp_);
             has_stored_ = false;
         }
     }
+
 protected:
-    bool has_stored_ = false;
+    bool      has_stored_ = false;
     ValueType tmp_;
 };
 
-}  // namespace checkers
-}  // namespace thrill
+} // namespace checkers
+} // namespace thrill
 
-#endif  // !THRILL_CHECKERS_SORT_HEADER
+#endif // !THRILL_CHECKERS_SORT_HEADER
 
 /******************************************************************************/

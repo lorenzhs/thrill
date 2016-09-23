@@ -505,10 +505,10 @@ public:
             while (current != nullptr)
             {
                 KeyValuePair* bi = current->items,
-                    *bend = current->items + current->size;
+                    * bend = current->items + current->size;
 
                 std::tie(bi, bend) = this->manipulator_(bi, bend);
-                for (; bi != bend; ++bi)
+                for ( ; bi != bend; ++bi)
                 {
                     emit(partition_id, *bi);
                 }

@@ -87,7 +87,7 @@ private:
     class Emitter
     {
     public:
-        explicit Emitter(ReduceToIndexNode* node, Checker &checker)
+        explicit Emitter(ReduceToIndexNode* node, Checker& checker)
             : node_(node), checker_(checker) { }
 
         void operator () (const ValueType& item) const {
@@ -102,47 +102,46 @@ private:
 
     private:
         ReduceToIndexNode* node_;
-        Checker &checker_;
+        Checker& checker_;
     };
-
 
     //! PreOp to insert elements into PrePhase
     template <typename V, typename PrePhase, typename Checker,
               typename KeyIsValue = void>
     struct ReducePreOp {
-        ReducePreOp(PrePhase &pre_phase, const KeyExtractor&, Checker &checker)
-            : pre_phase_(pre_phase), checker_(checker) {}
-        auto operator()(const ValueType& input) {
+        ReducePreOp(PrePhase& pre_phase, const KeyExtractor&, Checker& checker)
+            : pre_phase_(pre_phase), checker_(checker) { }
+        auto operator () (const ValueType& input) {
             checker_.add_pre(input);
             return pre_phase_.Insert(input);
         }
+
     private:
-        PrePhase &pre_phase_;
-        Checker &checker_;
+        PrePhase& pre_phase_;
+        Checker&  checker_;
     };
 
     //! PreOp to insert elements into PrePhase, handling the case where either
     //! Key or Value is equal to ValueType
     template <typename V, typename PrePhase, typename Checker>
     struct ReducePreOp<V, PrePhase, Checker,
-                       typename std::enable_if_t<(
-        std::is_same<std::decay_t<V>, Key>::value ||
-        std::is_same<std::decay_t<V>, Value>::value)> > {
-        ReducePreOp(PrePhase &pre_phase, const KeyExtractor &key_extractor,
-                    Checker &checker)
+                       typename std::enable_if_t<(std::is_same<std::decay_t<V>, Key>::value ||
+                                                  std::is_same<std::decay_t<V>, Value>::value)> >{
+        ReducePreOp(PrePhase& pre_phase, const KeyExtractor& key_extractor,
+                    Checker& checker)
             : pre_phase_(pre_phase),
               key_extractor_(key_extractor),
-              checker_(checker) {}
-        auto operator()(const ValueType& input) {
+              checker_(checker) { }
+        auto operator () (const ValueType& input) {
             checker_.add_pre(key_extractor_(input), input);
             return pre_phase_.Insert(input);
         }
-    private:
-        PrePhase &pre_phase_;
-        const KeyExtractor &key_extractor_;
-        Checker &checker_;
-    };
 
+    private:
+        PrePhase&           pre_phase_;
+        const KeyExtractor& key_extractor_;
+        Checker&            checker_;
+    };
 
 public:
     /*!
@@ -179,7 +178,7 @@ public:
         // reduce each bucket to a single value, afterwards send data to another
         // worker given by the shuffle algorithm.
         auto pre_op_fn = ReducePreOp<ValueType, decltype(pre_phase_), decltype(checker_)>
-            (pre_phase_, key_extractor, checker_);
+                             (pre_phase_, key_extractor, checker_);
 /*[this](const ValueType& input) {
                              checker_.add_pre(input);
                              return pre_phase_.Insert(input);

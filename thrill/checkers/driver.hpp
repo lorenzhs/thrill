@@ -21,13 +21,15 @@ namespace thrill {
 namespace checkers {
 
 template <typename Checker, typename Manipulator>
-class Driver {
+class Driver
+{
     static const bool debug = true;
+
 public:
-    Driver(Checker &checker, Manipulator &manipulator)
-        : checker_(checker)
-        , manipulator_(manipulator)
-    {}
+    Driver(Checker& checker, Manipulator& manipulator)
+        : checker_(checker),
+          manipulator_(manipulator)
+    { }
 
     bool check(api::Context& ctx) {
         bool success = checker_.check(ctx);

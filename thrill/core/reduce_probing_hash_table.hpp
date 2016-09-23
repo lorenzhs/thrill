@@ -98,7 +98,7 @@ public:
         const KeyExtractor& key_extractor,
         const ReduceFunction& reduce_function,
         Emitter& emitter,
-        Manipulator &manipulator,
+        Manipulator& manipulator,
         size_t num_partitions,
         const ReduceConfig& config = ReduceConfig(),
         bool immediate_flush = false,
