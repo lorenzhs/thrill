@@ -61,12 +61,12 @@ auto sort_random = [](auto manipulator) {
     }
 
 
-TEST_CHECK(Dummy);
-TEST_CHECK(DropLast);
-TEST_CHECK(ResetToDefault);
-TEST_CHECK(AddToEmpty);
-TEST_CHECK(SetEqual);
-TEST_CHECK(DuplicateLast);
-TEST_CHECK_T(MoveToNextBlock, MoveToNextBlock<int>);
+TEST_CHECK(Dummy)
+TEST_CHECK(DropLast)
+TEST_CHECK(ResetToDefault)
+TEST_CHECK(AddToEmpty)
+TEST_CHECK(SetEqual)
+TEST_CHECK(DuplicateLast)
+TEST_CHECK_T(MoveToNextBlock, MoveToNextBlock<int>)
 
 /******************************************************************************/
