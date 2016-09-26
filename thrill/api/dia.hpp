@@ -21,6 +21,7 @@
 #include <thrill/api/context.hpp>
 #include <thrill/api/dia_node.hpp>
 #include <thrill/api/function_stack.hpp>
+#include <thrill/checkers/driver.hpp>
 #include <thrill/checkers/reduce.hpp>
 #include <thrill/checkers/sort.hpp>
 #include <thrill/common/function_traits.hpp>
@@ -1106,8 +1107,11 @@ public:
      * \ingroup dia_dops
      */
     template <typename CompareFunction = std::less<ValueType>,
-              typename Manipulator = checkers::SortManipulatorDummy>
-    auto Sort(const CompareFunction& compare_function = CompareFunction()) const;
+              typename CheckingDriver = checkers::Driver<
+                  checkers::SortCheckerDummy,
+                  checkers::SortManipulatorDummy> >
+    auto Sort(const CompareFunction& compare_function = CompareFunction(),
+              CheckingDriver* driver = new CheckingDriver()) const;
 
     /*!
      * Sort is a DOp, which sorts a given DIA according to the given compare_function.
@@ -1124,9 +1128,12 @@ public:
      * \ingroup dia_dops
      */
     template <typename CompareFunction, typename SortFunction,
-              typename Manipulator = checkers::SortManipulatorDummy>
+              typename CheckingDriver = checkers::Driver<
+                  checkers::SortCheckerDummy,
+                  checkers::SortManipulatorDummy> >
     auto Sort(const CompareFunction &compare_function,
-              const SortFunction &sort_algorithm) const;
+              const SortFunction &sort_algorithm,
+              CheckingDriver* driver = new CheckingDriver()) const;
 
     /*!
      * Merge is a DOp, which merges two sorted DIAs to a single sorted DIA.

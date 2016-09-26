@@ -25,6 +25,25 @@
 namespace thrill {
 namespace checkers {
 
+class SortCheckerDummy {
+public:
+    SortCheckerDummy() {}
+
+    template <typename Ignored>
+    SortCheckerDummy(Ignored&) {}
+
+    void reset() {}
+
+    template <typename Ignored>
+    void add_pre(const Ignored &) {}
+
+    template <typename Ignored>
+    void add_post(const Ignored &) {}
+
+    template <typename Ignored>
+    bool check(Ignored&) { return true; }
+};
+
 /*!
  * Probabilistic checker for sorting algorithms
  *
@@ -49,7 +68,8 @@ public:
      *
      * \param cmp_ Compare function to use
      */
-    explicit SortChecker(CompareFunction cmp_) : cmp(cmp_) { reset(); }
+    explicit SortChecker(CompareFunction cmp_ = CompareFunction{})
+        : cmp(cmp_) { reset(); }
 
     //! Reset the checker's internal state
     void reset() {
@@ -177,6 +197,7 @@ struct SortManipulatorDummy {
     template <typename Ignored>
     void operator () (Ignored) { }
     bool made_changes() const { return false; }
+    void reset() {}
 };
 
 //! Drop last element from vector

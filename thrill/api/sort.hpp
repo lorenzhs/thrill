@@ -53,7 +53,7 @@ namespace api {
  * \ingroup api_layer
  */
 template <typename ValueType, typename CompareFunction, typename SortAlgorithm,
-          typename Manipulator>
+          typename CheckingDriver>
 class SortNode final : public DOpNode<ValueType>
 {
     static constexpr bool debug = false;
@@ -74,8 +74,6 @@ class SortNode final : public DOpNode<ValueType>
 
     using SampleIndexPair = std::pair<ValueType, size_t>;
 
-    using Checker = checkers::SortChecker<ValueType, CompareFunction>;
-
     static const bool use_background_thread_ = false;
 
 public:
@@ -85,13 +83,13 @@ public:
     template <typename ParentDIA>
     SortNode(const ParentDIA& parent,
              const CompareFunction& compare_function,
+             CheckingDriver& driver,
              const SortAlgorithm& sort_algorithm = SortAlgorithm())
         : Super(parent.ctx(), "Sort", { parent.id() }, { parent.node() }),
           compare_function_(compare_function),
           sort_algorithm_(sort_algorithm),
           parent_stack_empty_(ParentDIA::stack_empty),
-          checker_(compare_function),
-          checking_driver_(checker_, manipulator_)
+          checking_driver_(driver)
     {
         // Hook PreOp(s)
         auto pre_op_fn = [this](const ValueType& input) {
@@ -104,14 +102,14 @@ public:
 
     void StartPreOp(size_t /* id */) final {
         timer_preop_.Start();
-        if (check) checker_.reset();
+        if (check) checking_driver_.reset();
         unsorted_writer_ = unsorted_file_.GetWriter();
     }
 
     void PreOp(const ValueType& input) {
         if (check) {
             // let the checker hash the item
-            checker_.add_pre(input);
+            checking_driver_.checker().add_pre(input);
         }
         unsorted_writer_.Put(input);
         // In this stage we do not know how many elements are there in total.
@@ -146,7 +144,8 @@ public:
             // (random access), but the checker needs to hash every element
             auto reader = unsorted_file_.GetKeepReader();
             for (size_t i = 0; i < local_items_; ++i) {
-                checker_.add_pre(reader.template Next<ValueType>());
+                checking_driver_.checker().add_pre(
+                    reader.template Next<ValueType>());
             }
         }
 
@@ -235,7 +234,8 @@ public:
                 // Push the file to the checker, item by item
                 auto reader = files_[0].GetKeepReader();
                 while (reader.HasNext()) {
-                    checker_.add_post(reader.template Next<ValueType>());
+                    checking_driver_.checker().add_post(
+                        reader.template Next<ValueType>());
                 }
             }
             this->PushFile(files_[0], consume);
@@ -298,7 +298,7 @@ public:
 
             while (puller.HasNext()) {
                 auto next = puller.Next();
-                if (check) checker_.add_post(next);
+                if (check) checking_driver_.checker().add_post(next);
                 this->PushItem(next);
                 local_size++;
             }
@@ -343,11 +343,7 @@ private:
     //! Number of items on this worker
     size_t local_items_ = 0;
 
-    //! Probabilistic correctness checker
-    Checker checker_;
-    //! Manipulator to fudge the result, so that the checker has something to do
-    Manipulator manipulator_;
-    checkers::Driver<Checker, Manipulator> checking_driver_;
+    CheckingDriver &checking_driver_;
 
     //! Sample vector: pairs of (sample,local index)
     std::vector<SampleIndexPair> samples_;
@@ -783,14 +779,14 @@ private:
                 vec.push_back(reader.template Next<ValueType>());
             }
             else {
-                manipulator_(vec);
+                checking_driver_.manipulator()(vec);
                 SortAndWriteToFile(vec, files_);
             }
         }
 
         // call Manipulate before the check so it can potentially insert an
         // element into an otherwise empty output
-        manipulator_(vec);
+        checking_driver_.manipulator()(vec);
         if (vec.size())
             SortAndWriteToFile(vec, files_);
 
@@ -811,12 +807,13 @@ public:
 };
 
 template <typename ValueType, typename Stack>
-template <typename CompareFunction, typename Manipulator>
-auto DIA<ValueType, Stack>::Sort(const CompareFunction &compare_function) const {
+template <typename CompareFunction, typename CheckingDriver>
+auto DIA<ValueType, Stack>::Sort(const CompareFunction &compare_function,
+                                 CheckingDriver* driver) const {
     assert(IsValid());
 
     using SortNode = api::SortNode<
-              ValueType, CompareFunction, DefaultSortAlgorithm, Manipulator>;
+              ValueType, CompareFunction, DefaultSortAlgorithm, CheckingDriver>;
 
     static_assert(
         std::is_convertible<
@@ -836,20 +833,21 @@ auto DIA<ValueType, Stack>::Sort(const CompareFunction &compare_function) const 
             bool>::value,
         "CompareFunction has the wrong output type (should be bool)");
 
-    auto node = common::MakeCounting<SortNode>(*this, compare_function);
+    auto node = common::MakeCounting<SortNode>(*this, compare_function, *driver);
 
     return DIA<ValueType>(node);
 }
 
 template <typename ValueType, typename Stack>
 template <typename CompareFunction, typename SortAlgorithm,
-          typename Manipulator>
+          typename CheckingDriver>
 auto DIA<ValueType, Stack>::Sort(const CompareFunction &compare_function,
-                                 const SortAlgorithm &sort_algorithm) const {
+                                 const SortAlgorithm &sort_algorithm,
+                                 CheckingDriver* driver) const {
     assert(IsValid());
 
     using SortNode = api::SortNode<
-              ValueType, CompareFunction, SortAlgorithm, Manipulator>;
+              ValueType, CompareFunction, SortAlgorithm, CheckingDriver>;
 
     static_assert(
         std::is_convertible<
@@ -870,7 +868,7 @@ auto DIA<ValueType, Stack>::Sort(const CompareFunction &compare_function,
         "CompareFunction has the wrong output type (should be bool)");
 
     auto node = common::MakeCounting<SortNode>(
-        *this, compare_function, sort_algorithm);
+        *this, compare_function, *driver, sort_algorithm);
 
     return DIA<ValueType>(node);
 }

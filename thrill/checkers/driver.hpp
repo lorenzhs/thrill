@@ -26,10 +26,23 @@ class Driver
     static const bool debug = true;
 
 public:
-    Driver(Checker& checker, Manipulator& manipulator)
+    Driver() : checker_(), manipulator_() {}
+
+    template <typename Arg>
+    explicit Driver(Arg& arg) : checker_(arg), manipulator_() {}
+
+    Driver(Checker checker, Manipulator manipulator)
         : checker_(checker),
           manipulator_(manipulator)
     { }
+
+    using checker_t = Checker;
+    using manipulator_t = Manipulator;
+
+    void reset() {
+        checker_.reset();
+        manipulator_.reset();
+    }
 
     bool check(api::Context& ctx) {
         bool success = checker_.check(ctx);
@@ -51,8 +64,8 @@ public:
     Manipulator& manipulator() { return manipulator_; }
 
 protected:
-    Checker& checker_;
-    Manipulator& manipulator_;
+    Checker checker_;
+    Manipulator manipulator_;
 };
 
 } // namespace checkers
