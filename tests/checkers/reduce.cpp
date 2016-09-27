@@ -25,76 +25,53 @@
 
 using namespace thrill; // NOLINT
 
-using Manipulator = checkers::ReduceManipulatorDummy;
+constexpr size_t default_reps = 100;
 
-TEST(ReduceChecker, ReduceModulo2CorrectResults) {
+auto reduce_by_key_test_factory = [](auto manipulator, size_t reps = default_reps) {
+    using Value = size_t;
+    using ReduceFn = std::plus<Value>;
 
-    auto start_func =
-        [](Context& ctx) {
+    using Checker = checkers::ReduceChecker<Value, Value, ReduceFn>;
+    using Manipulator = decltype(manipulator);
+    using Driver = checkers::Driver<Checker, Manipulator>;
 
-            auto integers = Generate(
-                ctx, 0x1000000,
-                [](const size_t& index) {
-                    return index + 1;
-                });
+    return [reps](Context& ctx) {
+        std::default_random_engine generator(std::random_device { } ());
+        std::uniform_int_distribution<Value> distribution(0, 10000);
 
-            auto modulo_two = [](size_t in) {
-                                  return (in % 2) + 1;
-                              };
+        ctx.enable_consume();
 
-            auto driver = std::make_shared<
-                checkers::Driver<
-                    checkers::ReduceChecker<size_t, size_t, std::plus<size_t> >,
-                    Manipulator>
-                >();
+        for (size_t i = 0; i < reps; ++i) {
+            auto driver = std::make_shared<Driver>();
+            auto key_extractor = [](Value in) { return in & 0xFFFF; };
 
-            auto reduced = integers.ReduceByKey(
-                VolatileKeyTag, modulo_two, std::plus<size_t>(),
-                api::DefaultReduceConfig(), driver);
+            size_t force_eval =
+                Generate(
+                    ctx, 1000000,
+                    [&distribution, &generator](const size_t&) -> Value
+                    { return distribution(generator); })
+                .ReduceByKey(
+                    VolatileKeyTag, key_extractor, ReduceFn(),
+                    api::DefaultReduceConfig(), driver)
+                .Size();
 
-            auto force_eval = reduced.Size();
-
+            ASSERT_TRUE(force_eval > 0); // dummy
             ASSERT_TRUE(driver->check(ctx));
-            ASSERT_TRUE(force_eval > 0);
-        };
+        }
+    };
+};
 
-    api::RunLocalTests(start_func);
+
+// yikes, preprocessor
+#define TEST_CHECK(MANIP) TEST(Reduce, ReduceByKeyWith ## MANIP) { \
+        api::Run(reduce_by_key_test_factory(                       \
+                     checkers::ReduceManipulator ## MANIP()));     \
 }
 
-//! Test sums of integers 0..n-1 for n=100 in 1000 buckets in the reduce table
-TEST(ReduceChecker, ReduceModuloPairsCorrectResults) {
-
-    static constexpr size_t test_size = 0x1000000;
-    static constexpr size_t mod_size = 1024u;
-    static constexpr size_t div_size = test_size / mod_size;
-
-    auto start_func =
-        [](Context& ctx) {
-
-            using IntPair = std::pair<size_t, size_t>;
-
-            auto integers = Generate(
-                ctx, test_size,
-                [](const size_t& index) {
-                    return IntPair(index % mod_size, index / mod_size);
-                });
-
-            auto driver = std::make_shared<
-                checkers::Driver<
-                    checkers::ReduceChecker<size_t, size_t, std::plus<size_t> >,
-                    Manipulator>
-                >();
-
-            auto reduced = integers.ReducePair(
-                std::plus<size_t>(), api::DefaultReduceConfig(), driver);
-
-            auto force_eval = reduced.Size();
-
-            ASSERT_TRUE(driver->check(ctx));
-            ASSERT_TRUE(force_eval > 0);
-        };
-
-    api::RunLocalTests(start_func);
-}
+TEST_CHECK(Dummy)
+TEST_CHECK(DropFirst)
+TEST_CHECK(IncFirst)
+TEST_CHECK(IncFirstKey)
+TEST_CHECK(SwitchValues)
 
 /******************************************************************************/

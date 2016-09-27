@@ -44,9 +44,8 @@ auto sort_random = [](auto manipulator, size_t reps = default_reps) {
             size_t force_eval =
                 Generate(
                     ctx, 1000000,
-                    [&distribution, &generator](const size_t&) -> Value {
-                        return distribution(generator);
-                    })
+                    [&distribution, &generator](const size_t&) -> Value
+                    { return distribution(generator); })
                 .Sort(Compare{}, driver)
                 .Size();
 

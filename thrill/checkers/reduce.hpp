@@ -160,6 +160,7 @@ class ReduceChecker<Key, Value, ReduceFunction,
                                               reduce_checkable_v<ReduceFunction> > >
 {
     using KeyValuePair = std::pair<Key, Value>;
+    static constexpr bool debug = false;
 
 public:
     void add_pre(const Key& key, const Value& value) {
@@ -180,7 +181,8 @@ public:
         mini_pre.all_reduce(ctx);
         mini_post.all_reduce(ctx);
         bool success = (mini_pre == mini_post);
-        LOGC(ctx.my_rank() == 0) << "check(): " << (success ? "yay" : "NAY");
+        LOGC(debug && ctx.my_rank() == 0)
+            << "check(): " << (success ? "yay" : "NAY");
         return success;
     }
 
