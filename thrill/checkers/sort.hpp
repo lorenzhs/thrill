@@ -96,7 +96,7 @@ public:
     THRILL_ATTRIBUTE_ALWAYS_INLINE
     void add_post(const ValueType& v) {
         if (THRILL_LIKELY(count_post > 0) && cmp(v, last_post)) {
-            sLOG1 << "Non-sorted values in output";  // << last_post << v;
+            sLOG << "Non-sorted values in output";  // << last_post << v;
             sorted_ = false;
         }
         last_post = v;
@@ -123,14 +123,14 @@ public:
         // If any predecessor PE has an item, and we have one,
         // check that the predecessor is smaller
         if (recv.size() > 0 && count_post > 0 && cmp(first_post, recv[0])) {
-            sLOG1 << "check(): predecessor has larger item";
+            sLOG << "check(): predecessor has larger item";
             sorted_ = false;
         }
 
         int unsorted_count = sorted_ ? 0 : 1;
         unsorted_count = ctx.net.AllReduce(unsorted_count);
 
-        LOGC(ctx.my_rank() == 0 && unsorted_count > 0)
+        LOGC(debug && ctx.my_rank() == 0 && unsorted_count > 0)
             << common::log::fg_red() << common::log::bold() << unsorted_count
             << " of " << ctx.num_workers()
             << " PEs have output that isn't sorted" << common::log::reset();
@@ -154,13 +154,13 @@ public:
 
         const bool success = (sum[0] == sum[1]) && (sum[2] == sum[3]);
 
-        LOGC(!success && ctx.my_rank() == 0)
+        LOGC(debug && !success && ctx.my_rank() == 0)
             << common::log::fg_red() << common::log::bold()
             << "check() permutation: " << sum[0] << " pre-items, " << sum[1]
             << " post-items; check FAILED!!!!! Global pre-sum: " << sum[2]
             << " global post-sum: " << sum[3] << common::log::reset();
 
-        LOGC(success && debug && ctx.my_rank() == 0)
+        LOGC(debug && success && ctx.my_rank() == 0)
             << "check() permutation: " << sum[0] << " pre-items, " << sum[1]
             << " post-items; check successful. Global pre-sum: " << sum[2]
             << " global post-sum: " << sum[3];

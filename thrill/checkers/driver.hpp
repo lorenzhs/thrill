@@ -25,7 +25,7 @@ namespace checkers {
 template <typename Checker, typename Manipulator>
 class Driver
 {
-    static const bool debug = true;
+    static const bool debug = false;
 
 public:
     template <typename ... Args>
@@ -55,6 +55,11 @@ public:
 
         sLOGC(debug && ctx.net.my_rank() == 0)
             << "checking driver: check" << success << "manip" << manipulated;
+
+        LOGC(success == manipulated)
+            << common::log::bold() << common::log::fg_red()
+            << "Checker failure: check " << success << "; manip " << manipulated
+            << common::log::reset();
 
         // If it was manipulated and detected, or not manipulated and passed,
         // then we're good
