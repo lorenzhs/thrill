@@ -52,14 +52,13 @@ auto sort_random = [](auto manipulator) {
 };
 
 // yikes, preprocessor
-#define TEST_CHECK(MANIP) TEST(Sort, SortWith##MANIP) {                 \
-        api::RunLocalTests(ram, sort_random(checkers::SortManipulator##MANIP())); \
-    }
+#define TEST_CHECK(MANIP) TEST(Sort, SortWith ## MANIP) {                           \
+        api::RunLocalTests(ram, sort_random(checkers::SortManipulator ## MANIP())); \
+}
 
-#define TEST_CHECK_T(NAME, FULL) TEST(Sort, SortWith##NAME) {               \
-        api::RunLocalTests(ram, sort_random(checkers::SortManipulator##FULL())); \
-    }
-
+#define TEST_CHECK_T(NAME, FULL) TEST(Sort, SortWith ## NAME) {                    \
+        api::RunLocalTests(ram, sort_random(checkers::SortManipulator ## FULL())); \
+}
 
 TEST_CHECK(Dummy)
 TEST_CHECK(DropLast)

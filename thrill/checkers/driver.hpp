@@ -28,9 +28,9 @@ class Driver
     static const bool debug = true;
 
 public:
-    template <typename...Args>
-    explicit Driver(Args && ... args)
-        : checker_(std::forward<Args>(args)...), manipulator_() {}
+    template <typename ... Args>
+    explicit Driver(Args&& ... args)
+        : checker_(std::forward<Args>(args) ...), manipulator_() { }
 
     Driver(Checker checker, Manipulator manipulator)
         : checker_(checker),

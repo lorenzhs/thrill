@@ -1111,7 +1111,7 @@ public:
                   checkers::SortCheckerDummy,
                   checkers::SortManipulatorDummy> >
     auto Sort(const CompareFunction& compare_function = CompareFunction(),
-              CheckingDriver* driver = new CheckingDriver()) const;
+              CheckingDriver * driver = new CheckingDriver()) const;
 
     /*!
      * Sort is a DOp, which sorts a given DIA according to the given compare_function.
@@ -1133,7 +1133,7 @@ public:
                   checkers::SortManipulatorDummy> >
     auto Sort(const CompareFunction &compare_function,
               const SortFunction &sort_algorithm,
-              CheckingDriver* driver = new CheckingDriver()) const;
+              CheckingDriver * driver = new CheckingDriver()) const;
 
     /*!
      * Merge is a DOp, which merges two sorted DIAs to a single sorted DIA.

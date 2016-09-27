@@ -343,7 +343,7 @@ private:
     //! Number of items on this worker
     size_t local_items_ = 0;
 
-    CheckingDriver &checking_driver_;
+    CheckingDriver& checking_driver_;
 
     //! Sample vector: pairs of (sample,local index)
     std::vector<SampleIndexPair> samples_;
@@ -809,7 +809,7 @@ public:
 template <typename ValueType, typename Stack>
 template <typename CompareFunction, typename CheckingDriver>
 auto DIA<ValueType, Stack>::Sort(const CompareFunction &compare_function,
-                                 CheckingDriver* driver) const {
+                                 CheckingDriver * driver) const {
     assert(IsValid());
 
     using SortNode = api::SortNode<
@@ -843,7 +843,7 @@ template <typename CompareFunction, typename SortAlgorithm,
           typename CheckingDriver>
 auto DIA<ValueType, Stack>::Sort(const CompareFunction &compare_function,
                                  const SortAlgorithm &sort_algorithm,
-                                 CheckingDriver* driver) const {
+                                 CheckingDriver * driver) const {
     assert(IsValid());
 
     using SortNode = api::SortNode<
