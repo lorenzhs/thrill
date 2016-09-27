@@ -157,7 +157,6 @@ thrill_build_test(data/multiplexer_test)
 thrill_build_test(data/serialization_cereal_test)
 thrill_build_test(data/serialization_test)
 
-thrill_build_test(core/reduce_checker_test)
 thrill_build_test(core/reduce_hash_table_test)
 thrill_build_test(core/reduce_post_phase_test)
 thrill_build_test(core/reduce_pre_phase_test)
@@ -178,6 +177,7 @@ thrill_build_test(examples/page_rank_test)
 thrill_build_test(examples/select_test)
 thrill_build_test(examples/word_count_test)
 
+thrill_build_test(checkers/reduce)
 thrill_build_test(checkers/sort)
 
 ### Copy input files into tests binary directory: CMAKE_BINARY_DIR/tests/

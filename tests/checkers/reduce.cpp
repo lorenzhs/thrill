@@ -1,5 +1,5 @@
 /*******************************************************************************
- * tests/core/reduce_checker_test.cpp
+ * tests/checkers/reduce.cpp
  *
  * Part of Project Thrill - http://project-thrill.org
  *
@@ -11,10 +11,12 @@
  ******************************************************************************/
 
 #include <gtest/gtest.h>
-#include <thrill/api/all_gather.hpp>
 #include <thrill/api/generate.hpp>
 #include <thrill/api/reduce_by_key.hpp>
 #include <thrill/api/reduce_to_index.hpp>
+#include <thrill/api/size.hpp>
+#include <thrill/checkers/driver.hpp>
+#include <thrill/checkers/reduce.hpp>
 
 #include <algorithm>
 #include <string>
@@ -22,6 +24,8 @@
 #include <vector>
 
 using namespace thrill; // NOLINT
+
+using Manipulator = checkers::ReduceManipulatorDummy;
 
 TEST(ReduceChecker, ReduceModulo2CorrectResults) {
 
@@ -38,21 +42,20 @@ TEST(ReduceChecker, ReduceModulo2CorrectResults) {
                                   return (in % 2) + 1;
                               };
 
-            auto add_function = std::plus<size_t>();
+            auto driver = std::make_shared<
+                checkers::Driver<
+                    checkers::ReduceChecker<size_t, size_t, std::plus<size_t> >,
+                    Manipulator>
+                >();
+
             auto reduced = integers.ReduceByKey(
-                VolatileKeyTag, modulo_two, add_function);
+                VolatileKeyTag, modulo_two, std::plus<size_t>(),
+                api::DefaultReduceConfig(), driver);
 
-            std::vector<size_t> out_vec = reduced.AllGather();
+            auto force_eval = reduced.Size();
 
-            std::sort(out_vec.begin(), out_vec.end());
-
-            size_t i = 0;
-
-            for (const size_t& element : out_vec) {
-                ASSERT_EQ(element, (1ULL << 46) + (1ULL << 23) * (i++));
-            }
-
-            ASSERT_EQ((size_t)2, out_vec.size());
+            ASSERT_TRUE(driver->check(ctx));
+            ASSERT_TRUE(force_eval > 0);
         };
 
     api::RunLocalTests(start_func);
@@ -76,20 +79,19 @@ TEST(ReduceChecker, ReduceModuloPairsCorrectResults) {
                     return IntPair(index % mod_size, index / mod_size);
                 });
 
-            auto add_function = std::plus<size_t>();
-            auto reduced = integers.ReducePair(add_function);
+            auto driver = std::make_shared<
+                checkers::Driver<
+                    checkers::ReduceChecker<size_t, size_t, std::plus<size_t> >,
+                    Manipulator>
+                >();
 
-            std::vector<IntPair> out_vec = reduced.AllGather();
+            auto reduced = integers.ReducePair(
+                std::plus<size_t>(), api::DefaultReduceConfig(), driver);
 
-            std::sort(out_vec.begin(), out_vec.end(),
-                      [](const IntPair& p1, const IntPair& p2) {
-                          return p1.first < p2.first;
-                      });
+            auto force_eval = reduced.Size();
 
-            ASSERT_EQ(mod_size, out_vec.size());
-            for (const auto& element : out_vec) {
-                ASSERT_EQ(element.second, (div_size * (div_size - 1)) / 2u);
-            }
+            ASSERT_TRUE(driver->check(ctx));
+            ASSERT_TRUE(force_eval > 0);
         };
 
     api::RunLocalTests(start_func);

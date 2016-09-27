@@ -57,18 +57,18 @@ auto sort_random = [](auto manipulator, size_t reps = default_reps) {
 };
 
 // yikes, preprocessor
-#define TEST_CHECK(MANIP) TEST(Sort, SortWith ## MANIP) {               \
-        api::Run(sort_random(checkers::SortManipulator ## MANIP()));    \
+#define TEST_CHECK(MANIP) TEST(Sort, SortWith ## MANIP) {            \
+        api::Run(sort_random(checkers::SortManipulator ## MANIP())); \
 }
 
 // run with specified number of iterations
-#define TEST_CHECK_I(MANIP, ITS) TEST(Sort, SortWith ## MANIP) {              \
-        api::Run(sort_random(checkers::SortManipulator ## MANIP(), ITS));   \
+#define TEST_CHECK_I(MANIP, ITS) TEST(Sort, SortWith ## MANIP) {          \
+        api::Run(sort_random(checkers::SortManipulator ## MANIP(), ITS)); \
 }
 
 // run with template parameter
-#define TEST_CHECK_T(NAME, FULL) TEST(Sort, SortWith ## NAME) {        \
-        api::Run(sort_random(checkers::SortManipulator ## FULL()));    \
+#define TEST_CHECK_T(NAME, FULL) TEST(Sort, SortWith ## NAME) {     \
+        api::Run(sort_random(checkers::SortManipulator ## FULL())); \
 }
 
 TEST_CHECK_I(Dummy, 1)
