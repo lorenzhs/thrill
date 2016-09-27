@@ -43,8 +43,8 @@ auto sort_random = [](auto manipulator) {
                 return distribution(generator);
             });
 
-        std::shared_ptr<Driver> driver;
-        auto sorted = integers.template Sort<Compare, Driver>(Compare{}, driver);
+        std::shared_ptr<Driver> driver = std::make_shared<Driver>();
+        auto sorted = integers.Sort(Compare{}, driver);
         auto force_eval = sorted.Size();
 
         ASSERT_TRUE(force_eval > 0); // dummy
