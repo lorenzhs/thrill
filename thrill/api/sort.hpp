@@ -31,6 +31,7 @@
 #include <cstdlib>
 #include <deque>
 #include <functional>
+#include <memory>
 #include <numeric>
 #include <random>
 #include <utility>
@@ -83,7 +84,7 @@ public:
     template <typename ParentDIA>
     SortNode(const ParentDIA& parent,
              const CompareFunction& compare_function,
-             CheckingDriver& driver,
+             std::shared_ptr<CheckingDriver> driver,
              const SortAlgorithm& sort_algorithm = SortAlgorithm())
         : Super(parent.ctx(), "Sort", { parent.id() }, { parent.node() }),
           compare_function_(compare_function),
@@ -102,14 +103,14 @@ public:
 
     void StartPreOp(size_t /* id */) final {
         timer_preop_.Start();
-        if (check) checking_driver_.reset();
+        if (check) checking_driver_->reset();
         unsorted_writer_ = unsorted_file_.GetWriter();
     }
 
     void PreOp(const ValueType& input) {
         if (check) {
             // let the checker hash the item
-            checking_driver_.checker().add_pre(input);
+            checking_driver_->checker().add_pre(input);
         }
         unsorted_writer_.Put(input);
         // In this stage we do not know how many elements are there in total.
@@ -144,7 +145,7 @@ public:
             // (random access), but the checker needs to hash every element
             auto reader = unsorted_file_.GetKeepReader();
             for (size_t i = 0; i < local_items_; ++i) {
-                checking_driver_.checker().add_pre(
+                checking_driver_->checker().add_pre(
                     reader.template Next<ValueType>());
             }
         }
@@ -234,7 +235,7 @@ public:
                 // Push the file to the checker, item by item
                 auto reader = files_[0].GetKeepReader();
                 while (reader.HasNext()) {
-                    checking_driver_.checker().add_post(
+                    checking_driver_->checker().add_post(
                         reader.template Next<ValueType>());
                 }
             }
@@ -298,7 +299,7 @@ public:
 
             while (puller.HasNext()) {
                 auto next = puller.Next();
-                if (check) checking_driver_.checker().add_post(next);
+                if (check) checking_driver_->checker().add_post(next);
                 this->PushItem(next);
                 local_size++;
             }
@@ -306,7 +307,7 @@ public:
 
         // Do the checking
         if (check) {
-            checking_driver_.check(context_);
+            checking_driver_->check(context_);
         }
 
         timer_pushdata.Stop();
@@ -343,7 +344,7 @@ private:
     //! Number of items on this worker
     size_t local_items_ = 0;
 
-    CheckingDriver& checking_driver_;
+    std::shared_ptr<CheckingDriver> checking_driver_;
 
     //! Sample vector: pairs of (sample,local index)
     std::vector<SampleIndexPair> samples_;
@@ -779,14 +780,14 @@ private:
                 vec.push_back(reader.template Next<ValueType>());
             }
             else {
-                checking_driver_.manipulator()(vec);
+                checking_driver_->manipulator()(vec);
                 SortAndWriteToFile(vec, files_);
             }
         }
 
         // call Manipulate before the check so it can potentially insert an
         // element into an otherwise empty output
-        checking_driver_.manipulator()(vec);
+        checking_driver_->manipulator()(vec);
         if (vec.size())
             SortAndWriteToFile(vec, files_);
 
@@ -809,7 +810,7 @@ public:
 template <typename ValueType, typename Stack>
 template <typename CompareFunction, typename CheckingDriver>
 auto DIA<ValueType, Stack>::Sort(const CompareFunction &compare_function,
-                                 CheckingDriver * driver) const {
+                                 std::shared_ptr<CheckingDriver> driver) const {
     assert(IsValid());
 
     using SortNode = api::SortNode<
@@ -833,7 +834,7 @@ auto DIA<ValueType, Stack>::Sort(const CompareFunction &compare_function,
             bool>::value,
         "CompareFunction has the wrong output type (should be bool)");
 
-    auto node = common::MakeCounting<SortNode>(*this, compare_function, *driver);
+    auto node = common::MakeCounting<SortNode>(*this, compare_function, driver);
 
     return DIA<ValueType>(node);
 }
@@ -843,7 +844,7 @@ template <typename CompareFunction, typename SortAlgorithm,
           typename CheckingDriver>
 auto DIA<ValueType, Stack>::Sort(const CompareFunction &compare_function,
                                  const SortAlgorithm &sort_algorithm,
-                                 CheckingDriver * driver) const {
+                                 std::shared_ptr<CheckingDriver> driver) const {
     assert(IsValid());
 
     using SortNode = api::SortNode<
@@ -868,7 +869,7 @@ auto DIA<ValueType, Stack>::Sort(const CompareFunction &compare_function,
         "CompareFunction has the wrong output type (should be bool)");
 
     auto node = common::MakeCounting<SortNode>(
-        *this, compare_function, *driver, sort_algorithm);
+        *this, compare_function, driver, sort_algorithm);
 
     return DIA<ValueType>(node);
 }

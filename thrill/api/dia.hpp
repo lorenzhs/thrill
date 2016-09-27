@@ -29,6 +29,7 @@
 
 #include <cassert>
 #include <functional>
+#include <memory>
 #include <ostream>
 #include <string>
 #include <utility>
@@ -745,7 +746,8 @@ public:
     auto ReduceByKey(const KeyExtractor &key_extractor,
                      const ReduceFunction &reduce_function,
                      const ReduceConfig& reduce_config = ReduceConfig(),
-                     CheckingDriver * driver = new CheckingDriver()) const;
+                     std::shared_ptr<CheckingDriver> driver =
+                         std::make_shared<CheckingDriver>()) const;
 
     /*!
      * ReduceByKey is a DOp, which groups elements of the DIA with the
@@ -785,7 +787,8 @@ public:
                      const KeyExtractor &key_extractor,
                      const ReduceFunction &reduce_function,
                      const ReduceConfig& reduce_config = ReduceConfig(),
-                     CheckingDriver * driver = new CheckingDriver()) const;
+                     std::shared_ptr<CheckingDriver> driver =
+                         std::make_shared<CheckingDriver>()) const;
 
     /*!
      * ReducePair is a DOp, which groups key-value-pairs in the input DIA by
@@ -816,7 +819,8 @@ public:
                   checkers::ReduceManipulatorDummy> >
     auto ReducePair(const ReduceFunction &reduce_function,
                     const ReduceConfig& reduce_config = ReduceConfig(),
-                    CheckingDriver * driver = new CheckingDriver()) const;
+                    std::shared_ptr<CheckingDriver> driver =
+                        std::make_shared<CheckingDriver>()) const;
 
     /*!
      * ReduceToIndex is a DOp, which groups elements of the DIA with the
@@ -865,7 +869,8 @@ public:
         size_t size,
         const ValueType& neutral_element = ValueType(),
         const ReduceConfig& reduce_config = ReduceConfig(),
-        CheckingDriver * driver = new CheckingDriver()) const;
+        std::shared_ptr<CheckingDriver> driver =
+            std::make_shared<CheckingDriver>()) const;
 
     /*!
      * ReduceToIndexByKey is a DOp, which groups elements of the DIA with the
@@ -916,7 +921,8 @@ public:
         size_t size,
         const ValueType& neutral_element = ValueType(),
         const ReduceConfig& reduce_config = ReduceConfig(),
-        CheckingDriver * driver = new CheckingDriver()) const;
+        std::shared_ptr<CheckingDriver> driver =
+            std::make_shared<CheckingDriver>()) const;
 
     /*!
      * GroupByKey is a DOp, which groups elements of the DIA by its key.
@@ -1126,7 +1132,8 @@ public:
                   checkers::SortCheckerDummy,
                   checkers::SortManipulatorDummy> >
     auto Sort(const CompareFunction& compare_function = CompareFunction(),
-              CheckingDriver * driver = new CheckingDriver()) const;
+              std::shared_ptr<CheckingDriver> driver =
+                  std::make_shared<CheckingDriver>()) const;
 
     /*!
      * Sort is a DOp, which sorts a given DIA according to the given compare_function.
@@ -1148,7 +1155,8 @@ public:
                   checkers::SortManipulatorDummy> >
     auto Sort(const CompareFunction &compare_function,
               const SortFunction &sort_algorithm,
-              CheckingDriver * driver = new CheckingDriver()) const;
+              std::shared_ptr<CheckingDriver> driver =
+                  std::make_shared<CheckingDriver>()) const;
 
     /*!
      * Merge is a DOp, which merges two sorted DIAs to a single sorted DIA.

@@ -17,6 +17,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -42,12 +43,12 @@ auto sort_random = [](auto manipulator) {
                 return distribution(generator);
             });
 
-        Driver driver;
-        auto sorted = integers.template Sort<Compare, Driver>(Compare{}, &driver);
+        std::shared_ptr<Driver> driver;
+        auto sorted = integers.template Sort<Compare, Driver>(Compare{}, driver);
         auto force_eval = sorted.Size();
 
         ASSERT_TRUE(force_eval > 0); // dummy
-        ASSERT_TRUE(driver.check(ctx));
+        ASSERT_TRUE(driver->check(ctx));
     };
 };
 

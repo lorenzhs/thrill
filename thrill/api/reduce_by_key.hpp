@@ -26,6 +26,7 @@
 #include <thrill/core/reduce_pre_phase.hpp>
 
 #include <functional>
+#include <memory>
 #include <thread>
 #include <type_traits>
 #include <typeinfo>
@@ -150,7 +151,7 @@ public:
                const KeyExtractor& key_extractor,
                const ReduceFunction& reduce_function,
                const ReduceConfig& config,
-               CheckingDriver& driver)
+               std::shared_ptr<CheckingDriver> driver)
         : Super(parent.ctx(), label, { parent.id() }, { parent.node() }),
           mix_stream_(use_mix_stream_ ?
                       parent.ctx().GetNewMixStream(this) : nullptr),
@@ -160,10 +161,10 @@ public:
                     mix_stream_->GetWriters() : cat_stream_->GetWriters()),
           pre_phase_(
               context_, Super::id(), parent.ctx().num_workers(), key_extractor,
-              reduce_function, emitters_, driver.manipulator(), config),
+              reduce_function, emitters_, driver->manipulator(), config),
           post_phase_(
               context_, Super::id(), key_extractor, reduce_function,
-              Emitter(this, driver.checker()), driver.manipulator(), config),
+              Emitter(this, driver->checker()), driver->manipulator(), config),
           key_extractor_(key_extractor),
           checking_driver_(driver)
     {
@@ -171,7 +172,7 @@ public:
         // reduce each bucket to a single value, afterwards send data to another
         // worker given by the shuffle algorithm.
         auto pre_op_fn = ReducePreOp<ValueType, decltype(pre_phase_), Checker>
-                             (pre_phase_, key_extractor, driver.checker());
+                             (pre_phase_, key_extractor, driver->checker());
         // close the function stack with our pre op and register it at
         // parent node for output
         auto lop_chain = parent.stack().push(pre_op_fn).fold();
@@ -225,7 +226,7 @@ public:
             reduced_ = true;
         }
         post_phase_.PushData(consume);
-        checking_driver_.check(context_);
+        checking_driver_->check(context_);
     }
 
     //! process the inbound data in the post reduce phase
@@ -275,7 +276,7 @@ private:
 
     const KeyExtractor& key_extractor_;
 
-    CheckingDriver& checking_driver_;
+    std::shared_ptr<CheckingDriver> checking_driver_;
 
     bool reduced_ = false;
 };
@@ -287,7 +288,7 @@ auto DIA<ValueType, Stack>::ReduceByKey(
     const KeyExtractor &key_extractor,
     const ReduceFunction &reduce_function,
     const ReduceConfig &reduce_config,
-    CheckingDriver * driver) const {
+    std::shared_ptr<CheckingDriver> driver) const {
     assert(IsValid());
 
     using DOpResult
@@ -325,7 +326,7 @@ auto DIA<ValueType, Stack>::ReduceByKey(
               ReduceConfig, CheckingDriver, /* VolatileKey */ false, false>;
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReduceByKey", key_extractor, reduce_function, reduce_config,
-        *driver);
+        driver);
 
     return DIA<DOpResult>(node);
 }
@@ -338,7 +339,7 @@ auto DIA<ValueType, Stack>::ReduceByKey(
     const KeyExtractor &key_extractor,
     const ReduceFunction &reduce_function,
     const ReduceConfig &reduce_config,
-    CheckingDriver * driver) const {
+    std::shared_ptr<CheckingDriver> driver) const {
     assert(IsValid());
 
     using DOpResult
@@ -378,7 +379,7 @@ auto DIA<ValueType, Stack>::ReduceByKey(
 
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReduceByKey", key_extractor, reduce_function, reduce_config,
-        *driver);
+        driver);
 
     return DIA<DOpResult>(node);
 }
@@ -389,7 +390,7 @@ template <typename ReduceFunction, typename ReduceConfig,
 auto DIA<ValueType, Stack>::ReducePair(
     const ReduceFunction &reduce_function,
     const ReduceConfig &reduce_config,
-    CheckingDriver * driver) const {
+    std::shared_ptr<CheckingDriver> driver) const {
     assert(IsValid());
 
     using DOpResult
@@ -433,7 +434,7 @@ auto DIA<ValueType, Stack>::ReducePair(
             value = value;
             return Key();
         },
-        reduce_function, reduce_config, *driver);
+        reduce_function, reduce_config, driver);
 
     return DIA<ValueType>(node);
 }
