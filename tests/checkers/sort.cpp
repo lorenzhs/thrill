@@ -12,15 +12,15 @@
 #include <thrill/api/generate.hpp>
 #include <thrill/api/size.hpp>
 #include <thrill/api/sort.hpp>
+#include <thrill/checkers/driver.hpp>
 #include <thrill/checkers/sort.hpp>
 
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <functional>
 #include <memory>
-#include <string>
 #include <utility>
-#include <vector>
 
 using namespace thrill; // NOLINT
 

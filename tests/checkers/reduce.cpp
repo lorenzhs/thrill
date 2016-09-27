@@ -13,15 +13,14 @@
 #include <gtest/gtest.h>
 #include <thrill/api/generate.hpp>
 #include <thrill/api/reduce_by_key.hpp>
-#include <thrill/api/reduce_to_index.hpp>
 #include <thrill/api/size.hpp>
 #include <thrill/checkers/driver.hpp>
 #include <thrill/checkers/reduce.hpp>
 
 #include <algorithm>
-#include <string>
-#include <utility>
-#include <vector>
+#include <functional>
+#include <memory>
+#include <random>
 
 using namespace thrill; // NOLINT
 
