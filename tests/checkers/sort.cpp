@@ -24,44 +24,54 @@
 
 using namespace thrill; // NOLINT
 
-// How much memory to allow
-constexpr size_t ram = 512 * 1024 * 1024ull;
+constexpr size_t default_reps = 100;
 
-auto sort_random = [](auto manipulator) {
+auto sort_random = [](auto manipulator, size_t reps = default_reps) {
     using Value = int;
     using Compare = std::less<Value>;
     using Checker = checkers::SortChecker<Value, Compare>;
     using Driver = checkers::Driver<Checker, decltype(manipulator)>;
 
-    return [](Context& ctx) {
+    return [reps](Context& ctx) {
         std::default_random_engine generator(std::random_device { } ());
         std::uniform_int_distribution<Value> distribution(0, 10000);
 
-        auto integers = Generate(
-            ctx, 1000000,
-            [&distribution, &generator](const size_t&) -> Value {
-                return distribution(generator);
-            });
+        ctx.enable_consume();
 
-        std::shared_ptr<Driver> driver = std::make_shared<Driver>();
-        auto sorted = integers.Sort(Compare{}, driver);
-        auto force_eval = sorted.Size();
+        for (size_t i = 0; i < reps; ++i) {
+            auto driver = std::make_shared<Driver>();
 
-        ASSERT_TRUE(force_eval > 0); // dummy
-        ASSERT_TRUE(driver->check(ctx));
+            size_t force_eval =
+                Generate(
+                    ctx, 1000000,
+                    [&distribution, &generator](const size_t&) -> Value {
+                        return distribution(generator);
+                    })
+                .Sort(Compare{}, driver)
+                .Size();
+
+            ASSERT_TRUE(force_eval > 0); // dummy
+            ASSERT_TRUE(driver->check(ctx));
+        }
     };
 };
 
 // yikes, preprocessor
-#define TEST_CHECK(MANIP) TEST(Sort, SortWith ## MANIP) {                           \
-        api::RunLocalTests(ram, sort_random(checkers::SortManipulator ## MANIP())); \
+#define TEST_CHECK(MANIP) TEST(Sort, SortWith ## MANIP) {               \
+        api::Run(sort_random(checkers::SortManipulator ## MANIP()));    \
 }
 
-#define TEST_CHECK_T(NAME, FULL) TEST(Sort, SortWith ## NAME) {                    \
-        api::RunLocalTests(ram, sort_random(checkers::SortManipulator ## FULL())); \
+// run with specified number of iterations
+#define TEST_CHECK_I(MANIP, ITS) TEST(Sort, SortWith ## MANIP) {              \
+        api::Run(sort_random(checkers::SortManipulator ## MANIP(), ITS));   \
 }
 
-TEST_CHECK(Dummy)
+// run with template parameter
+#define TEST_CHECK_T(NAME, FULL) TEST(Sort, SortWith ## NAME) {        \
+        api::Run(sort_random(checkers::SortManipulator ## FULL()));    \
+}
+
+TEST_CHECK_I(Dummy, 1)
 TEST_CHECK(DropLast)
 TEST_CHECK(ResetToDefault)
 TEST_CHECK(AddToEmpty)

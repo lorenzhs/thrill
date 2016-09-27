@@ -344,9 +344,11 @@ int RunBackendLoopback(
 
     // okay, configuration is good.
 
-    std::cerr << "Thrill: running locally with " << num_hosts
-              << " test hosts and " << workers_per_host << " workers per host"
-              << " in a local " << backend << " network." << std::endl;
+    if (mem_config.verbose_)
+        std::cerr
+            << "Thrill: running locally with " << num_hosts
+            << " test hosts and " << workers_per_host << " workers per host"
+            << " in a local " << backend << " network." << std::endl;
 
     RunLoopbackThreads<NetGroup>(
         mem_config, num_hosts, workers_per_host, job_startpoint);

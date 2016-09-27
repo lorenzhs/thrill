@@ -75,7 +75,7 @@ public:
     size_t ram_floating_;
 
     //! StageBuilder verbosity flag
-    bool verbose_ = true;
+    bool verbose_ = false;
 };
 
 /*!
