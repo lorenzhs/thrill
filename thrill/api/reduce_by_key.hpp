@@ -18,8 +18,6 @@
 
 #include <thrill/api/dia.hpp>
 #include <thrill/api/dop_node.hpp>
-#include <thrill/checkers/driver.hpp>
-#include <thrill/checkers/reduce.hpp>
 #include <thrill/common/functional.hpp>
 #include <thrill/common/logger.hpp>
 #include <thrill/common/meta.hpp>
@@ -60,7 +58,7 @@ class DefaultReduceConfig : public core::DefaultReduceConfig
  */
 template <typename ValueType,
           typename KeyExtractor, typename ReduceFunction,
-          typename ReduceConfig, typename Manipulator,
+          typename ReduceConfig, typename CheckingDriver,
           const bool VolatileKey, const bool SendPair>
 class ReduceNode final : public DOpNode<ValueType>
 {
@@ -76,7 +74,8 @@ class ReduceNode final : public DOpNode<ValueType>
     using PrePhaseOutput =
               typename common::If<VolatileKey, KeyValuePair, Value>::type;
 
-    using Checker = typename checkers::ReduceChecker<Key, Value, ReduceFunction>;
+    using Checker = typename CheckingDriver::checker_t;
+    using Manipulator = typename CheckingDriver::manipulator_t;
 
     static constexpr bool use_mix_stream_ = ReduceConfig::use_mix_stream_;
     static constexpr bool use_post_thread_ = ReduceConfig::use_post_thread_;
@@ -150,7 +149,8 @@ public:
                const char* label,
                const KeyExtractor& key_extractor,
                const ReduceFunction& reduce_function,
-               const ReduceConfig& config)
+               const ReduceConfig& config,
+               CheckingDriver& driver)
         : Super(parent.ctx(), label, { parent.id() }, { parent.node() }),
           mix_stream_(use_mix_stream_ ?
                       parent.ctx().GetNewMixStream(this) : nullptr),
@@ -159,19 +159,19 @@ public:
           emitters_(use_mix_stream_ ?
                     mix_stream_->GetWriters() : cat_stream_->GetWriters()),
           pre_phase_(
-              context_, Super::id(), parent.ctx().num_workers(),
-              key_extractor, reduce_function, emitters_, manipulator_, config),
+              context_, Super::id(), parent.ctx().num_workers(), key_extractor,
+              reduce_function, emitters_, driver.manipulator(), config),
           post_phase_(
               context_, Super::id(), key_extractor, reduce_function,
-              Emitter(this, checker_), manipulator_, config),
+              Emitter(this, driver.checker()), driver.manipulator(), config),
           key_extractor_(key_extractor),
-          checking_driver_(checker_, manipulator_)
+          checking_driver_(driver)
     {
         // Hook PreOp: Locally hash elements of the current DIA onto buckets and
         // reduce each bucket to a single value, afterwards send data to another
         // worker given by the shuffle algorithm.
-        auto pre_op_fn = ReducePreOp<ValueType, decltype(pre_phase_), decltype(checker_)>
-                             (pre_phase_, key_extractor, checker_);
+        auto pre_op_fn = ReducePreOp<ValueType, decltype(pre_phase_), Checker>
+                             (pre_phase_, key_extractor, driver.checker());
         // close the function stack with our pre op and register it at
         // parent node for output
         auto lop_chain = parent.stack().push(pre_op_fn).fold();
@@ -275,20 +275,19 @@ private:
 
     const KeyExtractor& key_extractor_;
 
-    Checker checker_;
-    Manipulator manipulator_;
-    checkers::Driver<Checker, Manipulator> checking_driver_;
+    CheckingDriver& checking_driver_;
 
     bool reduced_ = false;
 };
 
 template <typename ValueType, typename Stack>
-template <typename KeyExtractor, typename ReduceFunction, typename Manipulator,
-          typename ReduceConfig>
+template <typename KeyExtractor, typename ReduceFunction,
+          typename ReduceConfig, typename CheckingDriver>
 auto DIA<ValueType, Stack>::ReduceByKey(
     const KeyExtractor &key_extractor,
     const ReduceFunction &reduce_function,
-    const ReduceConfig &reduce_config) const {
+    const ReduceConfig &reduce_config,
+    CheckingDriver * driver) const {
     assert(IsValid());
 
     using DOpResult
@@ -323,21 +322,23 @@ auto DIA<ValueType, Stack>::ReduceByKey(
 
     using ReduceNode = api::ReduceNode<
               DOpResult, KeyExtractor, ReduceFunction,
-              ReduceConfig, Manipulator, /* VolatileKey */ false, false>;
+              ReduceConfig, CheckingDriver, /* VolatileKey */ false, false>;
     auto node = common::MakeCounting<ReduceNode>(
-        *this, "ReduceByKey", key_extractor, reduce_function, reduce_config);
+        *this, "ReduceByKey", key_extractor, reduce_function, reduce_config,
+        *driver);
 
     return DIA<DOpResult>(node);
 }
 
 template <typename ValueType, typename Stack>
-template <typename KeyExtractor, typename ReduceFunction, typename Manipulator,
-          typename ReduceConfig>
+template <typename KeyExtractor, typename ReduceFunction,
+          typename ReduceConfig, typename CheckingDriver>
 auto DIA<ValueType, Stack>::ReduceByKey(
     struct VolatileKeyTag const &,
     const KeyExtractor &key_extractor,
     const ReduceFunction &reduce_function,
-    const ReduceConfig &reduce_config) const {
+    const ReduceConfig &reduce_config,
+    CheckingDriver * driver) const {
     assert(IsValid());
 
     using DOpResult
@@ -372,20 +373,23 @@ auto DIA<ValueType, Stack>::ReduceByKey(
 
     using ReduceNode = api::ReduceNode<
               DOpResult, KeyExtractor,
-              ReduceFunction, ReduceConfig, Manipulator,
+              ReduceFunction, ReduceConfig, CheckingDriver,
               /* VolatileKey */ true, false>;
 
     auto node = common::MakeCounting<ReduceNode>(
-        *this, "ReduceByKey", key_extractor, reduce_function, reduce_config);
+        *this, "ReduceByKey", key_extractor, reduce_function, reduce_config,
+        *driver);
 
     return DIA<DOpResult>(node);
 }
 
 template <typename ValueType, typename Stack>
-template <typename ReduceFunction, typename Manipulator, typename ReduceConfig>
+template <typename ReduceFunction, typename ReduceConfig,
+          typename CheckingDriver>
 auto DIA<ValueType, Stack>::ReducePair(
     const ReduceFunction &reduce_function,
-    const ReduceConfig &reduce_config) const {
+    const ReduceConfig &reduce_config,
+    CheckingDriver * driver) const {
     assert(IsValid());
 
     using DOpResult
@@ -419,7 +423,7 @@ auto DIA<ValueType, Stack>::ReducePair(
 
     using ReduceNode = api::ReduceNode<
               ValueType, std::function<Key(Value)>, ReduceFunction,
-              ReduceConfig, Manipulator, /* VolatileKey */ true, true>;
+              ReduceConfig, CheckingDriver, /* VolatileKey */ true, true>;
 
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReducePair", [](Value value) {
@@ -429,7 +433,7 @@ auto DIA<ValueType, Stack>::ReducePair(
             value = value;
             return Key();
         },
-        reduce_function, reduce_config);
+        reduce_function, reduce_config, *driver);
 
     return DIA<ValueType>(node);
 }

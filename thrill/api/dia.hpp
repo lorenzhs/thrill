@@ -738,11 +738,14 @@ public:
      * \ingroup dia_dops
      */
     template <typename KeyExtractor, typename ReduceFunction,
-              typename Manipulator = checkers::ReduceManipulatorDummy,
-              typename ReduceConfig = class DefaultReduceConfig>
+              typename ReduceConfig = class DefaultReduceConfig,
+              typename CheckingDriver = checkers::Driver<
+                  checkers::ReduceCheckerDummy,
+                  checkers::ReduceManipulatorDummy> >
     auto ReduceByKey(const KeyExtractor &key_extractor,
                      const ReduceFunction &reduce_function,
-                     const ReduceConfig& reduce_config = ReduceConfig()) const;
+                     const ReduceConfig& reduce_config = ReduceConfig(),
+                     CheckingDriver * driver = new CheckingDriver()) const;
 
     /*!
      * ReduceByKey is a DOp, which groups elements of the DIA with the
@@ -774,12 +777,15 @@ public:
      * \ingroup dia_dops
      */
     template <typename KeyExtractor, typename ReduceFunction,
-              typename Manipulator = checkers::ReduceManipulatorDummy,
-              typename ReduceConfig = class DefaultReduceConfig>
+              typename ReduceConfig = class DefaultReduceConfig,
+              typename CheckingDriver = checkers::Driver<
+                  checkers::ReduceCheckerDummy,
+                  checkers::ReduceManipulatorDummy> >
     auto ReduceByKey(struct VolatileKeyTag const &,
                      const KeyExtractor &key_extractor,
                      const ReduceFunction &reduce_function,
-                     const ReduceConfig& reduce_config = ReduceConfig()) const;
+                     const ReduceConfig& reduce_config = ReduceConfig(),
+                     CheckingDriver * driver = new CheckingDriver()) const;
 
     /*!
      * ReducePair is a DOp, which groups key-value-pairs in the input DIA by
@@ -804,10 +810,13 @@ public:
      * \ingroup dia_dops
      */
     template <typename ReduceFunction,
-              typename Manipulator = checkers::ReduceManipulatorDummy,
-              typename ReduceConfig = class DefaultReduceConfig>
+              typename ReduceConfig = class DefaultReduceConfig,
+              typename CheckingDriver = checkers::Driver<
+                  checkers::ReduceCheckerDummy,
+                  checkers::ReduceManipulatorDummy> >
     auto ReducePair(const ReduceFunction &reduce_function,
-                    const ReduceConfig& reduce_config = ReduceConfig()) const;
+                    const ReduceConfig& reduce_config = ReduceConfig(),
+                    CheckingDriver * driver = new CheckingDriver()) const;
 
     /*!
      * ReduceToIndex is a DOp, which groups elements of the DIA with the
@@ -846,14 +855,17 @@ public:
      * \ingroup dia_dops
      */
     template <typename KeyExtractor, typename ReduceFunction,
-              typename Manipulator = checkers::ReduceManipulatorDummy,
-              typename ReduceConfig = class DefaultReduceToIndexConfig>
+              typename ReduceConfig = class DefaultReduceToIndexConfig,
+              typename CheckingDriver = checkers::Driver<
+                  checkers::ReduceCheckerDummy,
+                  checkers::ReduceManipulatorDummy> >
     auto ReduceToIndex(
         const KeyExtractor &key_extractor,
         const ReduceFunction &reduce_function,
         size_t size,
         const ValueType& neutral_element = ValueType(),
-        const ReduceConfig& reduce_config = ReduceConfig()) const;
+        const ReduceConfig& reduce_config = ReduceConfig(),
+        CheckingDriver * driver = new CheckingDriver()) const;
 
     /*!
      * ReduceToIndexByKey is a DOp, which groups elements of the DIA with the
@@ -893,15 +905,18 @@ public:
      * \ingroup dia_dops
      */
     template <typename KeyExtractor, typename ReduceFunction,
-              typename Manipulator = checkers::ReduceManipulatorDummy,
-              typename ReduceConfig = class DefaultReduceToIndexConfig>
+              typename ReduceConfig = class DefaultReduceToIndexConfig,
+              typename CheckingDriver = checkers::Driver<
+                  checkers::ReduceCheckerDummy,
+                  checkers::ReduceManipulatorDummy> >
     auto ReduceToIndex(
         struct VolatileKeyTag const &,
         const KeyExtractor &key_extractor,
         const ReduceFunction &reduce_function,
         size_t size,
         const ValueType& neutral_element = ValueType(),
-        const ReduceConfig& reduce_config = ReduceConfig()) const;
+        const ReduceConfig& reduce_config = ReduceConfig(),
+        CheckingDriver * driver = new CheckingDriver()) const;
 
     /*!
      * GroupByKey is a DOp, which groups elements of the DIA by its key.

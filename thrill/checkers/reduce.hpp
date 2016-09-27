@@ -132,15 +132,24 @@ static constexpr bool check_reductions_ = true;
 template <typename Key, typename Value, typename ReduceFunction, typename Enable = void>
 class ReduceChecker
 {
-    using KeyValuePair = std::pair<Key, Value>;
-
 public:
-    void add_pre(const Key&, const Value&) { }
-    void add_pre(const KeyValuePair&) { }
-    void add_post(const Key&, const Value&) { }
-    void add_post(const KeyValuePair&) { }
+    template <typename K, typename V>
+    void add_pre(const K&, const V&) { }
+
+    template <typename KV>
+    void add_pre(const KV&) { }
+
+    template <typename K, typename V>
+    void add_post(const K&, const V&) { }
+
+    template <typename KV>
+    void add_post(const KV&) { }
+
     bool check(api::Context&) { return true; }
 };
+
+//! Convenience dummy checker
+using ReduceCheckerDummy = ReduceChecker<void, void, void>;
 
 /*!
  * Reduce checker for supported reduce functions

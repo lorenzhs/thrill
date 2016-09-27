@@ -18,8 +18,6 @@
 #include <thrill/api/context.hpp>
 #include <thrill/api/dia.hpp>
 #include <thrill/api/dop_node.hpp>
-#include <thrill/checkers/driver.hpp>
-#include <thrill/checkers/reduce.hpp>
 #include <thrill/common/functional.hpp>
 #include <thrill/common/logger.hpp>
 #include <thrill/common/meta.hpp>
@@ -58,7 +56,7 @@ class DefaultReduceToIndexConfig : public core::DefaultReduceConfig
  */
 template <typename ValueType,
           typename KeyExtractor, typename ReduceFunction,
-          typename ReduceConfig, typename Manipulator,
+          typename ReduceConfig, typename CheckingDriver,
           bool VolatileKey, bool SendPair>
 class ReduceToIndexNode final : public DOpNode<ValueType>
 {
@@ -77,7 +75,8 @@ class ReduceToIndexNode final : public DOpNode<ValueType>
     using PrePhaseOutput =
               typename common::If<VolatileKey, KeyValuePair, Value>::type;
 
-    using Checker = typename checkers::ReduceChecker<Key, Value, ReduceFunction>;
+    using Checker = typename CheckingDriver::checker_t;
+    using Manipulator = typename CheckingDriver::manipulator_t;
 
     static constexpr bool use_mix_stream_ = ReduceConfig::use_mix_stream_;
     static constexpr bool use_post_thread_ = ReduceConfig::use_post_thread_;
@@ -155,7 +154,8 @@ public:
                       const ReduceFunction& reduce_function,
                       size_t result_size,
                       const Value& neutral_element,
-                      const ReduceConfig& config)
+                      const ReduceConfig& config,
+                      CheckingDriver& driver)
         : Super(parent.ctx(), label, { parent.id() }, { parent.node() }),
           mix_stream_(use_mix_stream_ ?
                       parent.ctx().GetNewMixStream(this) : nullptr),
@@ -166,19 +166,20 @@ public:
           result_size_(result_size),
           pre_phase_(
               context_, Super::id(), context_.num_workers(),
-              key_extractor, reduce_function, emitters_, manipulator_,
+              key_extractor, reduce_function, emitters_, driver.manipulator(),
               config, core::ReduceByIndex<Key>(0, result_size)),
           post_phase_(
               context_, Super::id(),
-              key_extractor, reduce_function, Emitter(this, checker_),
-              manipulator_, config, core::ReduceByIndex<Key>(), neutral_element),
-          checking_driver_(checker_, manipulator_)
+              key_extractor, reduce_function, Emitter(this, driver.checker()),
+              driver.manipulator(), config, core::ReduceByIndex<Key>(),
+              neutral_element),
+          checking_driver_(driver)
     {
         // Hook PreOp: Locally hash elements of the current DIA onto buckets and
         // reduce each bucket to a single value, afterwards send data to another
         // worker given by the shuffle algorithm.
-        auto pre_op_fn = ReducePreOp<ValueType, decltype(pre_phase_), decltype(checker_)>
-                             (pre_phase_, key_extractor, checker_);
+        auto pre_op_fn = ReducePreOp<ValueType, decltype(pre_phase_), Checker>
+                             (pre_phase_, key_extractor, driver.checker());
 /*[this](const ValueType& input) {
                              checker_.add_pre(input);
                              return pre_phase_.Insert(input);
@@ -298,22 +299,21 @@ private:
         ValueType, Key, Value, KeyExtractor, ReduceFunction, Emitter,
         Manipulator, SendPair, ReduceConfig> post_phase_;
 
-    Checker checker_;
-    Manipulator manipulator_;
-    checkers::Driver<Checker, Manipulator> checking_driver_;
+    CheckingDriver& checking_driver_;
 
     bool reduced_ = false;
 };
 
 template <typename ValueType, typename Stack>
-template <typename KeyExtractor, typename ReduceFunction, typename Manipulator,
-          typename ReduceConfig>
+template <typename KeyExtractor, typename ReduceFunction,
+          typename ReduceConfig, typename CheckingDriver>
 auto DIA<ValueType, Stack>::ReduceToIndex(
     const KeyExtractor &key_extractor,
     const ReduceFunction &reduce_function,
     size_t size,
     const ValueType &neutral_element,
-    const ReduceConfig &reduce_config) const {
+    const ReduceConfig &reduce_config,
+    CheckingDriver * driver) const {
     assert(IsValid());
 
     using DOpResult
@@ -354,25 +354,26 @@ auto DIA<ValueType, Stack>::ReduceToIndex(
 
     using ReduceNode = ReduceToIndexNode<
               DOpResult, KeyExtractor, ReduceFunction,
-              ReduceConfig, Manipulator, /* VolatileKey */ false, false>;
+              ReduceConfig, CheckingDriver, /* VolatileKey */ false, false>;
 
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReduceToIndex", key_extractor, reduce_function,
-        size, neutral_element, reduce_config);
+        size, neutral_element, reduce_config, *driver);
 
     return DIA<DOpResult>(node);
 }
 
 template <typename ValueType, typename Stack>
-template <typename KeyExtractor, typename ReduceFunction, typename Manipulator,
-          typename ReduceConfig>
+template <typename KeyExtractor, typename ReduceFunction,
+          typename ReduceConfig, typename CheckingDriver>
 auto DIA<ValueType, Stack>::ReduceToIndex(
     struct VolatileKeyTag const &,
     const KeyExtractor &key_extractor,
     const ReduceFunction &reduce_function,
     size_t size,
     const ValueType &neutral_element,
-    const ReduceConfig &reduce_config) const {
+    const ReduceConfig &reduce_config,
+    CheckingDriver * driver) const {
     assert(IsValid());
 
     using DOpResult
@@ -413,11 +414,11 @@ auto DIA<ValueType, Stack>::ReduceToIndex(
 
     using ReduceNode = ReduceToIndexNode<
               DOpResult, KeyExtractor, ReduceFunction,
-              ReduceConfig, Manipulator, /* VolatileKey */ true, false>;
+              ReduceConfig, CheckingDriver, /* VolatileKey */ true, false>;
 
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReduceToIndex", key_extractor, reduce_function,
-        size, neutral_element, reduce_config);
+        size, neutral_element, reduce_config, *driver);
 
     return DIA<DOpResult>(node);
 }
