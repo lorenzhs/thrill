@@ -17,6 +17,8 @@
 #include <thrill/api/context.hpp>
 #include <thrill/common/logger.hpp>
 
+#include <type_traits>
+
 namespace thrill {
 namespace checkers {
 
@@ -26,10 +28,15 @@ class Driver
     static const bool debug = true;
 
 public:
-    Driver() : checker_(), manipulator_() {}
+    template <typename C = Checker>
+    Driver(typename std::enable_if_t<
+           std::is_default_constructible<Checker>::value>* = 0)
+        : checker_(), manipulator_() {}
 
     template <typename Arg>
-    explicit Driver(Arg& arg) : checker_(arg), manipulator_() {}
+    explicit Driver(Arg &&arg, typename std::enable_if_t<
+                    std::is_constructible<Checker, Arg&&>::value>* = 0)
+        : checker_(std::forward<Arg>(arg)), manipulator_() {}
 
     Driver(Checker checker, Manipulator manipulator)
         : checker_(checker),
