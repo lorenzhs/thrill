@@ -9,6 +9,7 @@
 # All rights reserved. Published under the BSD-2 license in the LICENSE file.
 ################################################################################
 
+add_subdirectory(checkers)
 add_subdirectory(k-means)
 add_subdirectory(logistic_regression)
 add_subdirectory(page_rank)

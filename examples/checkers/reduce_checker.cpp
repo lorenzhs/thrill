@@ -1,5 +1,5 @@
 /*******************************************************************************
- * tests/checkers/reduce.cpp
+ * examples/checkers/reduce_checker.cpp
  *
  * Part of Project Thrill - http://project-thrill.org
  *
@@ -10,12 +10,12 @@
  * All rights reserved. Published under the BSD-2 license in the LICENSE file.
  ******************************************************************************/
 
-#include <gtest/gtest.h>
 #include <thrill/api/generate.hpp>
 #include <thrill/api/reduce_by_key.hpp>
 #include <thrill/api/size.hpp>
 #include <thrill/checkers/driver.hpp>
 #include <thrill/checkers/reduce.hpp>
+#include <thrill/common/logger.hpp>
 
 #include <algorithm>
 #include <functional>
@@ -24,9 +24,10 @@
 
 using namespace thrill; // NOLINT
 
-constexpr size_t default_reps = 100;
+thread_local int my_rank = -1;
 
-auto reduce_by_key_test_factory = [](auto manipulator, size_t reps = default_reps) {
+auto reduce_by_key_test_factory = [](auto manipulator, const std::string& name,
+                                     size_t reps = 100) {
     using Value = size_t;
     using ReduceFn = std::plus<Value>;
 
@@ -34,12 +35,16 @@ auto reduce_by_key_test_factory = [](auto manipulator, size_t reps = default_rep
     using Manipulator = decltype(manipulator);
     using Driver = checkers::Driver<Checker, Manipulator>;
 
-    return [reps](Context& ctx) {
+    return [reps, name](Context& ctx) {
         std::default_random_engine generator(std::random_device { } ());
         std::uniform_int_distribution<Value> distribution(0, 10000);
 
         ctx.enable_consume();
+        if (my_rank < 0) my_rank = ctx.net.my_rank();
 
+        sLOGC(my_rank == 0) << "Running" << name << "tests," << reps << "reps";
+
+        size_t failures = 0, dummy = 0;
         for (size_t i = 0; i < reps; ++i) {
             auto driver = std::make_shared<Driver>();
             auto key_extractor = [](Value in) { return in & 0xFFFF; };
@@ -54,23 +59,31 @@ auto reduce_by_key_test_factory = [](auto manipulator, size_t reps = default_rep
                     api::DefaultReduceConfig(), driver)
                 .Size();
 
-            ASSERT_TRUE(force_eval > 0); // dummy
-            ASSERT_TRUE(driver->check(ctx));
+            dummy += force_eval;
+            bool success = driver->check(ctx);
+
+            if (!success) failures++;
         }
+
+        LOGC(my_rank == 0)
+            << name << ": " << failures << " out of " << reps
+            << " tests failed";
     };
 };
 
+auto run = [](auto manipulator, const std::string& name, size_t reps = 100) {
+    api::Run(reduce_by_key_test_factory(manipulator, name, reps));
+};
 
 // yikes, preprocessor
-#define TEST_CHECK(MANIP) TEST(Reduce, ReduceByKeyWith ## MANIP) { \
-        api::Run(reduce_by_key_test_factory(                       \
-                     checkers::ReduceManipulator ## MANIP()));     \
-}
+#define TEST_CHECK(MANIP) run(checkers::ReduceManipulator ## MANIP(), #MANIP)
 
-TEST_CHECK(Dummy)
-TEST_CHECK(DropFirst)
-TEST_CHECK(IncFirst)
-TEST_CHECK(IncFirstKey)
-TEST_CHECK(SwitchValues)
+int main() {
+    TEST_CHECK(Dummy);
+    TEST_CHECK(DropFirst);
+    TEST_CHECK(IncFirst);
+    TEST_CHECK(IncFirstKey);
+    TEST_CHECK(SwitchValues);
+}
 
 /******************************************************************************/
