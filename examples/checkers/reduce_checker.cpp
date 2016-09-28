@@ -27,7 +27,7 @@ using namespace thrill; // NOLINT
 thread_local int my_rank = -1;
 
 auto reduce_by_key_test_factory = [](auto manipulator, const std::string& name,
-                                     size_t reps = 100) {
+                                     size_t reps) {
     using Value = size_t;
     using ReduceFn = std::plus<Value>;
 
@@ -36,18 +36,21 @@ auto reduce_by_key_test_factory = [](auto manipulator, const std::string& name,
     using Driver = checkers::Driver<Checker, Manipulator>;
 
     return [reps, name](Context& ctx) {
-        std::default_random_engine generator(std::random_device { } ());
-        std::uniform_int_distribution<Value> distribution(0, 10000);
+        std::mt19937 generator(std::random_device { } ());
+        std::uniform_int_distribution<Value> distribution(0, 0xFFFFFFFF);
 
         ctx.enable_consume();
         if (my_rank < 0) my_rank = ctx.net.my_rank();
 
-        sLOGC(my_rank == 0) << "Running" << name << "tests," << reps << "reps";
 
-        size_t failures = 0, dummy = 0;
+        sLOGC(my_rank == 0) << "Running ReduceByKey tests with" << name
+                            << "manipulator," << reps << "reps";
+
+        size_t failures = 0, dummy = 0, manips = 0;
         for (size_t i = 0; i < reps; ++i) {
             auto driver = std::make_shared<Driver>();
-            auto key_extractor = [](Value in) { return in & 0xFFFF; };
+            driver->silence();
+            auto key_extractor = [](const Value& in) { return in & 0xFFFF; };
 
             size_t force_eval =
                 Generate(
@@ -60,26 +63,89 @@ auto reduce_by_key_test_factory = [](auto manipulator, const std::string& name,
                 .Size();
 
             dummy += force_eval;
-            bool success = driver->check(ctx);
+            auto success = driver->check(ctx);
 
-            if (!success) failures++;
+            if (!success.first) failures++;
+            if (success.second) manips++;
         }
 
         LOGC(my_rank == 0)
-            << name << ": " << failures << " out of " << reps
-            << " tests failed";
+            << "ReduceByKey with " << name << " manipulator: "
+            << failures << " out of " << reps << " tests failed"
+            << "; " << manips << " manipulations";
     };
 };
 
+auto reduce_pair_test_factory = [](auto manipulator, const std::string& name,
+                                   size_t reps) {
+    using Value = size_t;
+    using Pair = std::pair<Value, Value>;
+    using ReduceFn = std::plus<Value>;
+
+    using Checker = checkers::ReduceChecker<Value, Value, ReduceFn>;
+    using Manipulator = decltype(manipulator);
+    using Driver = checkers::Driver<Checker, Manipulator>;
+
+    return [reps, name](Context& ctx) {
+        std::mt19937 generator(std::random_device { } ());
+        std::uniform_int_distribution<Value> distribution(0, 0xFFFFFFFF);
+
+        ctx.enable_consume();
+        if (my_rank < 0) my_rank = ctx.net.my_rank();
+
+        sLOGC(my_rank == 0) << "Running ReducePair tests with" << name
+                            << "manipulator," << reps << "reps";
+
+        size_t failures = 0, dummy = 0, manips = 0;
+        for (size_t i = 0; i < reps; ++i) {
+            auto driver = std::make_shared<Driver>();
+            driver->silence();
+
+            size_t force_eval =
+                Generate(
+                    ctx, 1000000,
+                    [&distribution, &generator](const size_t&) -> Pair {
+                        return Pair{distribution(generator) & 0xFFFF, // key
+                                distribution(generator)};
+                    })
+                .ReducePair(ReduceFn(), api::DefaultReduceConfig(), driver)
+                .Size();
+
+            dummy += force_eval;
+            auto success = driver->check(ctx);
+
+            if (!success.first) failures++;
+            if (success.second) manips++;
+        }
+
+        LOGC(my_rank == 0)
+            << "ReducePair with " << name << " manipulator: "
+            << (failures > 0 ? common::log::fg_red() : "")
+            << failures << " out of " << reps << " tests failed"
+            << "; " << manips << " manipulations"
+            << common::log::reset();
+    };
+};
+
+
 auto run = [](auto manipulator, const std::string& name, size_t reps = 100) {
     api::Run(reduce_by_key_test_factory(manipulator, name, reps));
+    api::Run(reduce_pair_test_factory(manipulator, name, reps));
 };
 
 // yikes, preprocessor
 #define TEST_CHECK(MANIP) run(checkers::ReduceManipulator ## MANIP(), #MANIP)
+#define TEST_CHECK_I(MANIP, ITS) run(checkers::ReduceManipulator ## MANIP(), #MANIP, ITS)
+
+namespace std {
+template <typename T, typename U>
+ostream &operator << (ostream &os, const pair<T,U> &p) {
+    return os << '(' << p.first << ',' << p.second << ')';
+}
+}
 
 int main() {
-    TEST_CHECK(Dummy);
+    TEST_CHECK_I(Dummy, 1);
     TEST_CHECK(DropFirst);
     TEST_CHECK(IncFirst);
     TEST_CHECK(IncFirstKey);

@@ -206,9 +206,10 @@ struct ReduceManipulatorDummy {
 struct ReduceManipulatorDropFirst : public ManipulatorBase {
     template <typename It>
     std::pair<It, It> operator () (It begin, It end) {
-        if (begin < end) {
-            sLOG << "Manipulating" << end - begin << "elements, dropping first";
-            // << *begin;
+        using T = typename std::iterator_traits<It>::value_type;
+        if (begin < end && *begin != T()) {
+            sLOG << "Manipulating" << end - begin << "elements, dropping first"
+            << *begin;
             made_changes_ = true;
             return std::make_pair(begin + 1, end);
         }

@@ -41,7 +41,7 @@ auto sort_random = [](auto manipulator, const std::string& name,
 
         sLOGC(my_rank == 0) << "Running" << name << "tests," << reps << "reps";
 
-        size_t failures = 0, dummy = 0;
+        size_t failures = 0, dummy = 0, manips = 0;
         for (size_t i = 0; i < reps; ++i) {
             auto driver = std::make_shared<Driver>();
 
@@ -54,14 +54,15 @@ auto sort_random = [](auto manipulator, const std::string& name,
                 .Size();
 
             dummy += force_eval;
-            bool success = driver->check(ctx);
+            auto success = driver->check(ctx);
 
-            if (!success) failures++;
+            if (!success.first) failures++;
+            if (success.second) manips++;
         }
 
         LOGC(my_rank == 0)
             << name << ": " << failures << " out of " << reps
-            << " tests failed";
+            << " tests failed; " << manips << " manipulations";
     };
 };
 

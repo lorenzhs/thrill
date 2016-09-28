@@ -45,7 +45,10 @@ public:
         manipulator_.reset();
     }
 
-    bool check(api::Context& ctx) {
+    void silence() { silent = true; }
+    void unsilence() { silent = false; }
+
+    std::pair<bool,bool> check(api::Context& ctx) {
         bool success = checker_.check(ctx);
         bool manipulated = manipulator_.made_changes();
 
@@ -56,14 +59,14 @@ public:
         sLOGC(debug && ctx.net.my_rank() == 0)
             << "checking driver: check" << success << "manip" << manipulated;
 
-        LOGC(success == manipulated)
+        LOGC(!silent && success == manipulated && ctx.net.my_rank() == 0)
             << common::log::bold() << common::log::fg_red()
             << "Checker failure: check " << success << "; manip " << manipulated
             << common::log::reset();
 
         // If it was manipulated and detected, or not manipulated and passed,
         // then we're good
-        return (success == !manipulated);
+        return std::make_pair(success == !manipulated, manipulated);
     }
 
     Checker& checker() { return checker_; }
@@ -72,6 +75,7 @@ public:
 protected:
     Checker checker_;
     Manipulator manipulator_;
+    bool silent = false;
 };
 
 } // namespace checkers
