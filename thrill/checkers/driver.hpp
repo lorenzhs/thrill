@@ -30,12 +30,10 @@ class Driver
 public:
     template <typename ... Args>
     explicit Driver(Args&& ... args)
-        : checker_(std::forward<Args>(args) ...), manipulator_() { }
+        : checker_(std::forward<Args>(args) ...) {}
 
-    Driver(Checker checker, Manipulator manipulator)
-        : checker_(checker),
-          manipulator_(manipulator)
-    { }
+    Driver(const Driver&) = delete;
+    Driver(Driver&&) = delete;
 
     using checker_t = Checker;
     using manipulator_t = Manipulator;

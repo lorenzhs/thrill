@@ -15,12 +15,13 @@
 #define THRILL_CHECKERS_MANIPULATOR_HEADER
 
 #include <thrill/common/meta.hpp>
+#include <thrill/checkers/functional.hpp>
 
 namespace thrill {
 namespace checkers {
 
 //! Provides common manipulator functionality - don't use this, derive from it
-struct ManipulatorBase {
+struct ManipulatorBase : public noncopynonmove {
     bool made_changes() const { return made_changes_; }
 
     void reset() { made_changes_ = false; }

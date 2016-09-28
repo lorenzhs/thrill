@@ -32,7 +32,7 @@ namespace _detail {
 //! Reduce checker minireduction helper
 template <typename Key, typename Value, typename ReduceFunction,
           typename hash_fn = common::hash_crc32<Key>, size_t bucket_bits = 3>
-class ReduceCheckerMinireduction
+class ReduceCheckerMinireduction : public noncopynonmove
 {
     static_assert(reduce_checkable_v<ReduceFunction>,
                   "Reduce function isn't (marked) checkable");
@@ -130,9 +130,10 @@ static constexpr bool check_reductions_ = true;
 
 //! Reduce checker - no-op for unsupported reduce functions
 template <typename Key, typename Value, typename ReduceFunction, typename Enable = void>
-class ReduceChecker
+class ReduceChecker : public noncopynonmove
 {
 public:
+
     template <typename K, typename V>
     void add_pre(const K&, const V&) { }
 
@@ -158,6 +159,7 @@ template <typename Key, typename Value, typename ReduceFunction>
 class ReduceChecker<Key, Value, ReduceFunction,
                     typename std::enable_if_t<check_reductions_&&
                                               reduce_checkable_v<ReduceFunction> > >
+    : public noncopynonmove
 {
     using KeyValuePair = std::pair<Key, Value>;
     static constexpr bool debug = false;
@@ -194,7 +196,7 @@ private:
 static constexpr bool debug = false;
 
 //! Dummy No-Op Reduce Manipulator
-struct ReduceManipulatorDummy {
+struct ReduceManipulatorDummy : public ManipulatorBase {
     template <typename It>
     std::pair<It, It> operator () (It begin, It end) {
         return std::make_pair(begin, end);

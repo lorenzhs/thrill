@@ -26,13 +26,14 @@ using namespace thrill; // NOLINT
 
 thread_local int my_rank = -1;
 
-auto reduce_by_key_test_factory = [](auto manipulator, const std::string& name,
+auto reduce_by_key_test_factory = [](const auto &manipulator,
+                                     const std::string& name,
                                      size_t reps) {
     using Value = size_t;
     using ReduceFn = std::plus<Value>;
 
     using Checker = checkers::ReduceChecker<Value, Value, ReduceFn>;
-    using Manipulator = decltype(manipulator);
+    using Manipulator = std::decay_t<decltype(manipulator)>;
     using Driver = checkers::Driver<Checker, Manipulator>;
 
     return [reps, name](Context& ctx) {
@@ -76,14 +77,15 @@ auto reduce_by_key_test_factory = [](auto manipulator, const std::string& name,
     };
 };
 
-auto reduce_pair_test_factory = [](auto manipulator, const std::string& name,
+auto reduce_pair_test_factory = [](const auto &manipulator,
+                                   const std::string& name,
                                    size_t reps) {
     using Value = size_t;
     using Pair = std::pair<Value, Value>;
     using ReduceFn = std::plus<Value>;
 
     using Checker = checkers::ReduceChecker<Value, Value, ReduceFn>;
-    using Manipulator = decltype(manipulator);
+    using Manipulator = std::decay_t<decltype(manipulator)>;
     using Driver = checkers::Driver<Checker, Manipulator>;
 
     return [reps, name](Context& ctx) {
@@ -128,7 +130,8 @@ auto reduce_pair_test_factory = [](auto manipulator, const std::string& name,
 };
 
 
-auto run = [](auto manipulator, const std::string& name, size_t reps = 100) {
+auto run = [](const auto &manipulator, const std::string& name,
+              size_t reps = 100) {
     api::Run(reduce_by_key_test_factory(manipulator, name, reps));
     api::Run(reduce_pair_test_factory(manipulator, name, reps));
 };

@@ -34,6 +34,19 @@ struct reduce_checkable<common::TupleReduceIndex<Index, Tuple, Op> >
 template <typename ReduceFunction>
 constexpr bool reduce_checkable_v = reduce_checkable<ReduceFunction>::value;
 
+struct noncopynonmove {
+    //! default-constructible
+    noncopynonmove() = default;
+    //! non-copyable: delete copy-constructor
+    noncopynonmove(const noncopynonmove &) = delete;
+    //! non-copyable: delete assignment operator
+    noncopynonmove & operator = (const noncopynonmove &) = delete;
+    //! non-movable: delete move-constructor
+    noncopynonmove(noncopynonmove &&) = delete;
+    //! non-movable: delete move-assignment
+    noncopynonmove & operator = (noncopynonmove &&) = delete;
+};
+
 } // namespace checkers
 } // namespace thrill
 

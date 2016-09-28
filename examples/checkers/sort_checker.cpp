@@ -25,12 +25,13 @@ using namespace thrill; // NOLINT
 
 thread_local static int my_rank = -1;
 
-auto sort_random = [](auto manipulator, const std::string& name,
+auto sort_random = [](const auto &manipulator, const std::string& name,
                       size_t reps = 100) {
     using Value = int;
     using Compare = std::less<Value>;
+    using Manipulator = std::decay_t<decltype(manipulator)>;
     using Checker = checkers::SortChecker<Value, Compare>;
-    using Driver = checkers::Driver<Checker, decltype(manipulator)>;
+    using Driver = checkers::Driver<Checker, Manipulator>;
 
     return [reps, name](Context& ctx) {
         std::default_random_engine generator(std::random_device { } ());
@@ -66,7 +67,8 @@ auto sort_random = [](auto manipulator, const std::string& name,
     };
 };
 
-auto run = [](auto manipulator, const std::string &name, size_t reps = 100) {
+auto run = [](const auto &manipulator, const std::string &name,
+              size_t reps = 100) {
     api::Run(sort_random(manipulator, name, reps));
 };
 
@@ -77,7 +79,7 @@ auto run = [](auto manipulator, const std::string &name, size_t reps = 100) {
 // run with template parameter
 #define TEST_CHECK_T(NAME, FULL) run(checkers::SortManipulator ## FULL(), #NAME)
 
-int main(int argc, char** argv) {
+int main() {
     TEST_CHECK_A(Dummy, 1);
     TEST_CHECK(DropLast);
     TEST_CHECK(ResetToDefault);

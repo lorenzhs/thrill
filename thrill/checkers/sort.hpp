@@ -15,6 +15,7 @@
 #define THRILL_CHECKERS_SORT_HEADER
 
 #include <thrill/api/context.hpp>
+#include <thrill/checkers/functional.hpp>
 #include <thrill/checkers/manipulator.hpp>
 #include <thrill/common/defines.hpp>
 #include <thrill/common/hash.hpp>
@@ -25,14 +26,10 @@
 namespace thrill {
 namespace checkers {
 
-class SortCheckerDummy
+class SortCheckerDummy : public noncopynonmove
 {
 public:
-    SortCheckerDummy() { }
-
-    template <typename Ignored>
-    SortCheckerDummy(Ignored&) { }
-
+    SortCheckerDummy() = default;
     void reset() { }
 
     template <typename Ignored>
@@ -59,7 +56,7 @@ public:
 template <typename ValueType,
           typename CompareFunction,
           typename Hash = common::hash_crc32<ValueType> >
-class SortChecker
+class SortChecker : public noncopynonmove
 {
     static const bool debug = false;
 
@@ -194,7 +191,7 @@ protected:
 };
 
 //! Dummy no-op sort manipulator
-struct SortManipulatorDummy {
+struct SortManipulatorDummy: public ManipulatorBase {
     template <typename Ignored>
     void operator () (Ignored) { }
     bool made_changes() const { return false; }
