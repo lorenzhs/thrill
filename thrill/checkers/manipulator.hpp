@@ -14,8 +14,8 @@
 #ifndef THRILL_CHECKERS_MANIPULATOR_HEADER
 #define THRILL_CHECKERS_MANIPULATOR_HEADER
 
-#include <thrill/common/meta.hpp>
 #include <thrill/checkers/functional.hpp>
+#include <thrill/common/meta.hpp>
 
 namespace thrill {
 namespace checkers {

@@ -38,13 +38,13 @@ struct noncopynonmove {
     //! default-constructible
     noncopynonmove() = default;
     //! non-copyable: delete copy-constructor
-    noncopynonmove(const noncopynonmove &) = delete;
+    noncopynonmove(const noncopynonmove&) = delete;
     //! non-copyable: delete assignment operator
-    noncopynonmove & operator = (const noncopynonmove &) = delete;
+    noncopynonmove& operator = (const noncopynonmove&) = delete;
     //! non-movable: delete move-constructor
-    noncopynonmove(noncopynonmove &&) = delete;
+    noncopynonmove(noncopynonmove&&) = delete;
     //! non-movable: delete move-assignment
-    noncopynonmove & operator = (noncopynonmove &&) = delete;
+    noncopynonmove& operator = (noncopynonmove&&) = delete;
 };
 
 } // namespace checkers

@@ -133,7 +133,6 @@ template <typename Key, typename Value, typename ReduceFunction, typename Enable
 class ReduceChecker : public noncopynonmove
 {
 public:
-
     template <typename K, typename V>
     void add_pre(const K&, const V&) { }
 
@@ -211,7 +210,7 @@ struct ReduceManipulatorDropFirst : public ManipulatorBase {
         using T = typename std::iterator_traits<It>::value_type;
         if (begin < end && *begin != T()) {
             sLOG << "Manipulating" << end - begin << "elements, dropping first"
-            << *begin;
+            // << *begin;
             made_changes_ = true;
             return std::make_pair(begin + 1, end);
         }

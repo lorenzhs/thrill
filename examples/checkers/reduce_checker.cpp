@@ -142,7 +142,7 @@ auto run = [](const auto &manipulator, const std::string& name,
 
 namespace std {
 template <typename T, typename U>
-ostream &operator << (ostream &os, const pair<T,U> &p) {
+ostream& operator << (ostream& os, const pair<T, U>& p) {
     return os << '(' << p.first << ',' << p.second << ')';
 }
 }

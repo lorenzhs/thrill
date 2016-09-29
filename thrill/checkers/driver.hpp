@@ -30,7 +30,7 @@ class Driver
 public:
     template <typename ... Args>
     explicit Driver(Args&& ... args)
-        : checker_(std::forward<Args>(args) ...) {}
+        : checker_(std::forward<Args>(args) ...) { }
 
     Driver(const Driver&) = delete;
     Driver(Driver&&) = delete;
@@ -46,7 +46,7 @@ public:
     void silence() { silent = true; }
     void unsilence() { silent = false; }
 
-    std::pair<bool,bool> check(api::Context& ctx) {
+    std::pair<bool, bool> check(api::Context& ctx) {
         bool success = checker_.check(ctx);
         bool manipulated = manipulator_.made_changes();
 

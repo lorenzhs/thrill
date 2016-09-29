@@ -191,7 +191,7 @@ protected:
 };
 
 //! Dummy no-op sort manipulator
-struct SortManipulatorDummy: public ManipulatorBase {
+struct SortManipulatorDummy : public ManipulatorBase {
     template <typename Ignored>
     void operator () (Ignored) { }
     bool made_changes() const { return false; }
