@@ -194,6 +194,25 @@ private:
 //! Debug manipulators?
 static constexpr bool debug = false;
 
+//! Base class for reduce manipulators, using the Curiously Recurring Template
+//! Pattern to provide the implementation of 'manipulate'
+template <typename Strategy>
+struct ReduceManipulatorBase : public ManipulatorBase {
+    //! This wraps skipping empty keys and empty ranges
+    template <typename It>
+    std::pair<It, It> operator () (It begin, It end) {
+        It it = skip_empty_key(begin, end);
+        std::pair<It, It> ret;
+        if (it < end)
+            ret = static_cast<Strategy*>(this)->manipulate(it, end);
+
+        if (made_changes())
+            return ret;
+        else
+            return std::make_pair(begin, end);
+    }
+};
+
 //! Dummy No-Op Reduce Manipulator
 struct ReduceManipulatorDummy : public ManipulatorBase {
     template <typename It>
@@ -204,60 +223,56 @@ struct ReduceManipulatorDummy : public ManipulatorBase {
 };
 
 //! Drops first element
-struct ReduceManipulatorDropFirst : public ManipulatorBase {
+struct ReduceManipulatorDropFirst
+    : public ReduceManipulatorBase<ReduceManipulatorDropFirst>
+{
     template <typename It>
-    std::pair<It, It> operator () (It begin, It end) {
-        using T = typename std::iterator_traits<It>::value_type;
-        if (begin < end && *begin != T()) {
-            sLOG << "Manipulating" << end - begin << "elements, dropping first"
-            // << *begin;
-            made_changes_ = true;
-            return std::make_pair(begin + 1, end);
-        }
-        else {
-            return std::make_pair(begin, end);
-        }
+    std::pair<It, It> manipulate(It begin, It end) {
+        sLOG << "Manipulating" << end - begin << "elements, dropping first";
+        made_changes_ = true;
+        return std::make_pair(begin + 1, end);
     }
 };
 
 //! Increments value of first element
-struct ReduceManipulatorIncFirst : public ManipulatorBase {
+struct ReduceManipulatorIncFirst
+    : public ReduceManipulatorBase<ReduceManipulatorIncFirst>
+{
     template <typename It>
-    std::pair<It, It> operator () (It begin, It end) {
-        if (begin < end) {
-            sLOG << "Manipulating" << end - begin
-                 << "elements, incrementing first"; // << *begin;
-            begin->second++;
-            made_changes_ = true;
-        }
+    std::pair<It, It> manipulate(It begin, It end) {
+        sLOG << "Manipulating" << end - begin
+             << "elements, incrementing first";
+        begin->second++;
+        made_changes_ = true;
         return std::make_pair(begin, end);
     }
 };
 
 //! Increments key of first element
-struct ReduceManipulatorIncFirstKey : public ManipulatorBase {
+struct ReduceManipulatorIncFirstKey
+    : public ReduceManipulatorBase<ReduceManipulatorIncFirstKey>
+{
     template <typename It>
-    std::pair<It, It> operator () (It begin, It end) {
-        if (begin < end) {
-            sLOG << "Manipulating" << end - begin
-                 << "elements, incrementing key"; // << *begin;
-            begin->first++;
-            made_changes_ = true;
-        }
+    std::pair<It, It> manipulate(It begin, It end) {
+        sLOG << "Manipulating" << end - begin
+             << "elements, incrementing key of first";
+        begin->first++;
+        made_changes_ = true;
         return std::make_pair(begin, end);
     }
 };
 
 //! Switches values of first and second element
-struct ReduceManipulatorSwitchValues : public ManipulatorBase {
+struct ReduceManipulatorSwitchValues
+    : public ReduceManipulatorBase<ReduceManipulatorSwitchValues>
+{
     template <typename It>
-    std::pair<It, It> operator () (It begin, It end) {
-        if (begin + 1 < end && begin->second != (begin + 1)->second) {
-            sLOG << "Manipulating" << end - begin
-                 << "elements, switching values"; // << *begin << *(begin+1);
-            auto tmp = begin->second;
-            begin->second = (begin + 1)->second;
-            (begin + 1)->second = tmp;
+    std::pair<It, It> manipulate(It begin, It end) {
+        It next = skip_empty_key(begin + 1, end);
+        if (next < end && *begin != *next) {
+            sLOG << "Manipulating" << end - begin << "elements,"
+                 << "switching values at pos 0 and" << next - begin;
+            std::swap(begin->second, next->second);
             made_changes_ = true;
         }
         return std::make_pair(begin, end);

@@ -72,8 +72,10 @@ auto reduce_by_key_test_factory = [](const auto &manipulator,
 
         LOGC(my_rank == 0)
             << "ReduceByKey with " << name << " manipulator: "
+            << (failures > 0 ? common::log::fg_red() : "")
             << failures << " out of " << reps << " tests failed"
-            << "; " << manips << " manipulations";
+            << "; " << manips << " manipulations"
+            << common::log::reset();
     };
 };
 

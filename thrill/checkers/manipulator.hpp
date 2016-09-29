@@ -26,6 +26,13 @@ struct ManipulatorBase : public noncopynonmove {
 
     void reset() { made_changes_ = false; }
 
+    //! Skip all items whose key is the default
+    template <typename It>
+    It skip_empty_key(It begin, It end) {
+        using Key = typename std::iterator_traits<It>::value_type::first_type;
+        while (begin < end && begin->first == Key()) ++begin;
+        return begin;
+    }
 protected:
     bool made_changes_ = false;
 };
