@@ -54,6 +54,7 @@ class ReduceCheckerMinireduction : public noncopynonmove
     static constexpr size_t bucket_mask = (1ULL << bucket_bits) - 1;
 
     using reduction_t = std::array<Value, num_buckets>;
+    using table_t = std::array<reduction_t, num_parallel>;
 
     //! Enable extra debug output by setting this to true
     static constexpr bool extra_verbose = false;
@@ -72,8 +73,9 @@ public:
     void push(const Key& key, const Value& value) {
         hash_t h = hash_(key);
         for (size_t idx = 0; idx < num_parallel; ++idx) {
-            size_t bucket = extract_bucket(h, idx);
-            update_bucket(idx, bucket, value);
+            const size_t bucket = (h >> (idx * bucket_bits)) & bucket_mask;
+            reductions_[idx][bucket] =
+                reducefn(reductions_[idx][bucket], value);
         }
     }
 
@@ -91,10 +93,10 @@ public:
         return true;
     }
 
-    void all_reduce(api::Context& ctx) {
-        reductions_ =
-            ctx.net.AllReduce(reductions_,
-                              common::ComponentSum<decltype(reductions_), ReduceFunction>(reduce));
+    void reduce(api::Context& ctx, size_t root = 0) {
+        auto table_reduce =
+            common::ComponentSum<table_t, ReduceFunction>(reducefn);
+        reductions_ = ctx.net.Reduce(reductions_, root, table_reduce);
 
         if (extra_verbose && ctx.net.my_rank() == 0) {
             for (size_t i = 0; i < num_parallel; ++i) {
@@ -108,19 +110,10 @@ public:
         }
     }
 
-private:
-    constexpr size_t extract_bucket(const hash_t& hash, size_t idx) {
-        assert(idx < num_parallel);
-        return (hash >> (idx * bucket_bits)) & bucket_mask;
-    }
-
-    void update_bucket(const size_t idx, const size_t bucket, const Value& value) {
-        reductions_[idx][bucket] = reduce(reductions_[idx][bucket], value);
-    }
-
-    std::array<reduction_t, num_parallel> reductions_;
+protected:
+    table_t reductions_;
     hash_fn hash_;
-    ReduceFunction reduce;
+    ReduceFunction reducefn;
 };
 
 } // namespace _detail
@@ -178,9 +171,10 @@ public:
         mini_post.push(kv.first, kv.second);
     }
 
+    //! Do the check. Result is only meaningful at root (PE 0)
     bool check(api::Context& ctx) {
-        mini_pre.all_reduce(ctx);
-        mini_post.all_reduce(ctx);
+        mini_pre.reduce(ctx);
+        mini_post.reduce(ctx);
         bool success = (mini_pre == mini_post);
         LOGC(debug && ctx.my_rank() == 0)
             << "check(): " << (success ? "yay" : "NAY");
