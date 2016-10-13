@@ -23,6 +23,7 @@
 #include <thrill/common/logger.hpp>
 
 #include <array>
+#include <random>
 #include <utility>
 
 namespace thrill {
@@ -77,8 +78,7 @@ public:
     }
 
     //! Compare for equality
-    template <typename Other>
-    bool operator == (const Other& other) const {
+    bool operator == (const ReduceCheckerMinireduction& other) const {
         // check dimensions
         if (num_buckets != other.num_buckets) return false;
         if (num_parallel != other.num_parallel) return false;
@@ -198,9 +198,32 @@ static constexpr bool debug = false;
 //! Pattern to provide the implementation of 'manipulate'
 template <typename Strategy>
 struct ReduceManipulatorBase : public ManipulatorBase {
-    //! This wraps skipping empty keys and empty ranges
+    //! by default, manipulate all blocks (ranges)
+    static const bool manipulate_only_once = true;
+
+    //! Pair iterator key type
+    template <typename It>
+    using Key = typename std::iterator_traits<It>::value_type::first_type;
+
+    //! Pair iterator value type
+    template <typename It>
+    using Value = typename std::iterator_traits<It>::value_type::second_type;
+
+    //! No-op manipulator
+    template <typename It>
+    std::pair<It, It> manipulate(It begin, It end) {
+        return std::make_pair(begin, end);
+    }
+
+    //! Call operator, performing the manipulation.
+    //! This wraps skipping empty keys and empty blocks (ranges)
     template <typename It>
     std::pair<It, It> operator () (It begin, It end) {
+        if (Strategy::manipulate_only_once && made_changes()) {
+            // abort
+            return std::make_pair(begin, end);
+        }
+
         It it = skip_empty_key(begin, end);
         std::pair<It, It> ret;
         if (it < end)
@@ -214,13 +237,7 @@ struct ReduceManipulatorBase : public ManipulatorBase {
 };
 
 //! Dummy No-Op Reduce Manipulator
-struct ReduceManipulatorDummy : public ManipulatorBase {
-    template <typename It>
-    std::pair<It, It> operator () (It begin, It end) {
-        return std::make_pair(begin, end);
-    }
-    bool made_changes() const { return false; }
-};
+struct ReduceManipulatorDummy : public ReduceManipulatorBase<ReduceManipulatorDummy> {};
 
 //! Drops first element
 struct ReduceManipulatorDropFirst
@@ -228,9 +245,17 @@ struct ReduceManipulatorDropFirst
 {
     template <typename It>
     std::pair<It, It> manipulate(It begin, It end) {
-        sLOG << "Manipulating" << end - begin << "elements, dropping first";
-        made_changes_ = true;
-        return std::make_pair(begin + 1, end);
+        while (begin < end && (begin->first == Key<It>() ||
+                               begin->second == Value<It>()))
+            ++begin;
+        if (begin < end) {
+            sLOG << "Manipulating" << end - begin << "elements, dropping first";
+            begin->first = Key<It>();
+            begin->second = Value<It>();
+            ++begin;
+            made_changes_ = true;
+        }
+        return std::make_pair(begin, end);
     }
 };
 
@@ -248,6 +273,22 @@ struct ReduceManipulatorIncFirst
     }
 };
 
+//! Increments value of first element
+struct ReduceManipulatorRandFirst
+    : public ReduceManipulatorBase<ReduceManipulatorRandFirst>
+{
+    template <typename It>
+    std::pair<It, It> manipulate(It begin, It end) {
+        sLOG << "Manipulating" << end - begin
+             << "elements, randomizing first value";
+        begin->second = Value<It>{rng()};
+        made_changes_ = true;
+        return std::make_pair(begin, end);
+    }
+private:
+    std::mt19937 rng{std::random_device{}()};
+};
+
 //! Increments key of first element
 struct ReduceManipulatorIncFirstKey
     : public ReduceManipulatorBase<ReduceManipulatorIncFirstKey>
@@ -260,6 +301,23 @@ struct ReduceManipulatorIncFirstKey
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
+};
+
+
+//! Increments value of first element
+struct ReduceManipulatorRandFirstKey
+    : public ReduceManipulatorBase<ReduceManipulatorRandFirstKey>
+{
+    template <typename It>
+    std::pair<It, It> manipulate(It begin, It end) {
+        sLOG << "Manipulating" << end - begin
+             << "elements, randomizing first key";
+        begin->first = Key<It>{rng()};
+        made_changes_ = true;
+        return std::make_pair(begin, end);
+    }
+private:
+    std::mt19937 rng{std::random_device{}()};
 };
 
 //! Switches values of first and second element
