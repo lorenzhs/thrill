@@ -56,6 +56,7 @@ class ReduceCheckerMinireduction : public noncopynonmove
     using reduction_t = std::array<Value, num_buckets>;
     using table_t = std::array<reduction_t, num_parallel>;
 
+    static constexpr bool debug = false;
     //! Enable extra debug output by setting this to true
     static constexpr bool extra_verbose = false;
 
@@ -82,35 +83,56 @@ public:
     //! Compare for equality
     bool operator == (const ReduceCheckerMinireduction& other) const {
         // check dimensions
-        if (num_buckets != other.num_buckets) return false;
-        if (num_parallel != other.num_parallel) return false;
+        if (num_buckets != other.num_buckets) {
+            sLOG << "bucket number mismatch:" << num_buckets
+                 << other.num_buckets;
+            return false;
+        }
+        if (num_parallel != other.num_parallel) {
+            sLOG << "reduction number mismatch:" << num_parallel
+                 << other.num_parallel;
+            return false;
+        }
         // check all buckets for equality
         for (size_t i = 0; i < num_parallel; ++i) {
             for (size_t j = 0; j < num_buckets; ++j) {
-                if (reductions_[i][j] != other.reductions_[i][j]) return false;
+                if (reductions_[i][j] != other.reductions_[i][j]) {
+                    sLOG << "table entry mismatch at column" << i << "row" << j
+                         << "values" << reductions_[i][j]
+                         << other.reductions_[i][j];
+                    return false;
+                }
             }
         }
         return true;
     }
 
     void reduce(api::Context& ctx, size_t root = 0) {
+        if (extra_verbose && ctx.net.my_rank() == root) {
+            dump_to_log("Before");
+        }
+
         auto table_reduce =
             common::ComponentSum<table_t, ReduceFunction>(reducefn);
-        reductions_ = ctx.net.Reduce(reductions_, root, table_reduce);
+        reductions_ = ctx.net.AllReduce(reductions_, table_reduce);
 
-        if (extra_verbose && ctx.net.my_rank() == 0) {
-            for (size_t i = 0; i < num_parallel; ++i) {
-                std::stringstream s;
-                s << "Run " << i << ": ";
-                for (size_t j = 0; j < num_buckets; ++j) {
-                    s << reductions_[i][j] << " ";
-                }
-                LOG1 << s.str();
-            }
+        if (extra_verbose && ctx.net.my_rank() == root) {
+            dump_to_log("Run");
         }
     }
 
 protected:
+    void dump_to_log(std::string name = "Run") {
+        for (size_t i = 0; i < num_parallel; ++i) {
+            std::stringstream s;
+            s << name << " " << i << ": ";
+            for (size_t j = 0; j < num_buckets; ++j) {
+                s << reductions_[i][j] << " ";
+            }
+            LOG1 << s.str();
+        }
+    }
+
     table_t reductions_;
     hash_fn hash_;
     ReduceFunction reducefn;
@@ -157,6 +179,8 @@ class ReduceChecker<Key, Value, ReduceFunction,
     static constexpr bool debug = false;
 
 public:
+    ReduceChecker() : have_checked(false), result(false) {}
+
     void add_pre(const Key& key, const Value& value) {
         mini_pre.push(key, value);
     }
@@ -171,18 +195,33 @@ public:
         mini_post.push(kv.first, kv.second);
     }
 
+    void reset() {
+        mini_pre.reset();
+        mini_post.reset();
+        have_checked = false;
+        result = false;
+    }
+
     //! Do the check. Result is only meaningful at root (PE 0)
     bool check(api::Context& ctx) {
+        if (have_checked) {
+            return result;
+        }
+
+        have_checked = true;
         mini_pre.reduce(ctx);
         mini_post.reduce(ctx);
-        bool success = (mini_pre == mini_post);
+        if (ctx.my_rank() != 0) return true; // no point in checking
+
+        result = (mini_pre == mini_post);
         LOGC(debug && ctx.my_rank() == 0)
-            << "check(): " << (success ? "yay" : "NAY");
-        return success;
+            << "check(): " << (result ? "yay" : "NAY");
+        return result;
     }
 
 private:
     _detail::ReduceCheckerMinireduction<Key, Value, ReduceFunction> mini_pre, mini_post;
+    bool have_checked, result;
 };
 
 //! Debug manipulators?

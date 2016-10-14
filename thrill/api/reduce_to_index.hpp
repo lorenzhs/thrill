@@ -176,6 +176,8 @@ public:
               neutral_element),
           checking_driver_(driver)
     {
+        // Reset checker
+        checking_driver_->reset();
         // Hook PreOp: Locally hash elements of the current DIA onto buckets and
         // reduce each bucket to a single value, afterwards send data to another
         // worker given by the shuffle algorithm.
