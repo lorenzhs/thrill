@@ -161,6 +161,8 @@ public:
     void add_post(const KV&) { }
 
     bool check(api::Context&) { return true; }
+
+    void reset() {}
 };
 
 //! Convenience dummy checker
