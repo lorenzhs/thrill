@@ -162,7 +162,7 @@ public:
 
     bool check(api::Context&) { return true; }
 
-    void reset() {}
+    void reset() { }
 };
 
 //! Convenience dummy checker
@@ -181,7 +181,7 @@ class ReduceChecker<Key, Value, ReduceFunction,
     static constexpr bool debug = false;
 
 public:
-    ReduceChecker() : have_checked(false), result(false) {}
+    ReduceChecker() : have_checked(false), result(false) { }
 
     void add_pre(const Key& key, const Value& value) {
         mini_pre.push(key, value);
@@ -272,12 +272,11 @@ struct ReduceManipulatorBase : public ManipulatorBase {
 };
 
 //! Dummy No-Op Reduce Manipulator
-struct ReduceManipulatorDummy : public ReduceManipulatorBase<ReduceManipulatorDummy> {};
+struct ReduceManipulatorDummy : public ReduceManipulatorBase<ReduceManipulatorDummy>{ };
 
 //! Drops first element
 struct ReduceManipulatorDropFirst
-    : public ReduceManipulatorBase<ReduceManipulatorDropFirst>
-{
+    : public ReduceManipulatorBase<ReduceManipulatorDropFirst>{
     template <typename It>
     std::pair<It, It> manipulate(It begin, It end) {
         while (begin < end && (begin->first == Key<It>() ||
@@ -296,8 +295,7 @@ struct ReduceManipulatorDropFirst
 
 //! Increments value of first element
 struct ReduceManipulatorIncFirst
-    : public ReduceManipulatorBase<ReduceManipulatorIncFirst>
-{
+    : public ReduceManipulatorBase<ReduceManipulatorIncFirst>{
     template <typename It>
     std::pair<It, It> manipulate(It begin, It end) {
         sLOG << "Manipulating" << end - begin
@@ -310,24 +308,23 @@ struct ReduceManipulatorIncFirst
 
 //! Increments value of first element
 struct ReduceManipulatorRandFirst
-    : public ReduceManipulatorBase<ReduceManipulatorRandFirst>
-{
+    : public ReduceManipulatorBase<ReduceManipulatorRandFirst>{
     template <typename It>
     std::pair<It, It> manipulate(It begin, It end) {
         sLOG << "Manipulating" << end - begin
              << "elements, randomizing first value";
-        begin->second = Value<It>{rng()};
+        begin->second = Value<It>{ rng() }
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
+
 private:
-    std::mt19937 rng{std::random_device{}()};
+    std::mt19937 rng { std::random_device { } () };
 };
 
 //! Increments key of first element
 struct ReduceManipulatorIncFirstKey
-    : public ReduceManipulatorBase<ReduceManipulatorIncFirstKey>
-{
+    : public ReduceManipulatorBase<ReduceManipulatorIncFirstKey>{
     template <typename It>
     std::pair<It, It> manipulate(It begin, It end) {
         sLOG << "Manipulating" << end - begin
@@ -338,27 +335,25 @@ struct ReduceManipulatorIncFirstKey
     }
 };
 
-
 //! Increments value of first element
 struct ReduceManipulatorRandFirstKey
-    : public ReduceManipulatorBase<ReduceManipulatorRandFirstKey>
-{
+    : public ReduceManipulatorBase<ReduceManipulatorRandFirstKey>{
     template <typename It>
     std::pair<It, It> manipulate(It begin, It end) {
         sLOG << "Manipulating" << end - begin
              << "elements, randomizing first key";
-        begin->first = Key<It>{rng()};
+        begin->first = Key<It>{ rng() }
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
+
 private:
-    std::mt19937 rng{std::random_device{}()};
+    std::mt19937 rng { std::random_device { } () };
 };
 
 //! Switches values of first and second element
 struct ReduceManipulatorSwitchValues
-    : public ReduceManipulatorBase<ReduceManipulatorSwitchValues>
-{
+    : public ReduceManipulatorBase<ReduceManipulatorSwitchValues>{
     template <typename It>
     std::pair<It, It> manipulate(It begin, It end) {
         It next = skip_empty_key(begin + 1, end);

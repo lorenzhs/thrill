@@ -33,6 +33,7 @@ struct ManipulatorBase : public noncopynonmove {
         while (begin < end && begin->first == Key()) ++begin;
         return begin;
     }
+
 protected:
     bool made_changes_ = false;
 };
