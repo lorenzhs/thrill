@@ -32,7 +32,7 @@ namespace checkers {
 namespace _detail {
 //! Reduce checker minireduction helper
 template <typename Key, typename Value, typename ReduceFunction,
-          typename hash_fn = common::hash_crc32<Key>, size_t bucket_bits = 3>
+          typename hash_fn = common::hash_crc32<Key>, size_t bucket_bits = 8>
 class ReduceCheckerMinireduction : public noncopynonmove
 {
     static_assert(reduce_checkable_v<ReduceFunction>,
