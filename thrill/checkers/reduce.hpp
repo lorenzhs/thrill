@@ -313,7 +313,7 @@ struct ReduceManipulatorRandFirst
     std::pair<It, It> manipulate(It begin, It end) {
         sLOG << "Manipulating" << end - begin
              << "elements, randomizing first value";
-        begin->second = Value<It>{ rng() }
+        begin->second = Value<It>{ rng() };
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
@@ -342,7 +342,7 @@ struct ReduceManipulatorRandFirstKey
     std::pair<It, It> manipulate(It begin, It end) {
         sLOG << "Manipulating" << end - begin
              << "elements, randomizing first key";
-        begin->first = Key<It>{ rng() }
+        begin->first = Key<It>{ rng() };
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
