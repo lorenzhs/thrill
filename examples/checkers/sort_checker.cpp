@@ -42,10 +42,12 @@ auto sort_random = [](const auto &manipulator, const std::string& name,
 
         sLOGC(my_rank == 0) << "Running" << name << "tests," << reps << "reps";
 
+        common::StatsTimerStopped run_timer, check_timer;
         size_t failures = 0, dummy = 0, manips = 0;
         for (size_t i = 0; i < reps; ++i) {
             auto driver = std::make_shared<Driver>();
 
+            run_timer.Start();
             size_t force_eval =
                 Generate(
                     ctx, 1000000,
@@ -53,9 +55,12 @@ auto sort_random = [](const auto &manipulator, const std::string& name,
                     { return distribution(generator); })
                 .Sort(Compare{}, driver)
                 .Size();
+            run_timer.Stop();
 
             dummy += force_eval;
+            check_timer.Start();
             auto success = driver->check(ctx);
+            check_timer.Stop();
 
             if (!success.first) failures++;
             if (success.second) manips++;
@@ -64,6 +69,10 @@ auto sort_random = [](const auto &manipulator, const std::string& name,
         LOGC(my_rank == 0)
             << name << ": " << failures << " out of " << reps
             << " tests failed; " << manips << " manipulations";
+
+        sLOGC(my_rank == 0)
+            << "Sort:" << run_timer.Microseconds()/(1000.0*reps)
+            << "ms; Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms";
     };
 };
 

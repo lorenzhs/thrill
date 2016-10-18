@@ -16,6 +16,7 @@
 #include <thrill/checkers/driver.hpp>
 #include <thrill/checkers/reduce.hpp>
 #include <thrill/common/logger.hpp>
+#include <thrill/common/stats_timer.hpp>
 
 #include <algorithm>
 #include <functional>
@@ -47,12 +48,14 @@ auto reduce_by_key_test_factory = [](const auto &manipulator,
         sLOGC(my_rank == 0) << "Running ReduceByKey tests with" << name
                             << "manipulator," << reps << "reps";
 
+        common::StatsTimerStopped run_timer, check_timer;
         size_t failures = 0, dummy = 0, manips = 0;
         for (size_t i = 0; i < reps; ++i) {
             auto driver = std::make_shared<Driver>();
             driver->silence();
             auto key_extractor = [](const Value& in) { return in & 0xFFFF; };
 
+            run_timer.Start();
             size_t force_eval =
                 Generate(
                     ctx, 1000000,
@@ -62,9 +65,12 @@ auto reduce_by_key_test_factory = [](const auto &manipulator,
                     VolatileKeyTag, key_extractor, ReduceFn(),
                     api::DefaultReduceConfig(), driver)
                 .Size();
+            run_timer.Stop();
 
             dummy += force_eval;
+            check_timer.Start();
             auto success = driver->check(ctx);
+            check_timer.Stop();
 
             if (!success.first) failures++;
             if (success.second) manips++;
@@ -76,6 +82,10 @@ auto reduce_by_key_test_factory = [](const auto &manipulator,
             << failures << " out of " << reps << " tests failed"
             << "; " << manips << " manipulations"
             << common::log::reset();
+
+        sLOGC(my_rank == 0)
+            << "Reduce:" << run_timer.Microseconds()/(1000.0*reps)
+            << "ms; Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms";
     };
 };
 
@@ -100,11 +110,13 @@ auto reduce_pair_test_factory = [](const auto &manipulator,
         sLOGC(my_rank == 0) << "Running ReducePair tests with" << name
                             << "manipulator," << reps << "reps";
 
+        common::StatsTimerStopped run_timer, check_timer;
         size_t failures = 0, dummy = 0, manips = 0;
         for (size_t i = 0; i < reps; ++i) {
             auto driver = std::make_shared<Driver>();
             driver->silence();
 
+            run_timer.Start();
             size_t force_eval =
                 Generate(
                     ctx, 1000000,
@@ -114,9 +126,12 @@ auto reduce_pair_test_factory = [](const auto &manipulator,
                     })
                 .ReducePair(ReduceFn(), api::DefaultReduceConfig(), driver)
                 .Size();
+            run_timer.Stop();
 
             dummy += force_eval;
+            check_timer.Start();
             auto success = driver->check(ctx);
+            check_timer.Stop();
 
             if (!success.first) failures++;
             if (success.second) manips++;
@@ -128,6 +143,10 @@ auto reduce_pair_test_factory = [](const auto &manipulator,
             << failures << " out of " << reps << " tests failed"
             << "; " << manips << " manipulations"
             << common::log::reset();
+
+        sLOGC(my_rank == 0)
+            << "Reduce:" << run_timer.Microseconds()/(1000.0*reps)
+            << "ms; Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms";
     };
 };
 
