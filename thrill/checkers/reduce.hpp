@@ -80,7 +80,7 @@ public:
         }
     }
 
-    //! Compare for equality
+    //! Compare local minireduction for equality
     bool operator == (const ReduceCheckerMinireduction& other) const {
         // check dimensions
         if (num_buckets != other.num_buckets) {
