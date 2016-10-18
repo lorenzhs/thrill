@@ -228,7 +228,6 @@ public:
             reduced_ = true;
         }
         post_phase_.PushData(consume);
-        checking_driver_->check(context_);
     }
 
     //! process the inbound data in the post reduce phase

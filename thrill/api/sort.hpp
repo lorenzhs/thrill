@@ -305,11 +305,6 @@ public:
             }
         }
 
-        // Do the checking
-        if (check) {
-            checking_driver_->check(context_);
-        }
-
         timer_pushdata.Stop();
 
         if (stats_enabled) {
