@@ -736,6 +736,8 @@ public:
      *
      * \param reduce_config Reduce configuration.
      *
+     * \param driver Checking driver.
+     *
      * \ingroup dia_dops
      */
     template <typename KeyExtractor, typename ReduceFunction,
@@ -776,6 +778,8 @@ public:
      *
      * \param reduce_config Reduce configuration.
      *
+     * \param driver Checking driver.
+     *
      * \ingroup dia_dops
      */
     template <typename KeyExtractor, typename ReduceFunction,
@@ -809,6 +813,8 @@ public:
      * not necessarily commutative.
      *
      * \param reduce_config Reduce configuration.
+     *
+     * \param driver Checking driver.
      *
      * \ingroup dia_dops
      */
@@ -855,6 +861,8 @@ public:
      * each array cell.
      *
      * \param reduce_config Reduce configuration.
+     *
+     * \param driver Checking driver.
      *
      * \ingroup dia_dops
      */
@@ -906,6 +914,8 @@ public:
      * each array cell.
      *
      * \param reduce_config Reduce configuration.
+     *
+     * \param driver Checking driver.
      *
      * \ingroup dia_dops
      */
@@ -1125,6 +1135,8 @@ public:
      * \param compare_function Function, which compares two elements. Returns
      * true, if first element is smaller than second. False otherwise.
      *
+     * \param driver Checking driver.
+     *
      * \ingroup dia_dops
      */
     template <typename CompareFunction = std::less<ValueType>,
@@ -1146,6 +1158,8 @@ public:
      *
      * \param sort_algorithm Algorithm class used to sort items. Merging is
      * always done using a tournament tree with compare_function.
+     *
+     * \param driver Checking driver.
      *
      * \ingroup dia_dops
      */
