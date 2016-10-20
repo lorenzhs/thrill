@@ -34,6 +34,24 @@ struct reduce_checkable<common::TupleReduceIndex<Index, Tuple, Op> >
 template <typename ReduceFunction>
 constexpr bool reduce_checkable_v = reduce_checkable<ReduceFunction>::value;
 
+template<typename T, typename = void>
+struct is_iterator
+{
+   static constexpr bool value = false;
+};
+
+template<typename T>
+struct is_iterator<T, typename std::enable_if_t<
+                          !std::is_same<
+                              typename std::iterator_traits<T>::value_type,
+                              void>::value> >
+{
+   static constexpr bool value = true;
+};
+
+template <typename T>
+constexpr bool is_iterator_v = is_iterator<T>::value;
+
 struct noncopynonmove {
     //! default-constructible
     noncopynonmove() = default;

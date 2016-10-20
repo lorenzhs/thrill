@@ -60,7 +60,7 @@ class DefaultReduceConfig : public core::DefaultReduceConfig
 template <typename ValueType,
           typename KeyExtractor, typename ReduceFunction,
           typename ReduceConfig, typename CheckingDriver,
-          const bool VolatileKey, const bool SendPair>
+          const bool VolatileKey>
 class ReduceNode final : public DOpNode<ValueType>
 {
     static constexpr bool debug = false;
@@ -69,11 +69,10 @@ class ReduceNode final : public DOpNode<ValueType>
     using Super::context_;
 
     using Key = typename common::FunctionTraits<KeyExtractor>::result_type;
-    using Value = typename common::FunctionTraits<ReduceFunction>::result_type;
-    using KeyValuePair = std::pair<Key, Value>;
 
-    using PrePhaseOutput =
-              typename common::If<VolatileKey, KeyValuePair, Value>::type;
+    using TableItem =
+              typename common::If<
+                  VolatileKey, std::pair<Key, ValueType>, ValueType>::type;
 
     using Checker = typename CheckingDriver::checker_t;
     using Manipulator = typename CheckingDriver::manipulator_t;
@@ -94,7 +93,7 @@ private:
             return node_->PushItem(item);
         }
 
-        void operator () (const ValueType& item, const KeyValuePair& pair) const {
+        void operator () (const ValueType& item, const TableItem &pair) const {
             checker_.add_post(pair);
             return node_->PushItem(item);
         }
@@ -122,8 +121,8 @@ private:
     template <typename V, typename PrePhase, typename Checker>
     struct ReducePreOp<V, PrePhase, Checker,
                        typename std::enable_if_t<(
-                                                     std::is_same<std::decay_t<V>, Key>::value ||
-                                                     std::is_same<std::decay_t<V>, Value>::value)> >{
+                           std::is_same<std::decay_t<V>, Key>::value ||
+                           std::is_same<std::decay_t<V>, ValueType>::value)> >{
         ReducePreOp(PrePhase& pre_phase, const KeyExtractor& key_extractor,
                     Checker& checker)
             : pre_phase_(pre_phase),
@@ -238,7 +237,7 @@ public:
             sLOG << "reading data from" << mix_stream_->id()
                  << "to push into post phase which flushes to" << this->id();
             while (reader.HasNext()) {
-                post_phase_.Insert(reader.template Next<PrePhaseOutput>());
+                post_phase_.Insert(reader.template Next<TableItem>());
             }
         }
         else
@@ -247,7 +246,7 @@ public:
             sLOG << "reading data from" << cat_stream_->id()
                  << "to push into post phase which flushes to" << this->id();
             while (reader.HasNext()) {
-                post_phase_.Insert(reader.template Next<PrePhaseOutput>());
+                post_phase_.Insert(reader.template Next<TableItem>());
             }
         }
     }
@@ -268,12 +267,12 @@ private:
     std::thread thread_;
 
     core::ReducePrePhase<
-        ValueType, Key, Value, KeyExtractor, ReduceFunction, Manipulator,
+        TableItem, Key, ValueType, KeyExtractor, ReduceFunction, Manipulator,
         VolatileKey, ReduceConfig> pre_phase_;
 
     core::ReduceByHashPostPhase<
-        ValueType, Key, Value, KeyExtractor, ReduceFunction, Emitter,
-        Manipulator, SendPair, ReduceConfig> post_phase_;
+        TableItem, Key, ValueType, KeyExtractor, ReduceFunction, Emitter,
+        Manipulator, VolatileKey, ReduceConfig> post_phase_;
 
     const KeyExtractor& key_extractor_;
 
@@ -323,8 +322,8 @@ auto DIA<ValueType, Stack>::ReduceByKey(
         "KeyExtractor has the wrong input type");
 
     using ReduceNode = api::ReduceNode<
-              DOpResult, KeyExtractor, ReduceFunction,
-              ReduceConfig, CheckingDriver, /* VolatileKey */ false, false>;
+              DOpResult, KeyExtractor, ReduceFunction, ReduceConfig,
+              CheckingDriver, /* VolatileKey */ false>;
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReduceByKey", key_extractor, reduce_function, reduce_config,
         driver);
@@ -374,9 +373,8 @@ auto DIA<ValueType, Stack>::ReduceByKey(
         "KeyExtractor has the wrong input type");
 
     using ReduceNode = api::ReduceNode<
-              DOpResult, KeyExtractor,
-              ReduceFunction, ReduceConfig, CheckingDriver,
-              /* VolatileKey */ true, false>;
+              DOpResult, KeyExtractor, ReduceFunction, ReduceConfig,
+              CheckingDriver, /* VolatileKey */ true>;
 
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReduceByKey", key_extractor, reduce_function, reduce_config,
@@ -420,22 +418,20 @@ auto DIA<ValueType, Stack>::ReducePair(
             typename ValueType::second_type>::value,
         "ReduceFunction has the wrong output type");
 
-    using Key = typename ValueType::first_type;
-    using Value = typename ValueType::second_type;
+    auto key_extractor = [](const ValueType& value) { return value.first; };
+
+    auto reduce_pair_function =
+        [reduce_function](const ValueType& a, const ValueType& b) {
+            return ValueType(a.first, reduce_function(a.second, b.second));
+        };
 
     using ReduceNode = api::ReduceNode<
-              ValueType, std::function<Key(Value)>, ReduceFunction,
-              ReduceConfig, CheckingDriver, /* VolatileKey */ true, true>;
+              ValueType, decltype(key_extractor), decltype(reduce_pair_function),
+              ReduceConfig, CheckingDriver, /* VolatileKey */ false>;
 
     auto node = common::MakeCounting<ReduceNode>(
-        *this, "ReducePair", [](Value value) {
-            // This function should not be called, it is only here to give the
-            // key type to the hashtables.
-            assert(1 == 0);
-            value = value;
-            return Key();
-        },
-        reduce_function, reduce_config, driver);
+        *this, "ReducePair",
+         key_extractor, reduce_pair_function, reduce_config, driver);
 
     return DIA<ValueType>(node);
 }

@@ -62,7 +62,7 @@ static void TestAddMyStructByHash(Context& ctx) {
     using Phase = core::ReduceByHashPostPhase<
               MyStruct, size_t, MyStruct,
               decltype(key_ex), decltype(red_fn), decltype(emit_fn),
-              decltype(manipulator), false,
+              decltype(manipulator), /* VolatileKey */ false,
               core::DefaultReduceConfigSelect<table_impl> >;
 
     Phase phase(ctx, 0, key_ex, red_fn, emit_fn, manipulator);

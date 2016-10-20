@@ -58,7 +58,7 @@ class DefaultReduceToIndexConfig : public core::DefaultReduceConfig
 template <typename ValueType,
           typename KeyExtractor, typename ReduceFunction,
           typename ReduceConfig, typename CheckingDriver,
-          bool VolatileKey, bool SendPair>
+          bool VolatileKey>
 class ReduceToIndexNode final : public DOpNode<ValueType>
 {
     static constexpr bool debug = false;
@@ -67,14 +67,13 @@ class ReduceToIndexNode final : public DOpNode<ValueType>
     using Super::context_;
 
     using Key = typename common::FunctionTraits<KeyExtractor>::result_type;
-    using Value = typename common::FunctionTraits<ReduceFunction>::result_type;
-    using KeyValuePair = std::pair<Key, Value>;
+
+    using TableItem =
+              typename common::If<
+                  VolatileKey, std::pair<Key, ValueType>, ValueType>::type;
 
     static_assert(std::is_same<Key, size_t>::value,
                   "Key must be an unsigned integer");
-
-    using PrePhaseOutput =
-              typename common::If<VolatileKey, KeyValuePair, Value>::type;
 
     using Checker = typename CheckingDriver::checker_t;
     using Manipulator = typename CheckingDriver::manipulator_t;
@@ -95,7 +94,7 @@ private:
             return node_->PushItem(item);
         }
 
-        void operator () (const ValueType& item, const KeyValuePair& pair) const {
+        void operator () (const ValueType& item, const TableItem& pair) const {
             checker_.add_post(pair);
             return node_->PushItem(item);
         }
@@ -126,7 +125,7 @@ private:
     template <typename V, typename PrePhase, typename Checker>
     struct ReducePreOp<V, PrePhase, Checker,
                        typename std::enable_if_t<(std::is_same<std::decay_t<V>, Key>::value ||
-                                                  std::is_same<std::decay_t<V>, Value>::value)> >{
+                                                  std::is_same<std::decay_t<V>, ValueType>::value)> >{
         ReducePreOp(PrePhase& pre_phase, const KeyExtractor& key_extractor,
                     Checker& checker)
             : pre_phase_(pre_phase),
@@ -154,7 +153,7 @@ public:
                       const KeyExtractor& key_extractor,
                       const ReduceFunction& reduce_function,
                       size_t result_size,
-                      const Value& neutral_element,
+                      const ValueType& neutral_element,
                       const ReduceConfig& config,
                       std::shared_ptr<CheckingDriver> driver)
         : Super(parent.ctx(), label, { parent.id() }, { parent.node() }),
@@ -262,7 +261,7 @@ public:
             sLOG << "reading data from" << mix_stream_->id()
                  << "to push into post table which flushes to" << this->id();
             while (reader.HasNext()) {
-                post_phase_.Insert(reader.template Next<PrePhaseOutput>());
+                post_phase_.Insert(reader.template Next<TableItem>());
             }
         }
         else
@@ -271,7 +270,7 @@ public:
             sLOG << "reading data from" << cat_stream_->id()
                  << "to push into post table which flushes to" << this->id();
             while (reader.HasNext()) {
-                post_phase_.Insert(reader.template Next<PrePhaseOutput>());
+                post_phase_.Insert(reader.template Next<TableItem>());
             }
         }
     }
@@ -294,12 +293,12 @@ private:
     std::thread thread_;
 
     core::ReducePrePhase<
-        ValueType, Key, Value, KeyExtractor, ReduceFunction, Manipulator,
+        TableItem, Key, ValueType, KeyExtractor, ReduceFunction, Manipulator,
         VolatileKey, ReduceConfig, core::ReduceByIndex<Key> > pre_phase_;
 
     core::ReduceByIndexPostPhase<
-        ValueType, Key, Value, KeyExtractor, ReduceFunction, Emitter,
-        Manipulator, SendPair, ReduceConfig> post_phase_;
+        TableItem, Key, ValueType, KeyExtractor, ReduceFunction, Emitter,
+        Manipulator, VolatileKey, ReduceConfig> post_phase_;
 
     std::shared_ptr<CheckingDriver> checking_driver_;
 
@@ -356,7 +355,7 @@ auto DIA<ValueType, Stack>::ReduceToIndex(
 
     using ReduceNode = ReduceToIndexNode<
               DOpResult, KeyExtractor, ReduceFunction,
-              ReduceConfig, CheckingDriver, /* VolatileKey */ false, false>;
+              ReduceConfig, CheckingDriver, /* VolatileKey */ false>;
 
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReduceToIndex", key_extractor, reduce_function,
@@ -416,7 +415,7 @@ auto DIA<ValueType, Stack>::ReduceToIndex(
 
     using ReduceNode = ReduceToIndexNode<
               DOpResult, KeyExtractor, ReduceFunction,
-              ReduceConfig, CheckingDriver, /* VolatileKey */ true, false>;
+              ReduceConfig, CheckingDriver, /* VolatileKey */ true>;
 
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReduceToIndex", key_extractor, reduce_function,
