@@ -72,18 +72,18 @@ template <typename TableItem, typename Key, typename Value,
           const bool VolatileKey,
           typename ReduceConfig_,
           typename IndexFunction,
-          typename EqualToFunction = std::equal_to<Key> >
+          typename KeyEqualFunction = std::equal_to<Key> >
 class ReduceOldProbingHashTable
     : public ReduceTable<TableItem, Key, Value,
                          KeyExtractor, ReduceFunction, Emitter, Manipulator,
                          VolatileKey, ReduceConfig_,
-                         IndexFunction, EqualToFunction>
+                         IndexFunction, KeyEqualFunction>
 {
     using Super = ReduceTable<TableItem, Key, Value,
                               KeyExtractor, ReduceFunction, Emitter,
                               Manipulator,
                               VolatileKey, ReduceConfig_, IndexFunction,
-                              EqualToFunction>;
+                              KeyEqualFunction>;
     using Super::debug;
     static constexpr bool debug_items = false;
 
@@ -101,11 +101,11 @@ public:
         const ReduceConfig& config = ReduceConfig(),
         bool immediate_flush = false,
         const IndexFunction& index_function = IndexFunction(),
-        const EqualToFunction& equal_to_function = EqualToFunction())
+        const KeyEqualFunction& key_equal_function = KeyEqualFunction())
         : Super(ctx, dia_id,
                 key_extractor, reduce_function, emitter, manipulator,
                 num_partitions, config, immediate_flush,
-                index_function, equal_to_function) {
+                index_function, key_equal_function) {
 
         assert(num_partitions > 0);
     }
@@ -178,7 +178,7 @@ public:
 
         assert(h.partition_id < num_partitions_);
 
-        if (key(kv) == Key()) {
+        if (key_equal_function_(key(kv), Key())) {
             // handle pairs with sentinel key specially by reducing into last
             // element of items.
             TableItem& sentinel = items_[num_buckets_];
@@ -208,16 +208,11 @@ public:
         TableItemIterator begin_iter = pbegin + local_index;
         TableItemIterator iter = begin_iter;
 
-        while (!equal_to_function_(key(*iter), Key()))
+        while (!key_equal_function_(key(*iter), Key()))
         {
-            if (equal_to_function_(key(*iter), key(kv)))
+            if (key_equal_function_(key(*iter), key(kv)))
             {
-                LOGC(debug_items)
-                    << "match of key: " << key(kv)
-                    << " and " << key(*iter) << " ... reducing...";
-
                 *iter = reduce(*iter, kv);
-
                 return;
             }
 
@@ -237,7 +232,6 @@ public:
                 // increase counter for partition
                 ++items_per_partition_[h.partition_id];
                 ++num_items_;
-
                 return;
             }
         }
@@ -291,7 +285,7 @@ public:
 
         for ( ; iter != end; ++iter)
         {
-            if (key(*iter) != Key())
+            if (!key_equal_function_(key(*iter), Key()))
             {
                 writer.Put(*iter);
                 *iter = TableItem();
@@ -363,7 +357,7 @@ public:
 
         for ( ; iter != end; ++iter)
         {
-            if (key(*iter) != Key()) {
+            if (!key_equal_function_(key(*iter), Key())) {
                 emit(partition_id, *iter);
 
                 if (consume)
@@ -399,7 +393,7 @@ public:
 
 private:
     using Super::config_;
-    using Super::equal_to_function_;
+    using Super::key_equal_function_;
     using Super::immediate_flush_;
     using Super::index_function_;
     using Super::items_per_partition_;
@@ -429,17 +423,18 @@ template <typename TableItem, typename Key, typename Value,
           typename KeyExtractor, typename ReduceFunction,
           typename Emitter, typename Manipulator, const bool VolatileKey,
           typename ReduceConfig, typename IndexFunction,
-          typename EqualToFunction>
+          typename KeyEqualFunction>
 class ReduceTableSelect<
         ReduceTableImpl::OLD_PROBING,
         TableItem, Key, Value, KeyExtractor, ReduceFunction,
-        Emitter, Manipulator, VolatileKey, ReduceConfig, IndexFunction, EqualToFunction>
+        Emitter, Manipulator, VolatileKey, ReduceConfig, IndexFunction,
+        KeyEqualFunction>
 {
 public:
     using type = ReduceOldProbingHashTable<
               TableItem, Key, Value, KeyExtractor, ReduceFunction,
               Emitter, Manipulator, VolatileKey, ReduceConfig,
-              IndexFunction, EqualToFunction>;
+              IndexFunction, KeyEqualFunction>;
 };
 
 } // namespace core

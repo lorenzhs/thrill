@@ -82,7 +82,7 @@ template <typename TableItem, typename Key, typename Value,
           typename Manipulator, const bool VolatileKey,
           typename ReduceConfig_ = DefaultReduceConfig,
           typename IndexFunction = ReduceByHash<Key>,
-          typename EqualToFunction = std::equal_to<Key> >
+          typename KeyEqualFunction = std::equal_to<Key> >
 class ReducePrePhase
 {
     static constexpr bool debug = false;
@@ -96,7 +96,7 @@ public:
               ReduceConfig::table_impl_,
               TableItem, Key, Value,
               KeyExtractor, ReduceFunction, Emitter, Manipulator,
-              VolatileKey, ReduceConfig, IndexFunction, EqualToFunction>::type;
+              VolatileKey, ReduceConfig, IndexFunction, KeyEqualFunction>::type;
 
     /*!
      * A data structure which takes an arbitrary value and extracts a key using
@@ -111,12 +111,12 @@ public:
                    Manipulator& manipulator,
                    const ReduceConfig& config = ReduceConfig(),
                    const IndexFunction& index_function = IndexFunction(),
-                   const EqualToFunction& equal_to_function = EqualToFunction())
+                   const KeyEqualFunction& key_equal_function = KeyEqualFunction())
         : emit_(emit),
           table_(ctx, dia_id,
                  key_extractor, reduce_function, emit_, manipulator,
                  num_partitions, config, /* immediate_flush */ true,
-                 index_function, equal_to_function) {
+                 index_function, key_equal_function) {
         sLOG << "creating ReducePrePhase with" << emit.size() << "output emitters";
 
         assert(num_partitions == emit.size());

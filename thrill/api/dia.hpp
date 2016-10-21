@@ -712,7 +712,7 @@ public:
     //! \{
 
     /*!
-     * ReduceBy is a DOp, which groups elements of the DIA with the
+     * ReduceByKey is a DOp, which groups elements of the DIA with the
      * key_extractor and reduces each key-bucket to a single element using the
      * associative reduce_function. The reduce_function defines how two elements
      * can be reduced to a single element of equal type.
@@ -745,11 +745,100 @@ public:
               typename CheckingDriver = checkers::Driver<
                   checkers::ReduceCheckerDummy,
                   checkers::ReduceManipulatorDummy> >
-    auto ReduceByKey(const KeyExtractor &key_extractor,
-                     const ReduceFunction &reduce_function,
-                     const ReduceConfig& reduce_config = ReduceConfig(),
-                     std::shared_ptr<CheckingDriver> driver =
-                         std::make_shared<CheckingDriver>()) const;
+    auto ReduceByKey(
+        const KeyExtractor &key_extractor,
+        const ReduceFunction &reduce_function,
+        const ReduceConfig& reduce_config = ReduceConfig(),
+        std::shared_ptr<CheckingDriver> driver =
+            std::make_shared<CheckingDriver>()) const;
+
+    /*!
+     * ReduceByKey is a DOp, which groups elements of the DIA with the
+     * key_extractor and reduces each key-bucket to a single element using the
+     * associative reduce_function. The reduce_function defines how two elements
+     * can be reduced to a single element of equal type.
+     *
+     * The key of the reduced element has to be equal to the keys of the input
+     * elements. Since ReduceBy is a DOp, it creates a new DIANode. The DIA
+     * returned by Reduce links to this newly created DIANode. The stack_ of the
+     * returned DIA consists of the PostOp of Reduce, as a reduced element can
+     * directly be chained to the following LOps.
+     *
+     * \param key_extractor Key extractor function, which maps each element to a
+     * key of possibly different type.
+     *
+     * \tparam ReduceFunction Type of the reduce_function. This is a function
+     * reducing two elements of L's result type to a single element of equal
+     * type.
+     *
+     * \param reduce_function Reduce function, which defines how the key buckets
+     * are reduced to a single element. This function is applied associative but
+     * not necessarily commutative.
+     *
+     * \param reduce_config Reduce configuration.
+     *
+     * \param key_hash_function Function to hash keys extracted by KeyExtractor.
+     *
+     * \ingroup dia_dops
+     */
+    template <typename KeyExtractor, typename ReduceFunction,
+              typename ReduceConfig, typename KeyHashFunction,
+              typename CheckingDriver = checkers::Driver<
+                  checkers::ReduceCheckerDummy,
+                  checkers::ReduceManipulatorDummy> >
+    auto ReduceByKey(
+        const KeyExtractor &key_extractor,
+        const ReduceFunction &reduce_function,
+        const ReduceConfig &reduce_config,
+        const KeyHashFunction &key_hash_function,
+        std::shared_ptr<CheckingDriver> driver =
+            std::make_shared<CheckingDriver>()) const;
+
+    /*!
+     * ReduceByKey is a DOp, which groups elements of the DIA with the
+     * key_extractor and reduces each key-bucket to a single element using the
+     * associative reduce_function. The reduce_function defines how two elements
+     * can be reduced to a single element of equal type.
+     *
+     * The key of the reduced element has to be equal to the keys of the input
+     * elements. Since ReduceBy is a DOp, it creates a new DIANode. The DIA
+     * returned by Reduce links to this newly created DIANode. The stack_ of the
+     * returned DIA consists of the PostOp of Reduce, as a reduced element can
+     * directly be chained to the following LOps.
+     *
+     * \param key_extractor Key extractor function, which maps each element to a
+     * key of possibly different type.
+     *
+     * \tparam ReduceFunction Type of the reduce_function. This is a function
+     * reducing two elements of L's result type to a single element of equal
+     * type.
+     *
+     * \param reduce_function Reduce function, which defines how the key buckets
+     * are reduced to a single element. This function is applied associative but
+     * not necessarily commutative.
+     *
+     * \param reduce_config Reduce configuration.
+     *
+     * \param key_hash_function Function to hash keys extracted by KeyExtractor.
+     *
+     * \param key_equal_function Function to compare keys in reduce hash tables.
+     *
+     * \ingroup dia_dops
+     */
+    template <typename KeyExtractor, typename ReduceFunction,
+              typename ReduceConfig,
+              typename KeyHashFunction, typename KeyEqualFunction,
+              typename CheckingDriver = checkers::Driver<
+                  checkers::ReduceCheckerDummy,
+                  checkers::ReduceManipulatorDummy>>
+    auto ReduceByKey(
+        const KeyExtractor &key_extractor,
+        const ReduceFunction &reduce_function,
+        const ReduceConfig &reduce_config,
+        const KeyHashFunction &key_hash_function,
+        const KeyEqualFunction &key_equal_function,
+        std::shared_ptr<CheckingDriver> driver =
+            std::make_shared<CheckingDriver>()) const;
 
     /*!
      * ReduceByKey is a DOp, which groups elements of the DIA with the
@@ -787,12 +876,107 @@ public:
               typename CheckingDriver = checkers::Driver<
                   checkers::ReduceCheckerDummy,
                   checkers::ReduceManipulatorDummy> >
-    auto ReduceByKey(struct VolatileKeyTag const &,
-                     const KeyExtractor &key_extractor,
-                     const ReduceFunction &reduce_function,
-                     const ReduceConfig& reduce_config = ReduceConfig(),
-                     std::shared_ptr<CheckingDriver> driver =
-                         std::make_shared<CheckingDriver>()) const;
+    auto ReduceByKey(
+        struct VolatileKeyTag const &,
+        const KeyExtractor &key_extractor,
+        const ReduceFunction &reduce_function,
+        const ReduceConfig& reduce_config = ReduceConfig(),
+        std::shared_ptr<CheckingDriver> driver =
+            std::make_shared<CheckingDriver>()) const;
+
+    /*!
+     * ReduceByKey is a DOp, which groups elements of the DIA with the
+     * key_extractor and reduces each key-bucket to a single element using the
+     * associative reduce_function. The reduce_function defines how two elements
+     * can be reduced to a single element of equal type.
+     *
+     * In contrast to ReduceBy, the reduce_function is allowed to change the key
+     * (Example: Integers with modulo function as key_extractor). Creates
+     * overhead as both key and value have to be sent in shuffle step. Since
+     * ReduceByKey is a DOp, it creates a new DIANode. The DIA returned by
+     * Reduce links to this newly created DIANode. The stack_ of the returned
+     * DIA consists of the PostOp of Reduce, as a reduced element can directly
+     * be chained to the following LOps.
+     *
+     * \param key_extractor Key extractor function, which maps each element to a
+     * key of possibly different type.
+     *
+     * \tparam ReduceFunction Type of the reduce_function. This is a function
+     * reducing two elements of L's result type to a single element of equal
+     * type.
+     *
+     * \param reduce_function Reduce function, which defines how the key buckets
+     * are reduced to a single element. This function is applied associative but
+     * not necessarily commutative.
+     *
+     * \param reduce_config Reduce configuration.
+     *
+     * \param key_hash_function Function to hash keys extracted by KeyExtractor.
+     *
+     * \ingroup dia_dops
+     */
+    template <typename KeyExtractor, typename ReduceFunction,
+              typename ReduceConfig, typename KeyHashFunction,
+              typename CheckingDriver = checkers::Driver<
+                  checkers::ReduceCheckerDummy,
+                  checkers::ReduceManipulatorDummy> >
+    auto ReduceByKey(
+        struct VolatileKeyTag const &,
+        const KeyExtractor &key_extractor,
+        const ReduceFunction &reduce_function,
+        const ReduceConfig &reduce_config,
+        const KeyHashFunction &key_hash_function,
+        std::shared_ptr<CheckingDriver> driver =
+            std::make_shared<CheckingDriver>()) const;
+
+    /*!
+     * ReduceByKey is a DOp, which groups elements of the DIA with the
+     * key_extractor and reduces each key-bucket to a single element using the
+     * associative reduce_function. The reduce_function defines how two elements
+     * can be reduced to a single element of equal type.
+     *
+     * In contrast to ReduceBy, the reduce_function is allowed to change the key
+     * (Example: Integers with modulo function as key_extractor). Creates
+     * overhead as both key and value have to be sent in shuffle step. Since
+     * ReduceByKey is a DOp, it creates a new DIANode. The DIA returned by
+     * Reduce links to this newly created DIANode. The stack_ of the returned
+     * DIA consists of the PostOp of Reduce, as a reduced element can directly
+     * be chained to the following LOps.
+     *
+     * \param key_extractor Key extractor function, which maps each element to a
+     * key of possibly different type.
+     *
+     * \tparam ReduceFunction Type of the reduce_function. This is a function
+     * reducing two elements of L's result type to a single element of equal
+     * type.
+     *
+     * \param reduce_function Reduce function, which defines how the key buckets
+     * are reduced to a single element. This function is applied associative but
+     * not necessarily commutative.
+     *
+     * \param reduce_config Reduce configuration.
+     *
+     * \param key_hash_function Function to hash keys extracted by KeyExtractor.
+     *
+     * \param key_equal_function Function to compare keys in reduce hash tables.
+     *
+     * \ingroup dia_dops
+     */
+    template <typename KeyExtractor, typename ReduceFunction,
+              typename ReduceConfig,
+              typename KeyHashFunction, typename KeyEqualFunction,
+              typename CheckingDriver = checkers::Driver<
+                  checkers::ReduceCheckerDummy,
+                  checkers::ReduceManipulatorDummy> >
+    auto ReduceByKey(
+        struct VolatileKeyTag const &,
+        const KeyExtractor &key_extractor,
+        const ReduceFunction &reduce_function,
+        const ReduceConfig &reduce_config,
+        const KeyHashFunction &key_hash_function,
+        const KeyEqualFunction &key_equal_function,
+        std::shared_ptr<CheckingDriver> driver =
+            std::make_shared<CheckingDriver>()) const;
 
     /*!
      * ReducePair is a DOp, which groups key-value-pairs in the input DIA by
@@ -823,10 +1007,88 @@ public:
               typename CheckingDriver = checkers::Driver<
                   checkers::ReduceCheckerDummy,
                   checkers::ReduceManipulatorDummy> >
-    auto ReducePair(const ReduceFunction &reduce_function,
-                    const ReduceConfig& reduce_config = ReduceConfig(),
-                    std::shared_ptr<CheckingDriver> driver =
-                        std::make_shared<CheckingDriver>()) const;
+    auto ReducePair(
+        const ReduceFunction &reduce_function,
+        const ReduceConfig& reduce_config = ReduceConfig(),
+        std::shared_ptr<CheckingDriver> driver =
+            std::make_shared<CheckingDriver>()) const;
+
+    /*!
+     * ReducePair is a DOp, which groups key-value-pairs in the input DIA by
+     * their key and reduces each key-bucket to a single element using the
+     * associative reduce_function. The reduce_function defines how two elements
+     * can be reduced to a single element of equal type. The reduce_function is
+     * allowed to change the key. Since ReducePair is a DOp, it creates a new
+     * DIANode. The DIA returned by Reduce links to this newly created
+     * DIANode. The stack_ of the returned DIA consists of the PostOp of Reduce,
+     * as a reduced element can directly be chained to the following LOps.
+     *
+     * \tparam ReduceFunction Type of the reduce_function. This is a function
+     * reducing two elements of L's result type to a single element of equal
+     * type.
+     *
+     * \param reduce_function Reduce function, which defines how the key buckets
+     * are reduced to a single element. This function is applied associative but
+     * not necessarily commutative.
+     *
+     * \param reduce_config Reduce configuration.
+     *
+     * \param key_hash_function Function to hash keys extracted by KeyExtractor.
+     *
+     * \ingroup dia_dops
+     */
+    template <typename ReduceFunction,
+              typename ReduceConfig,
+              typename KeyHashFunction,
+              typename CheckingDriver = checkers::Driver<
+                  checkers::ReduceCheckerDummy,
+                  checkers::ReduceManipulatorDummy> >
+    auto ReducePair(
+        const ReduceFunction &reduce_function,
+        const ReduceConfig &reduce_config,
+        const KeyHashFunction &key_hash_function,
+        std::shared_ptr<CheckingDriver> driver =
+            std::make_shared<CheckingDriver>()) const;
+
+    /*!
+     * ReducePair is a DOp, which groups key-value-pairs in the input DIA by
+     * their key and reduces each key-bucket to a single element using the
+     * associative reduce_function. The reduce_function defines how two elements
+     * can be reduced to a single element of equal type. The reduce_function is
+     * allowed to change the key. Since ReducePair is a DOp, it creates a new
+     * DIANode. The DIA returned by Reduce links to this newly created
+     * DIANode. The stack_ of the returned DIA consists of the PostOp of Reduce,
+     * as a reduced element can directly be chained to the following LOps.
+     *
+     * \tparam ReduceFunction Type of the reduce_function. This is a function
+     * reducing two elements of L's result type to a single element of equal
+     * type.
+     *
+     * \param reduce_function Reduce function, which defines how the key buckets
+     * are reduced to a single element. This function is applied associative but
+     * not necessarily commutative.
+     *
+     * \param reduce_config Reduce configuration.
+     *
+     * \param key_hash_function Function to hash keys extracted by KeyExtractor.
+     *
+     * \param key_equal_function Function to compare keys in reduce hash tables.
+     *
+     * \ingroup dia_dops
+     */
+    template <typename ReduceFunction,
+              typename ReduceConfig,
+              typename KeyHashFunction, typename KeyEqualFunction,
+              typename CheckingDriver = checkers::Driver<
+                  checkers::ReduceCheckerDummy,
+                  checkers::ReduceManipulatorDummy> >
+    auto ReducePair(
+        const ReduceFunction &reduce_function,
+        const ReduceConfig &reduce_config,
+        const KeyHashFunction &key_hash_function,
+        const KeyEqualFunction &key_equal_function,
+        std::shared_ptr<CheckingDriver> driver =
+            std::make_shared<CheckingDriver>()) const;
 
     /*!
      * ReduceToIndex is a DOp, which groups elements of the DIA with the

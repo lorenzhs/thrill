@@ -59,7 +59,8 @@ class DefaultReduceConfig : public core::DefaultReduceConfig
  */
 template <typename ValueType,
           typename KeyExtractor, typename ReduceFunction,
-          typename ReduceConfig, typename CheckingDriver,
+          typename ReduceConfig, typename KeyHashFunction,
+          typename KeyEqualFunction, typename CheckingDriver,
           const bool VolatileKey>
 class ReduceNode final : public DOpNode<ValueType>
 {
@@ -73,6 +74,8 @@ class ReduceNode final : public DOpNode<ValueType>
     using TableItem =
               typename common::If<
                   VolatileKey, std::pair<Key, ValueType>, ValueType>::type;
+
+    using HashIndexFunction = core::ReduceByHash<Key, KeyHashFunction>;
 
     using Checker = typename CheckingDriver::checker_t;
     using Manipulator = typename CheckingDriver::manipulator_t;
@@ -150,6 +153,8 @@ public:
                const KeyExtractor& key_extractor,
                const ReduceFunction& reduce_function,
                const ReduceConfig& config,
+               const KeyHashFunction& key_hash_function,
+               const KeyEqualFunction& key_equal_function,
                std::shared_ptr<CheckingDriver> driver)
         : Super(parent.ctx(), label, { parent.id() }, { parent.node() }),
           mix_stream_(use_mix_stream_ ?
@@ -159,11 +164,13 @@ public:
           emitters_(use_mix_stream_ ?
                     mix_stream_->GetWriters() : cat_stream_->GetWriters()),
           pre_phase_(
-              context_, Super::id(), parent.ctx().num_workers(), key_extractor,
-              reduce_function, emitters_, driver->manipulator(), config),
+              context_, Super::id(), parent.ctx().num_workers(),
+              key_extractor, reduce_function, emitters_, driver->manipulator(),
+              config, HashIndexFunction(key_hash_function), key_equal_function),
           post_phase_(
               context_, Super::id(), key_extractor, reduce_function,
-              Emitter(this, driver->checker()), driver->manipulator(), config),
+              Emitter(this, driver->checker()), driver->manipulator(), config,
+              HashIndexFunction(key_hash_function), key_equal_function),
           key_extractor_(key_extractor),
           checking_driver_(driver)
     {
@@ -268,11 +275,13 @@ private:
 
     core::ReducePrePhase<
         TableItem, Key, ValueType, KeyExtractor, ReduceFunction, Manipulator,
-        VolatileKey, ReduceConfig> pre_phase_;
+        VolatileKey, ReduceConfig, HashIndexFunction, KeyEqualFunction>
+            pre_phase_;
 
     core::ReduceByHashPostPhase<
         TableItem, Key, ValueType, KeyExtractor, ReduceFunction, Emitter,
-        Manipulator, VolatileKey, ReduceConfig> post_phase_;
+        Manipulator, VolatileKey, ReduceConfig,
+        HashIndexFunction, KeyEqualFunction> post_phase_;
 
     const KeyExtractor& key_extractor_;
 
@@ -288,6 +297,39 @@ auto DIA<ValueType, Stack>::ReduceByKey(
     const KeyExtractor &key_extractor,
     const ReduceFunction &reduce_function,
     const ReduceConfig &reduce_config,
+    std::shared_ptr<CheckingDriver> driver) const {
+    // forward to main function
+    using Key = typename common::FunctionTraits<KeyExtractor>::result_type;
+    return ReduceByKey(key_extractor, reduce_function, reduce_config,
+                       std::hash<Key>(), std::equal_to<Key>(), driver);
+}
+
+template <typename ValueType, typename Stack>
+template <typename KeyExtractor, typename ReduceFunction,
+          typename ReduceConfig, typename KeyHashFunction,
+          typename CheckingDriver>
+auto DIA<ValueType, Stack>::ReduceByKey(
+    const KeyExtractor &key_extractor,
+    const ReduceFunction &reduce_function,
+    const ReduceConfig &reduce_config,
+    const KeyHashFunction &key_hash_function,
+    std::shared_ptr<CheckingDriver> driver) const {
+    // forward to main function
+    using Key = typename common::FunctionTraits<KeyExtractor>::result_type;
+    return ReduceByKey(key_extractor, reduce_function, reduce_config,
+                       key_hash_function, std::equal_to<Key>(), driver);
+}
+
+template <typename ValueType, typename Stack>
+template <typename KeyExtractor, typename ReduceFunction, typename ReduceConfig,
+          typename KeyHashFunction, typename KeyEqualFunction,
+          typename CheckingDriver>
+auto DIA<ValueType, Stack>::ReduceByKey(
+    const KeyExtractor &key_extractor,
+    const ReduceFunction &reduce_function,
+    const ReduceConfig &reduce_config,
+    const KeyHashFunction &key_hash_function,
+    const KeyEqualFunction &key_equal_funtion,
     std::shared_ptr<CheckingDriver> driver) const {
     assert(IsValid());
 
@@ -323,10 +365,12 @@ auto DIA<ValueType, Stack>::ReduceByKey(
 
     using ReduceNode = api::ReduceNode<
               DOpResult, KeyExtractor, ReduceFunction, ReduceConfig,
-              CheckingDriver, /* VolatileKey */ false>;
+              KeyHashFunction, KeyEqualFunction, CheckingDriver,
+              /* VolatileKey */ false>;
     auto node = common::MakeCounting<ReduceNode>(
-        *this, "ReduceByKey", key_extractor, reduce_function, reduce_config,
-        driver);
+        *this, "ReduceByKey",
+        key_extractor, reduce_function, reduce_config,
+        key_hash_function, key_equal_funtion, driver);
 
     return DIA<DOpResult>(node);
 }
@@ -335,10 +379,47 @@ template <typename ValueType, typename Stack>
 template <typename KeyExtractor, typename ReduceFunction,
           typename ReduceConfig, typename CheckingDriver>
 auto DIA<ValueType, Stack>::ReduceByKey(
+    struct VolatileKeyTag const & volatile_key_tag,
+    const KeyExtractor &key_extractor,
+    const ReduceFunction &reduce_function,
+    const ReduceConfig &reduce_config,
+    std::shared_ptr<CheckingDriver> driver) const {
+    // forward to main function
+    using Key = typename common::FunctionTraits<KeyExtractor>::result_type;
+    return ReduceByKey(volatile_key_tag,
+                       key_extractor, reduce_function, reduce_config,
+                       std::hash<Key>(), std::equal_to<Key>());
+}
+
+template <typename ValueType, typename Stack>
+template <typename KeyExtractor, typename ReduceFunction,
+          typename ReduceConfig, typename KeyHashFunction,
+          typename CheckingDriver>
+auto DIA<ValueType, Stack>::ReduceByKey(
+    struct VolatileKeyTag const & volatile_key_tag,
+    const KeyExtractor &key_extractor,
+    const ReduceFunction &reduce_function,
+    const ReduceConfig &reduce_config,
+    const KeyHashFunction &key_hash_function,
+    std::shared_ptr<CheckingDriver> driver) const {
+    // forward to main function
+    using Key = typename common::FunctionTraits<KeyExtractor>::result_type;
+    return ReduceByKey(volatile_key_tag,
+                       key_extractor, reduce_function, reduce_config,
+                       key_hash_function, std::equal_to<Key>(), driver);
+}
+
+template <typename ValueType, typename Stack>
+template <typename KeyExtractor, typename ReduceFunction, typename ReduceConfig,
+          typename KeyHashFunction, typename KeyEqualFunction,
+          typename CheckingDriver>
+auto DIA<ValueType, Stack>::ReduceByKey(
     struct VolatileKeyTag const &,
     const KeyExtractor &key_extractor,
     const ReduceFunction &reduce_function,
     const ReduceConfig &reduce_config,
+    const KeyHashFunction &key_hash_function,
+    const KeyEqualFunction &key_equal_funtion,
     std::shared_ptr<CheckingDriver> driver) const {
     assert(IsValid());
 
@@ -374,11 +455,13 @@ auto DIA<ValueType, Stack>::ReduceByKey(
 
     using ReduceNode = api::ReduceNode<
               DOpResult, KeyExtractor, ReduceFunction, ReduceConfig,
-              CheckingDriver, /* VolatileKey */ true>;
+              KeyHashFunction, KeyEqualFunction, CheckingDriver,
+              /* VolatileKey */ true>;
 
     auto node = common::MakeCounting<ReduceNode>(
-        *this, "ReduceByKey", key_extractor, reduce_function, reduce_config,
-        driver);
+        *this, "ReduceByKey",
+        key_extractor, reduce_function, reduce_config,
+        key_hash_function, key_equal_funtion, driver);
 
     return DIA<DOpResult>(node);
 }
@@ -389,6 +472,37 @@ template <typename ReduceFunction, typename ReduceConfig,
 auto DIA<ValueType, Stack>::ReducePair(
     const ReduceFunction &reduce_function,
     const ReduceConfig &reduce_config,
+    std::shared_ptr<CheckingDriver> driver) const {
+    // forward to main function
+    using Key = typename ValueType::first_type;
+    return ReducePair(reduce_function, reduce_config,
+                      std::hash<Key>(), std::equal_to<Key>(), driver);
+}
+
+template <typename ValueType, typename Stack>
+template <typename ReduceFunction,
+          typename ReduceConfig, typename KeyHashFunction,
+          typename CheckingDriver>
+auto DIA<ValueType, Stack>::ReducePair(
+    const ReduceFunction &reduce_function,
+    const ReduceConfig &reduce_config,
+    const KeyHashFunction &key_hash_function,
+    std::shared_ptr<CheckingDriver> driver) const {
+    // forward to main function
+    using Key = typename ValueType::first_type;
+    return ReduceByKey(reduce_function, reduce_config,
+                       key_hash_function, std::equal_to<Key>(), driver);
+}
+
+template <typename ValueType, typename Stack>
+template <typename ReduceFunction, typename ReduceConfig,
+          typename KeyHashFunction, typename KeyEqualFunction,
+          typename CheckingDriver>
+auto DIA<ValueType, Stack>::ReducePair(
+    const ReduceFunction &reduce_function,
+    const ReduceConfig &reduce_config,
+    const KeyHashFunction &key_hash_function,
+    const KeyEqualFunction &key_equal_funtion,
     std::shared_ptr<CheckingDriver> driver) const {
     assert(IsValid());
 
@@ -426,12 +540,15 @@ auto DIA<ValueType, Stack>::ReducePair(
         };
 
     using ReduceNode = api::ReduceNode<
-              ValueType, decltype(key_extractor), decltype(reduce_pair_function),
-              ReduceConfig, CheckingDriver, /* VolatileKey */ false>;
+              ValueType,
+              decltype(key_extractor), decltype(reduce_pair_function),
+              ReduceConfig, KeyHashFunction, KeyEqualFunction,
+              CheckingDriver, /* VolatileKey */ false>;
 
     auto node = common::MakeCounting<ReduceNode>(
         *this, "ReducePair",
-         key_extractor, reduce_pair_function, reduce_config, driver);
+        key_extractor, reduce_pair_function, reduce_config,
+        key_hash_function, key_equal_funtion, driver);
 
     return DIA<ValueType>(node);
 }
