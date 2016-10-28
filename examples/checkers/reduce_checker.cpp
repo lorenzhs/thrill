@@ -127,10 +127,12 @@ auto run = [](const auto &manipulator, const std::string& name,
     using T = size_t;
     api::Run(reduce_by_key_test_factory(manipulator, common::hash_crc32<T>(),
                                         name, "crc32", reps));
+    /*
     api::Run(reduce_by_key_test_factory(manipulator, common::hash_tabulated<T>(),
                                         name, "tab", reps));
     api::Run(reduce_by_key_test_factory(manipulator, common::hash_highway<T>(),
                                         name, "hway", reps));
+    */
 };
 
 // yikes, preprocessor
