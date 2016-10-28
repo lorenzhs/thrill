@@ -122,7 +122,7 @@ struct hash_crc32_intel {
     // For constant sizes, this is neatly optimized away at higher optimization
     // levels - only a mov (for initialization) and crc32 instructions remain
     inline uint32_t hash_bytes(const void* data, size_t length,
-                               uint32_t crc = 0xffffffff) {
+                               uint32_t crc = 0xffffffff) const {
         const char* p_buf = (const char*)data;
         // The 64-bit crc32 instruction returns a 64-bit value (even though a
         // CRC32 hash has - well - 32 bits. Whatever.
@@ -165,7 +165,7 @@ struct hash_crc32_intel {
     }
 
     inline uint32_t operator () (const ValueType& val,
-                                 uint32_t crc = 0xffffffff) {
+                                 uint32_t crc = 0xffffffff) const {
         const char* ptr = hash_helper<ValueType>::ptr(val);
         size_t size = hash_helper<ValueType>::size(val);
         return hash_bytes(ptr, size, crc);
@@ -185,7 +185,8 @@ uint32_t crc32_slicing_by_8(uint32_t crc, const void* data, size_t length);
  */
 template <typename ValueType>
 struct hash_crc32_fallback {
-    uint32_t operator () (const ValueType& val, uint32_t crc = 0xffffffff) {
+    uint32_t operator () (const ValueType& val, uint32_t crc = 0xffffffff) const
+    {
         const char* ptr = hash_helper<ValueType>::ptr(val);
         size_t size = hash_helper<ValueType>::size(val);
         return crc32_slicing_by_8(crc, ptr, size);
@@ -250,7 +251,7 @@ struct hash_highway {
         key_[3] = key[3];
     }
 
-    uint64_t operator () (const ValueType& val) {
+    uint64_t operator () (const ValueType& val) const {
         const char* ptr = hash_helper<ValueType>::ptr(val);
         size_t size = hash_helper<ValueType>::size(val);
         return hasher::hash_bytes(key_, ptr, size);
