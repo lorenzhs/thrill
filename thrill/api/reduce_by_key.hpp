@@ -388,7 +388,7 @@ auto DIA<ValueType, Stack>::ReduceByKey(
     using Key = typename common::FunctionTraits<KeyExtractor>::result_type;
     return ReduceByKey(volatile_key_tag,
                        key_extractor, reduce_function, reduce_config,
-                       std::hash<Key>(), std::equal_to<Key>());
+                       std::hash<Key>(), std::equal_to<Key>(), driver);
 }
 
 template <typename ValueType, typename Stack>
