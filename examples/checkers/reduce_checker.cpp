@@ -106,7 +106,7 @@ auto reduce_by_key_unchecked = [](size_t reps) {
         if (my_rank < 0) my_rank = ctx.net.my_rank();
         sRLOG << "Running ReduceByKey tests without checker," << reps << "reps";
 
-        size_t dummy;
+        size_t dummy = 0;
         common::StatsTimerStart run_timer;
         for (size_t i = 0; i < reps; ++i) {
             size_t force_eval =
