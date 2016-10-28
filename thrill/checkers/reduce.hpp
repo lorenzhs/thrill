@@ -32,7 +32,7 @@ namespace checkers {
 namespace _detail {
 //! Reduce checker minireduction helper
 template <typename Key, typename Value, typename ReduceFunction,
-          typename hash_fn = common::hash_crc32<Key>, size_t bucket_bits = 8>
+          typename hash_fn, size_t bucket_bits = 8>
 class ReduceCheckerMinireduction : public noncopynonmove
 {
     static_assert(reduce_checkable_v<ReduceFunction>,
@@ -144,7 +144,9 @@ protected:
 static constexpr bool check_reductions_ = true;
 
 //! Reduce checker - no-op for unsupported reduce functions
-template <typename Key, typename Value, typename ReduceFunction, typename Enable = void>
+template <typename Key, typename Value, typename ReduceFunction,
+          typename HashFunction = common::hash_crc32<Key>,
+          typename Enable = void>
 class ReduceChecker : public noncopynonmove
 {
 public:
@@ -166,18 +168,21 @@ public:
 };
 
 //! Convenience dummy checker
-using ReduceCheckerDummy = ReduceChecker<void, void, void>;
+using ReduceCheckerDummy = ReduceChecker<void, void, std::hash<void>, void>;
 
 /*!
  * Reduce checker for supported reduce functions
  */
-template <typename Key, typename Value, typename ReduceFunction>
-class ReduceChecker<Key, Value, ReduceFunction,
+template <typename Key, typename Value, typename ReduceFunction,
+          typename HashFunction>
+class ReduceChecker<Key, Value, ReduceFunction, HashFunction,
                     typename std::enable_if_t<check_reductions_&&
                                               reduce_checkable_v<ReduceFunction> > >
     : public noncopynonmove
 {
     using KeyValuePair = std::pair<Key, Value>;
+    using Minireduction = _detail::ReduceCheckerMinireduction<
+        Key, Value, ReduceFunction, HashFunction>;
     static constexpr bool debug = false;
 
 public:
@@ -222,7 +227,7 @@ public:
     }
 
 private:
-    _detail::ReduceCheckerMinireduction<Key, Value, ReduceFunction> mini_pre, mini_post;
+    Minireduction mini_pre, mini_post;
     bool have_checked, result;
 };
 

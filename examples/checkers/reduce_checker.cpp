@@ -32,17 +32,19 @@ thread_local int my_rank = -1;
 #define RLOG LOGC(my_rank == 0)
 #define sRLOG sLOGC(my_rank == 0)
 
-auto reduce_by_key_test_factory = [](const auto &manipulator,
-                                     const std::string& name,
+auto reduce_by_key_test_factory = [](const auto &manipulator, const auto &hash,
+                                     const std::string& manip_name,
+                                     const std::string& hash_name,
                                      size_t reps) {
     using Value = size_t;
     using ReduceFn = std::plus<Value>;
 
-    using Checker = checkers::ReduceChecker<Value, Value, ReduceFn>;
+    using Hash = std::decay_t<decltype(hash)>;
+    using Checker = checkers::ReduceChecker<Value, Value, ReduceFn, Hash>;
     using Manipulator = std::decay_t<decltype(manipulator)>;
     using Driver = checkers::Driver<Checker, Manipulator>;
 
-    return [reps, name](Context& ctx) {
+    return [reps, manip_name, hash_name](Context& ctx) {
         std::mt19937 rng(std::random_device { } ());
         std::uniform_int_distribution<Value> distribution(0, 0xFFFFFFFF);
         auto key_extractor = [](const Value& in) { return in & 0xFFFF; };
@@ -51,8 +53,8 @@ auto reduce_by_key_test_factory = [](const auto &manipulator,
 
         ctx.enable_consume();
         if (my_rank < 0) my_rank = ctx.net.my_rank();
-        sRLOG << "Running ReduceByKey tests with" << name
-              << "manipulator," << reps << "reps";
+        sRLOG << "Running ReduceByKey tests with" << manip_name
+              << "manipulator and" << hash_name << "hash," << reps << "reps";
 
         common::StatsTimerStopped run_timer, check_timer;
         size_t failures = 0, dummy = 0, manips = 0;
@@ -78,9 +80,10 @@ auto reduce_by_key_test_factory = [](const auto &manipulator,
             if (success.second) manips++;
         }
 
-        RLOG << "ReduceByKey with " << name << " manipulator: "
+        RLOG << "ReduceByKey with " << manip_name << " manip and "
+             << hash_name << " hash: "
              << (failures > 0 ? common::log::fg_red() : "")
-             << failures << " out of " << reps << " tests failed"
+             << failures << " / " << reps << " tests failed"
              << "; " << manips << " manipulations" << common::log::reset();
         sRLOG << "Reduce:" << run_timer.Microseconds()/(1000.0*reps) << "ms;"
               << "Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms";
@@ -119,68 +122,15 @@ auto reduce_by_key_unchecked = [](size_t reps) {
     };
 };
 
-
-auto reduce_pair_test_factory = [](const auto &manipulator,
-                                   const std::string& name,
-                                   size_t reps) {
-    using Value = size_t;
-    using Pair = std::pair<Value, Value>;
-    using ReduceFn = std::plus<Value>;
-
-    using Checker = checkers::ReduceChecker<Value, Value, ReduceFn>;
-    using Manipulator = std::decay_t<decltype(manipulator)>;
-    using Driver = checkers::Driver<Checker, Manipulator>;
-
-    return [reps, name](Context& ctx) {
-        std::mt19937 rng(std::random_device { } ());
-        std::uniform_int_distribution<Value> distribution(0, 0xFFFFFFFF);
-        auto generator =
-            [&distribution, &rng](const size_t&) -> Pair {
-            return Pair{distribution(rng) & 0xFFFF, // key
-                        distribution(rng)}; // value
-            };
-
-        ctx.enable_consume();
-        if (my_rank < 0) my_rank = ctx.net.my_rank();
-        sRLOG << "Running ReducePair tests with" << name << "manipulator,"
-              << reps << "reps";
-
-        common::StatsTimerStopped run_timer, check_timer;
-        size_t failures = 0, dummy = 0, manips = 0;
-        for (size_t i = 0; i < reps; ++i) {
-            auto driver = std::make_shared<Driver>();
-            driver->silence();
-
-            run_timer.Start();
-            size_t force_eval =
-                Generate(ctx, 1000000, generator)
-                .ReducePair(ReduceFn(), api::DefaultReduceConfig(), driver)
-                .Size();
-            run_timer.Stop();
-
-            dummy += force_eval;
-            check_timer.Start();
-            auto success = driver->check(ctx);
-            check_timer.Stop();
-
-            if (!success.first) failures++;
-            if (success.second) manips++;
-        }
-
-        RLOG << "ReducePair with " << name << " manipulator: "
-             << (failures > 0 ? common::log::fg_red() : "")
-             << failures << " out of " << reps << " tests failed"
-             << "; " << manips << " manipulations" << common::log::reset();
-        sRLOG << "Reduce:" << run_timer.Microseconds()/(1000.0*reps) << "ms;"
-              << "Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms";
-    };
-};
-
-
 auto run = [](const auto &manipulator, const std::string& name,
               size_t reps = default_reps) {
-    api::Run(reduce_by_key_test_factory(manipulator, name, reps));
-    //api::Run(reduce_pair_test_factory(manipulator, name, reps));
+    using T = size_t;
+    api::Run(reduce_by_key_test_factory(manipulator, common::hash_crc32<T>(),
+                                        name, "crc32", reps));
+    api::Run(reduce_by_key_test_factory(manipulator, common::hash_tabulated<T>(),
+                                        name, "tab", reps));
+    api::Run(reduce_by_key_test_factory(manipulator, common::hash_highway<T>(),
+                                        name, "hway", reps));
 };
 
 // yikes, preprocessor
