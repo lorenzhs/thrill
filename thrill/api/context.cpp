@@ -21,6 +21,7 @@
 #include <thrill/common/string.hpp>
 #include <thrill/common/system_exception.hpp>
 #include <thrill/io/iostats.hpp>
+#include <thrill/vfs/file_io.hpp>
 
 // mock net backend is always available -tb :)
 #include <thrill/net/mock/group.hpp>
@@ -152,7 +153,7 @@ RunLoopbackThreads(
 }
 
 /******************************************************************************/
-// Other Configuration Options
+// Other Configuration Initializations
 
 static inline bool SetupBlockSize() {
 
@@ -175,6 +176,22 @@ static inline bool SetupBlockSize() {
     std::cerr << "Thrill: setting default_block_size = "
               << data::default_block_size
               << std::endl;
+
+    return true;
+}
+
+static inline bool Initialize() {
+
+    if (!SetupBlockSize()) return false;
+
+    vfs::Initialize();
+
+    return true;
+}
+
+static inline bool Deinitialize() {
+
+    vfs::Deinitialize();
 
     return true;
 }
@@ -347,8 +364,12 @@ int RunBackendLoopback(
             << " test hosts and " << workers_per_host << " workers per host"
             << " in a local " << backend << " network." << std::endl;
 
+    if (!Initialize()) return -1;
+
     RunLoopbackThreads<NetGroup>(
         mem_config, num_hosts, workers_per_host, job_startpoint);
+
+    if (!Deinitialize()) return -1;
 
     return 0;
 }
@@ -456,7 +477,7 @@ int RunBackendTcp(const std::function<void(Context&)>& job_startpoint) {
         std::cerr << ' ' << ep;
     std::cerr << std::endl;
 
-    if (!SetupBlockSize()) return -1;
+    if (!Initialize()) return -1;
 
     static constexpr size_t kGroupCount = net::Manager::kGroupCount;
 
@@ -492,6 +513,8 @@ int RunBackendTcp(const std::function<void(Context&)>& job_startpoint) {
     for (size_t i = 0; i < workers_per_host; i++) {
         threads[i].join();
     }
+
+    if (!Deinitialize()) return -1;
 
     return global_result;
 }
@@ -540,7 +563,7 @@ int RunBackendMpi(const std::function<void(Context&)>& job_startpoint) {
               << " as rank " << mpi_rank << "."
               << std::endl;
 
-    if (!SetupBlockSize()) return -1;
+    if (!Initialize()) return -1;
 
     static constexpr size_t kGroupCount = net::Manager::kGroupCount;
 
@@ -577,6 +600,8 @@ int RunBackendMpi(const std::function<void(Context&)>& job_startpoint) {
     for (size_t i = 0; i < workers_per_host; i++) {
         threads[i].join();
     }
+
+    if (!Deinitialize()) return -1;
 
     return global_result;
 }
@@ -625,7 +650,7 @@ int RunBackendIb(const std::function<void(Context&)>& job_startpoint) {
               << " as rank " << mpi_rank << "."
               << std::endl;
 
-    if (!SetupBlockSize()) return -1;
+    if (!Initialize()) return -1;
 
     static constexpr size_t kGroupCount = net::Manager::kGroupCount;
 
@@ -662,6 +687,8 @@ int RunBackendIb(const std::function<void(Context&)>& job_startpoint) {
     for (size_t i = 0; i < workers_per_host; i++) {
         threads[i].join();
     }
+
+    if (!Deinitialize()) return -1;
 
     return global_result;
 }
