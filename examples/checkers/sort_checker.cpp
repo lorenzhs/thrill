@@ -23,10 +23,15 @@
 
 using namespace thrill; // NOLINT
 
+const size_t default_reps = 100;
+
 thread_local static int my_rank = -1;
 
+#define RLOG LOGC(my_rank == 0)
+#define sRLOG sLOGC(my_rank == 0)
+
 auto sort_random = [](const auto &manipulator, const std::string& name,
-                      size_t reps = 100) {
+                      size_t reps) {
     using Value = int;
     using Compare = std::less<Value>;
     using Manipulator = std::decay_t<decltype(manipulator)>;
@@ -40,7 +45,7 @@ auto sort_random = [](const auto &manipulator, const std::string& name,
         ctx.enable_consume();
         if (my_rank < 0) my_rank = ctx.net.my_rank();
 
-        sLOGC(my_rank == 0) << "Running" << name << "tests," << reps << "reps";
+        sRLOG << "Running" << name << "tests," << reps << "reps";
 
         common::StatsTimerStopped run_timer, check_timer;
         size_t failures = 0, dummy = 0, manips = 0;
@@ -58,7 +63,6 @@ auto sort_random = [](const auto &manipulator, const std::string& name,
                 .Sort(Compare{}, driver)
                 .Size();
             run_timer.Stop();
-
             dummy += force_eval;
 
             // Re-synchronize, then run final checking pass
@@ -71,18 +75,54 @@ auto sort_random = [](const auto &manipulator, const std::string& name,
             if (success.second) manips++;
         }
 
-        LOGC(my_rank == 0)
-            << name << ": " << failures << " out of " << reps
-            << " tests failed; " << manips << " manipulations";
+        RLOG << name << ": " << failures << " out of " << reps
+             << " tests failed; " << manips << " manipulations";
 
-        sLOGC(my_rank == 0)
+        sRLOG
             << "Sort:" << run_timer.Microseconds()/(1000.0*reps)
             << "ms; Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms";
     };
 };
 
+
+auto sort_unchecked = [](size_t reps = 100) {
+    using Value = int;
+    using Compare = std::less<Value>;
+
+    return [reps](Context& ctx) {
+        std::default_random_engine generator(std::random_device { } ());
+        std::uniform_int_distribution<Value> distribution(0, 10000);
+
+        ctx.enable_consume();
+        if (my_rank < 0) my_rank = ctx.net.my_rank();
+
+        sRLOG << "Running tests without checker," << reps << "reps";
+
+        common::StatsTimerStopped run_timer;
+        size_t dummy = 0;
+        for (size_t i = 0; i < reps; ++i) {
+            // Synchronize with barrier
+            ctx.net.Barrier();
+            run_timer.Start();
+            size_t force_eval =
+                Generate(
+                    ctx, 1000000,
+                    [&distribution, &generator](const size_t&) -> Value
+                    { return distribution(generator); })
+                .Sort(Compare{})
+                .Size();
+            run_timer.Stop();
+            dummy += force_eval;
+        }
+
+        sRLOG << "Sort:" << run_timer.Microseconds()/(1000.0*reps)
+              << "ms (no checking, no manipulation)";
+    };
+};
+
+
 auto run = [](const auto &manipulator, const std::string &name,
-              size_t reps = 100) {
+              size_t reps = default_reps) {
     api::Run(sort_random(manipulator, name, reps));
 };
 
@@ -94,7 +134,8 @@ auto run = [](const auto &manipulator, const std::string &name,
 #define TEST_CHECK_T(NAME, FULL) run(checkers::SortManipulator ## FULL(), #NAME)
 
 int main() {
-    TEST_CHECK_A(Dummy, 1);
+    api::Run(sort_unchecked(default_reps));
+    TEST_CHECK(Dummy);
     TEST_CHECK(DropLast);
     TEST_CHECK(ResetToDefault);
     TEST_CHECK(AddToEmpty);
