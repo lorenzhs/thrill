@@ -62,6 +62,8 @@ auto reduce_by_key_test_factory = [](const auto &manipulator, const auto &hash,
             auto driver = std::make_shared<Driver>();
             driver->silence();
 
+            // Synchronize with barrier
+            ctx.net.Barrier();
             run_timer.Start();
             size_t force_eval =
                 Generate(ctx, 1000000, generator)
@@ -70,8 +72,10 @@ auto reduce_by_key_test_factory = [](const auto &manipulator, const auto &hash,
                     api::DefaultReduceConfig(), driver)
                 .Size();
             run_timer.Stop();
-
             dummy += force_eval;
+
+            // Re-synchronize, then run final checking pass
+            ctx.net.Barrier();
             check_timer.Start();
             auto success = driver->check(ctx);
             check_timer.Stop();
@@ -107,15 +111,17 @@ auto reduce_by_key_unchecked = [](size_t reps) {
         sRLOG << "Running ReduceByKey tests without checker," << reps << "reps";
 
         size_t dummy = 0;
-        common::StatsTimerStart run_timer;
+        common::StatsTimerStopped run_timer;
         for (size_t i = 0; i < reps; ++i) {
+            ctx.net.Barrier();
+            run_timer.Start();
             size_t force_eval =
                 Generate(ctx, 1000000, generator)
                 .ReduceByKey(VolatileKeyTag, key_extractor, ReduceFn())
                 .Size();
             dummy += force_eval;
+            run_timer.Stop();
         }
-        run_timer.Stop();
 
         sRLOG << "Reduce:" << run_timer.Microseconds()/(1000.0*reps)
               << "ms (no checking, no manipulation)";

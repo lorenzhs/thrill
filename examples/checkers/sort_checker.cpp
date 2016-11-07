@@ -47,6 +47,8 @@ auto sort_random = [](const auto &manipulator, const std::string& name,
         for (size_t i = 0; i < reps; ++i) {
             auto driver = std::make_shared<Driver>();
 
+            // Synchronize with barrier
+            ctx.net.Barrier();
             run_timer.Start();
             size_t force_eval =
                 Generate(
@@ -58,6 +60,9 @@ auto sort_random = [](const auto &manipulator, const std::string& name,
             run_timer.Stop();
 
             dummy += force_eval;
+
+            // Re-synchronize, then run final checking pass
+            ctx.net.Barrier();
             check_timer.Start();
             auto success = driver->check(ctx);
             check_timer.Stop();
