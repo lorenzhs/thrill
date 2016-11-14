@@ -12,6 +12,10 @@
 #ifndef THRILL_CHECKERS_FUNCTIONAL_HEADER
 #define THRILL_CHECKERS_FUNCTIONAL_HEADER
 
+#include <thrill/common/functional.hpp>
+
+#include <type_traits>
+
 namespace thrill {
 namespace checkers {
 

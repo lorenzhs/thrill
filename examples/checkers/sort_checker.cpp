@@ -43,7 +43,7 @@ auto sort_random = [](const auto &manipulator, const std::string& name,
         std::uniform_int_distribution<Value> distribution(0, 10000);
 
         ctx.enable_consume();
-        if (my_rank < 0) my_rank = ctx.net.my_rank();
+        if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
 
         sRLOG << "Running" << name << "tests," << reps << "reps";
 
@@ -71,8 +71,8 @@ auto sort_random = [](const auto &manipulator, const std::string& name,
             auto success = driver->check(ctx);
             check_timer.Stop();
 
-            if (!success.first) failures++;
-            if (success.second) manips++;
+            if (!success.first) { failures++; }
+            if (success.second) { manips++; }
         }
 
         RLOG << name << ": " << failures << " out of " << reps
@@ -94,7 +94,7 @@ auto sort_unchecked = [](size_t reps = 100) {
         std::uniform_int_distribution<Value> distribution(0, 10000);
 
         ctx.enable_consume();
-        if (my_rank < 0) my_rank = ctx.net.my_rank();
+        if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
 
         sRLOG << "Running tests without checker," << reps << "reps";
 

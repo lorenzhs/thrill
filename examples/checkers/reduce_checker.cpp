@@ -52,7 +52,7 @@ auto reduce_by_key_test_factory = [](const auto &manipulator, const auto &hash,
             { return distribution(rng); };
 
         ctx.enable_consume();
-        if (my_rank < 0) my_rank = ctx.net.my_rank();
+        if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
         sRLOG << "Running ReduceByKey tests with" << manip_name
               << "manipulator and" << hash_name << "hash," << reps << "reps";
 
@@ -80,8 +80,8 @@ auto reduce_by_key_test_factory = [](const auto &manipulator, const auto &hash,
             auto success = driver->check(ctx);
             check_timer.Stop();
 
-            if (!success.first) failures++;
-            if (success.second) manips++;
+            if (!success.first) { failures++; }
+            if (success.second) { manips++; }
         }
 
         RLOG << "ReduceByKey with " << manip_name << " manip and "
@@ -107,7 +107,7 @@ auto reduce_by_key_unchecked = [](size_t reps) {
             { return distribution(rng); };
 
         ctx.enable_consume();
-        if (my_rank < 0) my_rank = ctx.net.my_rank();
+        if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
         sRLOG << "Running ReduceByKey tests without checker," << reps << "reps";
 
         size_t dummy = 0;
@@ -150,7 +150,7 @@ template <typename T, typename U>
 ostream& operator << (ostream& os, const pair<T, U>& p) {
     return os << '(' << p.first << ',' << p.second << ')';
 }
-}
+} // namespace std
 
 int main() {
     api::Run(reduce_by_key_unchecked(default_reps));

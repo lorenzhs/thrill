@@ -122,7 +122,7 @@ public:
     }
 
 protected:
-    void dump_to_log(std::string name = "Run") {
+    void dump_to_log(const std::string& name = "Run") {
         for (size_t i = 0; i < num_parallel; ++i) {
             std::stringstream s;
             s << name << " " << i << ": ";
@@ -151,18 +151,18 @@ class ReduceChecker : public noncopynonmove
 {
 public:
     template <typename K, typename V>
-    void add_pre(const K&, const V&) { }
+    void add_pre(const K& /*unused*/, const V& /*unused*/) { }
 
     template <typename KV>
-    void add_pre(const KV&) { }
+    void add_pre(const KV& /*unused*/) { }
 
     template <typename K, typename V>
-    void add_post(const K&, const V&) { }
+    void add_post(const K& /*unused*/, const V& /*unused*/) { }
 
     template <typename KV>
-    void add_post(const KV&) { }
+    void add_post(const KV& /*unused*/) { }
 
-    bool check(api::Context&) { return true; }
+    bool check(api::Context& /*unused*/) { return true; }
 
     void reset() { }
 };
@@ -218,7 +218,7 @@ public:
         have_checked = true;
         mini_pre.reduce(ctx);
         mini_post.reduce(ctx);
-        if (ctx.my_rank() != 0) return true; // no point in checking
+        if (ctx.my_rank() != 0) { return true; }// no point in checking
 
         result = (mini_pre == mini_post);
         LOGC(debug && ctx.my_rank() == 0)
@@ -266,13 +266,15 @@ struct ReduceManipulatorBase : public ManipulatorBase {
 
         It it = skip_empty_key(begin, end);
         std::pair<It, It> ret;
-        if (it < end)
+        if (it < end) {
             ret = static_cast<Strategy*>(this)->manipulate(it, end);
+        }
 
-        if (made_changes())
+        if (made_changes()) {
             return ret;
-        else
+        } else {
             return std::make_pair(begin, end);
+        }
     }
 };
 
@@ -285,8 +287,9 @@ struct ReduceManipulatorDropFirst
     template <typename It>
     std::pair<It, It> manipulate(It begin, It end) {
         while (begin < end && (begin->first == Key<It>() ||
-                               begin->second == Value<It>()))
+                               begin->second == Value<It>())) {
             ++begin;
+        }
         if (begin < end) {
             sLOG << "Manipulating" << end - begin << "elements, dropping first";
             begin->first = Key<It>();
