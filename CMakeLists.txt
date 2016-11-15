@@ -29,6 +29,9 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Build type")
 endif()
 
+option(CHECKERS_FULL
+  "Build the full checker matrix" OFF)
+
 option(THRILL_USE_MPI
   "Use (optional) MPI net backend." OFF)
 

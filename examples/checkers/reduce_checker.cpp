@@ -25,26 +25,32 @@
 
 using namespace thrill; // NOLINT
 
+#ifdef CHECKERS_FULL
+const size_t default_reps = 10000;
+#else
 const size_t default_reps = 100;
+#endif
 
 thread_local int my_rank = -1;
 
 #define RLOG LOGC(my_rank == 0)
 #define sRLOG sLOGC(my_rank == 0)
 
-auto reduce_by_key_test_factory = [](const auto &manipulator, const auto &hash,
-                                     const std::string& manip_name,
-                                     const std::string& hash_name,
-                                     size_t reps) {
+auto reduce_by_key_test_factory = [](
+    const auto &manipulator, const auto &config,
+    const std::string& manip_name,
+    const std::string& config_name,
+    size_t reps)
+{
     using Value = size_t;
     using ReduceFn = std::plus<Value>;
 
-    using Hash = std::decay_t<decltype(hash)>;
-    using Checker = checkers::ReduceChecker<Value, Value, ReduceFn, Hash>;
+    using Config = std::decay_t<decltype(config)>;
+    using Checker = checkers::ReduceChecker<Value, Value, ReduceFn, Config>;
     using Manipulator = std::decay_t<decltype(manipulator)>;
     using Driver = checkers::Driver<Checker, Manipulator>;
 
-    return [reps, manip_name, hash_name](Context& ctx) {
+    return [reps, manip_name, config_name](Context& ctx) {
         std::mt19937 rng(std::random_device { } ());
         std::uniform_int_distribution<Value> distribution(0, 0xFFFFFFFF);
         auto key_extractor = [](const Value& in) { return in & 0xFFFF; };
@@ -54,7 +60,7 @@ auto reduce_by_key_test_factory = [](const auto &manipulator, const auto &hash,
         ctx.enable_consume();
         if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
         sRLOG << "Running ReduceByKey tests with" << manip_name
-              << "manipulator and" << hash_name << "hash," << reps << "reps";
+              << "manipulator," << config_name << "config," << reps << "reps";
 
         common::StatsTimerStopped run_timer, check_timer;
         size_t failures = 0, dummy = 0, manips = 0;
@@ -85,12 +91,13 @@ auto reduce_by_key_test_factory = [](const auto &manipulator, const auto &hash,
         }
 
         RLOG << "ReduceByKey with " << manip_name << " manip and "
-             << hash_name << " hash: "
+             << config_name << " config: "
              << (failures > 0 ? common::log::fg_red() : "")
              << failures << " / " << reps << " tests failed"
              << "; " << manips << " manipulations" << common::log::reset();
         sRLOG << "Reduce:" << run_timer.Microseconds()/(1000.0*reps) << "ms;"
-              << "Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms";
+              << "Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms;"
+              << "Config:" << config_name;
     };
 };
 
@@ -128,17 +135,42 @@ auto reduce_by_key_unchecked = [](size_t reps) {
     };
 };
 
+using T = size_t;
+
+template <size_t bucket_bits, size_t num_parallel>
+using CRC32Config = checkers::MinireductionConfig<common::hash_crc32<T>,
+                                                  bucket_bits, num_parallel>;
+
+template <size_t bucket_bits, size_t num_parallel>
+using TabConfig = checkers::MinireductionConfig<common::hash_tabulated<T>,
+                                                bucket_bits, num_parallel>;
+
 auto run = [](const auto &manipulator, const std::string& name,
               size_t reps = default_reps) {
-    using T = size_t;
-    api::Run(reduce_by_key_test_factory(manipulator, common::hash_crc32<T>(),
-                                        name, "crc32", reps));
-    /*
-    api::Run(reduce_by_key_test_factory(manipulator, common::hash_tabulated<T>(),
-                                        name, "tab", reps));
-    api::Run(reduce_by_key_test_factory(manipulator, common::hash_highway<T>(),
-                                        name, "hway", reps));
-    */
+
+    auto& f = reduce_by_key_test_factory;
+
+    api::Run(f(manipulator, CRC32Config<8, 4>{}, name, "4x8 CRC32", reps));
+#ifdef CHECKERS_FULL
+    api::Run(f(manipulator, CRC32Config<8, 3>{}, name, "3x8 CRC32", reps));
+    api::Run(f(manipulator, CRC32Config<8, 2>{}, name, "2x8 CRC32", reps));
+    api::Run(f(manipulator, CRC32Config<8, 1>{}, name, "1x8 CRC32", reps));
+    api::Run(f(manipulator, CRC32Config<4, 8>{}, name, "8x4 CRC32", reps));
+    api::Run(f(manipulator, CRC32Config<4, 6>{}, name, "6x4 CRC32", reps));
+    api::Run(f(manipulator, CRC32Config<4, 4>{}, name, "4x4 CRC32", reps));
+    api::Run(f(manipulator, CRC32Config<4, 2>{}, name, "2x4 CRC32", reps));
+#endif
+
+    api::Run(f(manipulator, TabConfig<8, 4>{}, name, "4x8 Tab", reps));
+#ifdef CHECKERS_FULL
+    api::Run(f(manipulator, TabConfig<8, 3>{}, name, "3x8 Tab", reps));
+    api::Run(f(manipulator, TabConfig<8, 2>{}, name, "2x8 Tab", reps));
+    api::Run(f(manipulator, TabConfig<8, 1>{}, name, "1x8 Tab", reps));
+    api::Run(f(manipulator, TabConfig<4, 8>{}, name, "8x4 Tab", reps));
+    api::Run(f(manipulator, TabConfig<4, 6>{}, name, "6x4 Tab", reps));
+    api::Run(f(manipulator, TabConfig<4, 4>{}, name, "4x4 Tab", reps));
+    api::Run(f(manipulator, TabConfig<4, 2>{}, name, "2x4 Tab", reps));
+#endif
 };
 
 // yikes, preprocessor

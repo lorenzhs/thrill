@@ -23,7 +23,11 @@
 
 using namespace thrill; // NOLINT
 
+#ifdef CHECKERS_FULL
+const size_t default_reps = 10000;
+#else
 const size_t default_reps = 100;
+#endif
 
 thread_local static int my_rank = -1;
 

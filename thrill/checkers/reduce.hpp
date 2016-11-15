@@ -29,25 +29,40 @@
 namespace thrill {
 namespace checkers {
 
+template <typename hash_fn_, size_t bucket_bits_, size_t num_parallel_>
+struct MinireductionConfig {
+    using hash_fn = hash_fn_;
+    static constexpr size_t bucket_bits = bucket_bits_;
+    static constexpr size_t num_parallel = num_parallel_;
+};
+
+template <typename Key>
+using DefaultMinireductionConfig =
+    MinireductionConfig<common::hash_crc32<Key>, 8, 4>;
+
 namespace _detail {
 //! Reduce checker minireduction helper
 template <typename Key, typename Value, typename ReduceFunction,
-          typename hash_fn, size_t bucket_bits = 8>
+          typename Config = DefaultMinireductionConfig<Key> >
 class ReduceCheckerMinireduction : public noncopynonmove
 {
     static_assert(reduce_checkable_v<ReduceFunction>,
                   "Reduce function isn't (marked) checkable");
 
     using KeyValuePair = std::pair<Key, Value>;
+
+    // Get stuff from the config
+    using hash_fn = typename Config::hash_fn;
+    static constexpr size_t bucket_bits = Config::bucket_bits;
+    static constexpr size_t num_parallel = Config::num_parallel;
+
     //! hash value type
     using hash_t = decltype(hash_fn()(Key { }));
-    //! Bits in hash value
-    static constexpr size_t hash_bits = 8 * sizeof(hash_t);
-    static_assert(bucket_bits <= hash_bits,
+    //! Check that hash function produces enough data
+    static_assert(bucket_bits <= 8 * sizeof(hash_t),
                   "hash_fn produces fewer bits than needed to discern buckets");
-
-    //! Number of parallel executions
-    static constexpr size_t num_parallel = hash_bits / bucket_bits;
+    static_assert(num_parallel * bucket_bits <= 8 * sizeof(hash_t),
+                  "hash_fn bits insufficient for requested number of buckets");
     //! Number of buckets
     static constexpr size_t num_buckets = 1ULL << bucket_bits;
     //! Mask to extract a bucket
@@ -145,7 +160,7 @@ static constexpr bool check_reductions_ = true;
 
 //! Reduce checker - no-op for unsupported reduce functions
 template <typename Key, typename Value, typename ReduceFunction,
-          typename HashFunction = common::hash_crc32<Key>,
+          typename Config = DefaultMinireductionConfig<Key>,
           typename Enable = void>
 class ReduceChecker : public noncopynonmove
 {
@@ -173,16 +188,15 @@ using ReduceCheckerDummy = ReduceChecker<void, void, std::hash<void>, void>;
 /*!
  * Reduce checker for supported reduce functions
  */
-template <typename Key, typename Value, typename ReduceFunction,
-          typename HashFunction>
-class ReduceChecker<Key, Value, ReduceFunction, HashFunction,
+template <typename Key, typename Value, typename ReduceFunction, typename Config>
+class ReduceChecker<Key, Value, ReduceFunction, Config,
                     typename std::enable_if_t<check_reductions_&&
                                               reduce_checkable_v<ReduceFunction> > >
     : public noncopynonmove
 {
     using KeyValuePair = std::pair<Key, Value>;
     using Minireduction = _detail::ReduceCheckerMinireduction<
-        Key, Value, ReduceFunction, HashFunction>;
+        Key, Value, ReduceFunction, Config>;
     static constexpr bool debug = false;
 
 public:
