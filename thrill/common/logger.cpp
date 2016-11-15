@@ -115,7 +115,7 @@ Logger::Logger() {
 }
 
 Logger::~Logger() {
-    oss_ << '\n';
+    oss_ << std::endl;
     Output(oss_.str());
 }
 
@@ -126,7 +126,7 @@ SpacingLogger::SpacingLogger() {
 }
 
 SpacingLogger::~SpacingLogger() {
-    oss_ << '\n';
+    oss_ << std::endl;
     Logger::Output(oss_.str());
 }
 
