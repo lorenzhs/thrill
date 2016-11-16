@@ -19,6 +19,17 @@
 namespace thrill {
 namespace checkers {
 
+template <typename Integral>
+struct checked_plus {
+    Integral operator()(const Integral &i1, const Integral &i2) const {
+        Integral result;
+        if (__builtin_add_overflow(i1, i2, &result)) {
+            sLOG1 << "Add overflow:" << i1 << "+" << i2 << "!=" << result;
+        }
+        return result;
+    }
+};
+
 /*!
  * Struct that signals whether the ReduceFunction is checkable.
  */
@@ -28,6 +39,9 @@ struct reduce_checkable : public std::false_type { };
 //! Addition is checkable
 template <typename T>
 struct reduce_checkable<std::plus<T> >: public std::true_type { };
+
+template <typename T>
+struct reduce_checkable<checked_plus<T> >: public std::true_type { };
 
 //! Operations on a tuple member are checkable if the operation is
 template <size_t Index, typename Tuple, typename Op>
