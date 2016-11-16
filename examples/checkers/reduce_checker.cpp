@@ -42,7 +42,7 @@ auto reduce_by_key_test_factory = [](
     const std::string& config_name,
     size_t reps)
 {
-    using Value = size_t;
+    using Value = uint64_t;
     using ReduceFn = std::plus<Value>;
 
     using Config = std::decay_t<decltype(config)>;
