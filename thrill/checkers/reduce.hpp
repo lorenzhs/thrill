@@ -90,6 +90,7 @@ public:
         hash_t h = hash_(key);
         for (size_t idx = 0; idx < num_parallel; ++idx) {
             const size_t bucket = (h >> (idx * bucket_bits)) & bucket_mask;
+            sLOG << key << idx << bucket << "=" << std::hex << bucket << h << std::dec;
             reductions_[idx][bucket] =
                 reducefn(reductions_[idx][bucket], value);
         }
@@ -200,7 +201,7 @@ class ReduceChecker<Key, Value, ReduceFunction, Config,
     static constexpr bool debug = false;
 
 public:
-    ReduceChecker() : have_checked(false), result(false) { }
+    ReduceChecker() : have_checked(false), cached_result(false) { }
 
     void add_pre(const Key& key, const Value& value) {
         mini_pre.push(key, value);
@@ -220,29 +221,34 @@ public:
         mini_pre.reset();
         mini_post.reset();
         have_checked = false;
-        result = false;
+        cached_result = false;
     }
 
-    //! Do the check. Result is only meaningful at root (PE 0)
+    //! Do the check. Result is only meaningful at root (PE 0), and cached.
+    //! Cache is invalidated only upon reset().
     bool check(api::Context& ctx) {
-        if (have_checked) {
-            return result;
+        if (have_checked) { // return cached result
+            return cached_result;
+        }
+
+        mini_pre.reduce(ctx);
+        mini_post.reduce(ctx);
+
+        bool result = true; // return true on non-root PEs
+        if (ctx.my_rank() == 0) {
+            result = (mini_pre == mini_post);
         }
 
         have_checked = true;
-        mini_pre.reduce(ctx);
-        mini_post.reduce(ctx);
-        if (ctx.my_rank() != 0) { return true; }// no point in checking
-
-        result = (mini_pre == mini_post);
         LOGC(debug && ctx.my_rank() == 0)
             << "check(): " << (result ? "yay" : "NAY");
+        cached_result = result;
         return result;
     }
 
 private:
     Minireduction mini_pre, mini_post;
-    bool have_checked, result;
+    bool have_checked, cached_result;
 };
 
 //! Debug manipulators?
@@ -335,7 +341,7 @@ struct ReduceManipulatorRandFirst
     std::pair<It, It> manipulate(It begin, It end) {
         sLOG << "Manipulating" << end - begin
              << "elements, randomizing first value";
-        begin->second = Value<It>{ rng() };
+        begin->second = static_cast<Value<It>>(rng());
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
@@ -364,7 +370,7 @@ struct ReduceManipulatorRandFirstKey
     std::pair<It, It> manipulate(It begin, It end) {
         sLOG << "Manipulating" << end - begin
              << "elements, randomizing first key";
-        begin->first = Key<It>{ rng() };
+        begin->first = static_cast<Key<It>>(rng());
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
