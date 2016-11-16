@@ -341,7 +341,10 @@ struct ReduceManipulatorRandFirst
     std::pair<It, It> manipulate(It begin, It end) {
         sLOG << "Manipulating" << end - begin
              << "elements, randomizing first value";
-        begin->second = static_cast<Value<It>>(rng());
+        Value<It> old = begin->second;
+        do {
+            begin->second = static_cast<Value<It>>(rng());
+        } while (old == begin->second);
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
@@ -370,7 +373,10 @@ struct ReduceManipulatorRandFirstKey
     std::pair<It, It> manipulate(It begin, It end) {
         sLOG << "Manipulating" << end - begin
              << "elements, randomizing first key";
-        begin->first = static_cast<Key<It>>(rng());
+        Key<It> old = begin->first;
+        do {
+            begin->first = static_cast<Key<It>>(rng());
+        } while (old == begin->first);
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
