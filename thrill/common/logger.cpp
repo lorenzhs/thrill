@@ -91,21 +91,21 @@ void Logger::Output(const char* str) {
     // lock the global mutex of logger for serialized output in
     // multi-threaded programs.
     std::unique_lock<std::mutex> lock(s_logger_mutex);
-    std::cout << str;
+    std::cout << str << std::endl;
 }
 
 void Logger::Output(const std::string& str) {
     // lock the global mutex of logger for serialized output in
     // multi-threaded programs.
     std::unique_lock<std::mutex> lock(s_logger_mutex);
-    std::cout << str;
+    std::cout << str << std::endl;
 }
 
 void Logger::Output(const mem::safe_string& str) {
     // lock the global mutex of logger for serialized output in
     // multi-threaded programs.
     std::unique_lock<std::mutex> lock(s_logger_mutex);
-    std::cout << str;
+    std::cout << str << std::endl;
 }
 
 Logger::Logger() {
@@ -115,7 +115,6 @@ Logger::Logger() {
 }
 
 Logger::~Logger() {
-    oss_ << std::endl;
     Output(oss_.str());
 }
 
@@ -126,7 +125,6 @@ SpacingLogger::SpacingLogger() {
 }
 
 SpacingLogger::~SpacingLogger() {
-    oss_ << std::endl;
     Logger::Output(oss_.str());
 }
 
