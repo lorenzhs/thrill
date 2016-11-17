@@ -353,7 +353,13 @@ public:
             items_.begin() + (partition_id + 1) * num_buckets_per_partition_;
 
         // XXX manipulator
-        std::tie(iter, end) = this->manipulator_(iter, end);
+        {
+            checkers::ReduceManipulatorConfig<
+                KeyExtractor, KeyEqualFunction,
+                ReduceMakeTableItem<Value, TableItem, VolatileKey> >
+                cfg(this->key_extractor(), this->key_equal_function());
+            std::tie(iter, end) = this->manipulator_(iter, end, cfg);
+        }
 
         for ( ; iter != end; ++iter)
         {

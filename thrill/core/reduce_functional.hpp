@@ -167,10 +167,13 @@ auto has_checker = common::is_valid(
 template <typename Value, typename TableItem, bool VolatileKey>
 class ReduceMakeTableItem;
 
-template <typename Value, typename TableItem>
-class ReduceMakeTableItem<Value, TableItem, /* VolatileKey */ false>
+template <typename Value_, typename TableItem_>
+class ReduceMakeTableItem<Value_, TableItem_, /* VolatileKey */ false>
 {
 public:
+    using Value = Value_;
+    using TableItem = TableItem_;
+
     template <typename KeyExtractor>
     static TableItem Make(const Value& v, KeyExtractor& /* key_extractor */) {
         return v;
@@ -193,10 +196,13 @@ public:
     }
 };
 
-template <typename Value, typename TableItem>
-class ReduceMakeTableItem<Value, TableItem, /* VolatileKey */ true>
+template <typename Value_, typename TableItem_>
+class ReduceMakeTableItem<Value_, TableItem_, /* VolatileKey */ true>
 {
 public:
+    using Value = Value_;
+    using TableItem = TableItem_;
+
     template <typename KeyExtractor>
     static TableItem Make(const Value& v, KeyExtractor& key_extractor) {
         return TableItem(key_extractor(v), v);

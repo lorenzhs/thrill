@@ -254,6 +254,31 @@ private:
 //! Debug manipulators?
 static constexpr bool debug = false;
 
+template <typename Key_Ex, typename Key_Eq, typename RMTI_>
+struct ReduceManipulatorConfig {
+    using KeyEx = Key_Ex;
+    using KeyEq = Key_Eq;
+    using RMTI = RMTI_;
+
+    using Key = typename common::FunctionTraits<KeyEx>::result_type;
+    using Value = typename RMTI::Value;
+    using TableItem = typename RMTI::TableItem;
+
+    ReduceManipulatorConfig(const KeyEx &key_ex_, const KeyEq &key_eq_)
+        : key_ex(key_ex_), key_eq(key_eq_) {}
+
+    auto GetKey(const TableItem &t) const {
+        return RMTI::GetKey(t, key_ex);
+    }
+
+    bool IsDefaultKey(const TableItem &t) const {
+        return GetKey(t) == Key();
+    }
+
+    const KeyEx key_ex;
+    const KeyEq key_eq;
+};
+
 //! Base class for reduce manipulators, using the Curiously Recurring Template
 //! Pattern to provide the implementation of 'manipulate'
 template <typename Strategy>
@@ -261,33 +286,34 @@ struct ReduceManipulatorBase : public ManipulatorBase {
     //! by default, manipulate all blocks (ranges)
     static const bool manipulate_only_once = true;
 
-    //! Pair iterator key type
-    template <typename It>
-    using Key = typename std::iterator_traits<It>::value_type::first_type;
+    //! Skip all items whose key is the default
+    template <typename It, typename Config>
+    It skip_empty_key(It begin, It end, Config config) {
+        while (begin < end && config.key_eq(
+                   config.GetKey(*begin), typename Config::Key())) ++begin;
+        return begin;
+    }
 
-    //! Pair iterator value type
-    template <typename It>
-    using Value = typename std::iterator_traits<It>::value_type::second_type;
 
     //! No-op manipulator
-    template <typename It>
-    std::pair<It, It> manipulate(It begin, It end) {
+    template <typename It, typename Config>
+    std::pair<It, It> manipulate(It begin, It end, Config /* config */) {
         return std::make_pair(begin, end);
     }
 
     //! Call operator, performing the manipulation.
     //! This wraps skipping empty keys and empty blocks (ranges)
-    template <typename It>
-    std::pair<It, It> operator () (It begin, It end) {
+    template <typename It, typename Config>
+    std::pair<It, It> operator () (It begin, It end, Config config) {
         if (Strategy::manipulate_only_once && made_changes()) {
             // abort
             return std::make_pair(begin, end);
         }
 
-        It it = skip_empty_key(begin, end);
+        It it = skip_empty_key(begin, end, config);
         std::pair<It, It> ret;
         if (it < end) {
-            ret = static_cast<Strategy*>(this)->manipulate(it, end);
+            ret = static_cast<Strategy*>(this)->manipulate(it, end, config);
         }
 
         if (made_changes()) {
@@ -304,16 +330,16 @@ struct ReduceManipulatorDummy : public ReduceManipulatorBase<ReduceManipulatorDu
 //! Drops first element
 struct ReduceManipulatorDropFirst
     : public ReduceManipulatorBase<ReduceManipulatorDropFirst>{
-    template <typename It>
-    std::pair<It, It> manipulate(It begin, It end) {
-        while (begin < end && (begin->first == Key<It>() ||
-                               begin->second == Value<It>())) {
+    template <typename It, typename Config>
+    std::pair<It, It> manipulate(It begin, It end, Config config) {
+        while (begin < end && (config.IsDefaultKey(*begin) ||
+                               begin->second == typename Config::Value())) {
             ++begin;
         }
         if (begin < end) {
             sLOG << "Manipulating" << end - begin << "elements, dropping first";
-            begin->first = Key<It>();
-            begin->second = Value<It>();
+            begin->first = typename Config::Key();
+            begin->second = typename Config::Value();
             ++begin;
             made_changes_ = true;
         }
@@ -324,8 +350,8 @@ struct ReduceManipulatorDropFirst
 //! Increments value of first element
 struct ReduceManipulatorIncFirst
     : public ReduceManipulatorBase<ReduceManipulatorIncFirst>{
-    template <typename It>
-    std::pair<It, It> manipulate(It begin, It end) {
+    template <typename It, typename Config>
+    std::pair<It, It> manipulate(It begin, It end, Config /* config */) {
         sLOG << "Manipulating" << end - begin
              << "elements, incrementing first";
         begin->second++;
@@ -337,13 +363,13 @@ struct ReduceManipulatorIncFirst
 //! Increments value of first element
 struct ReduceManipulatorRandFirst
     : public ReduceManipulatorBase<ReduceManipulatorRandFirst>{
-    template <typename It>
-    std::pair<It, It> manipulate(It begin, It end) {
+    template <typename It, typename Config>
+    std::pair<It, It> manipulate(It begin, It end, Config /* config */) {
         sLOG << "Manipulating" << end - begin
              << "elements, randomizing first value";
-        Value<It> old = begin->second;
+        typename Config::Value old = begin->second;
         do {
-            begin->second = static_cast<Value<It>>(rng());
+            begin->second = static_cast<typename Config::Value>(rng());
         } while (old == begin->second);
         made_changes_ = true;
         return std::make_pair(begin, end);
@@ -356,11 +382,11 @@ private:
 //! Increments key of first element
 struct ReduceManipulatorIncFirstKey
     : public ReduceManipulatorBase<ReduceManipulatorIncFirstKey>{
-    template <typename It>
-    std::pair<It, It> manipulate(It begin, It end) {
+    template <typename It, typename Config>
+    std::pair<It, It> manipulate(It begin, It end, Config /* config */) {
         sLOG << "Manipulating" << end - begin
              << "elements, incrementing key of first";
-        begin->first++;
+        begin->first++; // XXX
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
@@ -369,14 +395,14 @@ struct ReduceManipulatorIncFirstKey
 //! Increments value of first element
 struct ReduceManipulatorRandFirstKey
     : public ReduceManipulatorBase<ReduceManipulatorRandFirstKey>{
-    template <typename It>
-    std::pair<It, It> manipulate(It begin, It end) {
+    template <typename It, typename Config>
+    std::pair<It, It> manipulate(It begin, It end, Config config) {
         sLOG << "Manipulating" << end - begin
              << "elements, randomizing first key";
-        Key<It> old = begin->first;
+        auto old_key = config.GetKey(*begin);
         do {
-            begin->first = static_cast<Key<It>>(rng());
-        } while (old == begin->first);
+            begin->first = static_cast<typename Config::Key>(rng()); // XXX
+        } while (config.key_eq(old_key, config.GetKey(*begin)));
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
@@ -388,9 +414,9 @@ private:
 //! Switches values of first and second element
 struct ReduceManipulatorSwitchValues
     : public ReduceManipulatorBase<ReduceManipulatorSwitchValues>{
-    template <typename It>
-    std::pair<It, It> manipulate(It begin, It end) {
-        It next = skip_empty_key(begin + 1, end);
+    template <typename It, typename Config>
+    std::pair<It, It> manipulate(It begin, It end, Config config) {
+        It next = skip_empty_key(begin + 1, end, config);
         if (next < end && *begin != *next) {
             sLOG << "Manipulating" << end - begin << "elements,"
                  << "switching values at pos 0 and" << next - begin;

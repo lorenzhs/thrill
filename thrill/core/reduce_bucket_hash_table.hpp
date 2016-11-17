@@ -485,7 +485,14 @@ public:
                 TableItem* bi = current->items,
                     * bend = current->items + current->size;
 
-                std::tie(bi, bend) = this->manipulator_(bi, bend);
+                {
+                    checkers::ReduceManipulatorConfig<
+                        KeyExtractor, KeyEqualFunction,
+                        ReduceMakeTableItem<Value, TableItem, VolatileKey> >
+                        cfg(this->key_extractor(), this->key_equal_function());
+                    std::tie(bi, bend) = this->manipulator_(bi, bend, cfg);
+                }
+
                 for ( ; bi != bend; ++bi)
                 {
                     emit(partition_id, *bi);

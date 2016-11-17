@@ -419,7 +419,13 @@ public:
 
         // XXX TODO here's a good place for manipulations that the checker then
         // has to catch
-        std::tie(iter, pend) = this->manipulator_(iter, pend);
+        {
+            checkers::ReduceManipulatorConfig<
+                KeyExtractor, KeyEqualFunction,
+                ReduceMakeTableItem<Value, TableItem, VolatileKey> >
+                cfg(this->key_extractor(), this->key_equal_function());
+            std::tie(iter, pend) = this->manipulator_(iter, pend, cfg);
+        }
 
         for ( ; iter != pend; ++iter)
         {
