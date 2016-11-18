@@ -372,7 +372,8 @@ struct ReduceManipulatorRandFirst
         do {
             begin->second = static_cast<typename Config::Value>(rng());
         } while (old == begin->second);
-        sLOG << "Update: old val" << old << "new" << maybe_print(begin->second);
+        sLOG << "Update: old val" << maybe_print(old)
+             << "new" << maybe_print(begin->second);
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
