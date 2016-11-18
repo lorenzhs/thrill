@@ -353,7 +353,7 @@ public:
             items_.begin() + (partition_id + 1) * num_buckets_per_partition_;
 
         // XXX manipulator
-        {
+        if (this->ctx_.net.my_rank() == 0) {
             checkers::ReduceManipulatorConfig<
                 KeyExtractor, KeyEqualFunction,
                 ReduceMakeTableItem<Value, TableItem, VolatileKey> >

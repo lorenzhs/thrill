@@ -485,7 +485,7 @@ public:
                 TableItem* bi = current->items,
                     * bend = current->items + current->size;
 
-                {
+                if (this->ctx_.net.my_rank() == 0) {
                     checkers::ReduceManipulatorConfig<
                         KeyExtractor, KeyEqualFunction,
                         ReduceMakeTableItem<Value, TableItem, VolatileKey> >

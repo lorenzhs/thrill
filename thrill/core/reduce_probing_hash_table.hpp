@@ -419,7 +419,7 @@ public:
 
         // XXX TODO here's a good place for manipulations that the checker then
         // has to catch
-        {
+        if (this->ctx_.net.my_rank() == 0) {
             checkers::ReduceManipulatorConfig<
                 KeyExtractor, KeyEqualFunction,
                 ReduceMakeTableItem<Value, TableItem, VolatileKey> >
