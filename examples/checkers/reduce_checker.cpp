@@ -98,6 +98,7 @@ auto reduce_by_key_test_factory = [](
         sRLOG << "Reduce:" << run_timer.Microseconds()/(1000.0*reps) << "ms;"
               << "Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms;"
               << "Config:" << config_name;
+        sRLOG << "";
     };
 };
 
@@ -132,6 +133,7 @@ auto reduce_by_key_unchecked = [](size_t reps) {
 
         sRLOG << "Reduce:" << run_timer.Microseconds()/(1000.0*reps)
               << "ms (no checking, no manipulation)";
+        sRLOG << "";
     };
 };
 
