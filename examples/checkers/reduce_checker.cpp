@@ -161,6 +161,7 @@ auto run = [](const auto &manipulator, const std::string& name,
     api::Run(f(manipulator, CRC32Config<4, 6>{}, name, "6x4 CRC32", reps));
     api::Run(f(manipulator, CRC32Config<4, 4>{}, name, "4x4 CRC32", reps));
     api::Run(f(manipulator, CRC32Config<4, 2>{}, name, "2x4 CRC32", reps));
+    api::Run(f(manipulator, CRC32Config<4, 1>{}, name, "1x4 CRC32", reps));
 #endif
 
     api::Run(f(manipulator, TabConfig<8, 4>{}, name, "4x8 Tab", reps));
@@ -172,6 +173,7 @@ auto run = [](const auto &manipulator, const std::string& name,
     api::Run(f(manipulator, TabConfig<4, 6>{}, name, "6x4 Tab", reps));
     api::Run(f(manipulator, TabConfig<4, 4>{}, name, "4x4 Tab", reps));
     api::Run(f(manipulator, TabConfig<4, 2>{}, name, "2x4 Tab", reps));
+    api::Run(f(manipulator, TabConfig<4, 1>{}, name, "1x4 Tab", reps));
 #endif
 };
 
@@ -191,9 +193,9 @@ int main() {
     TEST_CHECK_I(Dummy, std::min(default_reps, (size_t)100));
     TEST_CHECK(RandFirstKey);
     TEST_CHECK(SwitchValues);
-    TEST_CHECK(DropFirst);
-    TEST_CHECK(IncFirst);
-    TEST_CHECK(RandFirst);
+    // TEST_CHECK(DropFirst); // disabled because always detected
+    // TEST_CHECK(IncFirst); // disabled because always detected
+    // TEST_CHECK(RandFirst); // disabled because always detected
     TEST_CHECK(IncFirstKey);
 }
 
