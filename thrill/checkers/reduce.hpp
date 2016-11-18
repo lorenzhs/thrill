@@ -90,7 +90,8 @@ public:
         hash_t h = hash_(key);
         for (size_t idx = 0; idx < num_parallel; ++idx) {
             const size_t bucket = (h >> (idx * bucket_bits)) & bucket_mask;
-            sLOG << key << idx << bucket << "=" << std::hex << bucket << h << std::dec;
+            sLOGC(extra_verbose) << key << idx << bucket << "="
+                                 << std::hex << bucket << h << std::dec;
             reductions_[idx][bucket] =
                 reducefn(reductions_[idx][bucket], value);
         }
@@ -128,8 +129,7 @@ public:
             dump_to_log("Before");
         }
 
-        auto table_reduce =
-            common::ComponentSum<table_t, ReduceFunction>(reducefn);
+        common::ComponentSum<table_t, ReduceFunction> table_reduce(reducefn);
         reductions_ = ctx.net.AllReduce(reductions_, table_reduce);
 
         if (extra_verbose && ctx.net.my_rank() == root) {
