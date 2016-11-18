@@ -337,7 +337,8 @@ struct ReduceManipulatorDropFirst
             ++begin;
         }
         if (begin < end) {
-            sLOG << "Manipulating" << end - begin << "elements, dropping first";
+            sLOG << "Manipulating" << end - begin << "elements, dropping first:"
+                 << maybe_print(*begin);
             begin->first = typename Config::Key();
             begin->second = typename Config::Value();
             ++begin;
@@ -353,7 +354,7 @@ struct ReduceManipulatorIncFirst
     template <typename It, typename Config>
     std::pair<It, It> manipulate(It begin, It end, Config /* config */) {
         sLOG << "Manipulating" << end - begin
-             << "elements, incrementing first";
+             << "elements, incrementing first:" << maybe_print(*begin);
         begin->second++;
         made_changes_ = true;
         return std::make_pair(begin, end);
@@ -366,11 +367,12 @@ struct ReduceManipulatorRandFirst
     template <typename It, typename Config>
     std::pair<It, It> manipulate(It begin, It end, Config /* config */) {
         sLOG << "Manipulating" << end - begin
-             << "elements, randomizing first value";
+             << "elements, randomizing first value:" << maybe_print(*begin);
         typename Config::Value old = begin->second;
         do {
             begin->second = static_cast<typename Config::Value>(rng());
         } while (old == begin->second);
+        sLOG << "Update: old val" << old << "new" << maybe_print(begin->second);
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
@@ -385,7 +387,7 @@ struct ReduceManipulatorIncFirstKey
     template <typename It, typename Config>
     std::pair<It, It> manipulate(It begin, It end, Config /* config */) {
         sLOG << "Manipulating" << end - begin
-             << "elements, incrementing key of first";
+             << "elements, incrementing key of first:" << maybe_print(*begin);
         begin->first++; // XXX
         made_changes_ = true;
         return std::make_pair(begin, end);
@@ -398,11 +400,13 @@ struct ReduceManipulatorRandFirstKey
     template <typename It, typename Config>
     std::pair<It, It> manipulate(It begin, It end, Config config) {
         sLOG << "Manipulating" << end - begin
-             << "elements, randomizing first key";
+             << "elements, randomizing first key" << maybe_print(*begin);
         auto old_key = config.GetKey(*begin);
         do {
             begin->first = static_cast<typename Config::Key>(rng()); // XXX
         } while (config.key_eq(old_key, config.GetKey(*begin)));
+        sLOG << "Update: old key" << maybe_print(old_key)
+             << "new" << maybe_print(begin->first);
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
@@ -419,7 +423,8 @@ struct ReduceManipulatorSwitchValues
         It next = skip_empty_key(begin + 1, end, config);
         if (next < end && *begin != *next) {
             sLOG << "Manipulating" << end - begin << "elements,"
-                 << "switching values at pos 0 and" << next - begin;
+                 << "switching values at pos 0 and" << next - begin
+                 << maybe_print(*begin) << maybe_print(*next);
             std::swap(begin->second, next->second);
             made_changes_ = true;
         }

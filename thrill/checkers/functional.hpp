@@ -14,6 +14,8 @@
 
 #include <thrill/common/functional.hpp>
 
+#include <ostream>
+#include <sstream>
 #include <type_traits>
 
 namespace thrill {
@@ -82,6 +84,38 @@ struct noncopynonmove {
     //! non-movable: delete move-assignment
     noncopynonmove& operator = (noncopynonmove&&) = delete;
 };
+
+//! Type trait to check whether a type can be printed to an std::ostream
+template <typename T, typename Result = void>
+struct is_printable : std::false_type {};
+
+template <typename T>
+struct is_printable<T,
+    typename std::enable_if_t<
+        // check convertability of...
+        std::is_convertible<
+            // the return type of printing a T to an std::ostream...
+            decltype(std::declval<std::ostream&>() << std::declval<T const&>()),
+            // to an std::ostream& (to match the signature of op<<)
+            std::ostream&
+        >::value>
+    > : std::true_type {};
+
+//! Convert a type to a string where this is possible
+template <typename T>
+typename std::enable_if_t<is_printable<T>::value, std::string>
+maybe_print(T const& t) {
+    std::ostringstream out;
+    out << t;
+    return out.str();
+}
+
+//! Fallback for non-printable types, prints "✖"
+template<typename T>
+typename std::enable_if_t<!is_printable<T>::value, std::string>
+maybe_print(T const&) {
+    return "✖";
+}
 
 } // namespace checkers
 } // namespace thrill
