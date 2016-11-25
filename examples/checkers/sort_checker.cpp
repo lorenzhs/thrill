@@ -25,7 +25,7 @@
 using namespace thrill; // NOLINT
 
 #ifdef CHECKERS_FULL
-const size_t default_reps = 10000;
+const size_t default_reps = 100000;
 #else
 const size_t default_reps = 100;
 #endif
@@ -141,7 +141,7 @@ auto run = [](const auto &manipulator, const std::string &name,
               size_t reps = default_reps) {
 
 #ifdef CHECKERS_FULL
-    api::Run(sort_random(manipulator, Hash<32>{}, name, "CRC32-32", reps));
+    //api::Run(sort_random(manipulator, Hash<32>{}, name, "CRC32-32", reps));
     api::Run(sort_random(manipulator, Hash<16>{}, name, "CRC32-16", reps));
 #endif
     api::Run(sort_random(manipulator, Hash<8>{}, name, "CRC32-8", reps));

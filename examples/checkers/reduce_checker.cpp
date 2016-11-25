@@ -156,39 +156,37 @@ auto run = [](const auto &manipulator, const std::string& name,
     // default
     api::Run(f(manipulator, CRC32Config<8, 1>{}, name, "1x8 CRC32", reps));
 #else
-#ifdef ODD_CONFIGS
+    api::Run(f(manipulator, CRC32Config<8, 2>{}, name, "2x8 CRC32", reps));
+    api::Run(f(manipulator, CRC32Config<8, 1>{}, name, "1x8 CRC32", reps));
+
+    api::Run(f(manipulator, CRC32Config<4, 4>{}, name, "4x4 CRC32", reps));
+    api::Run(f(manipulator, CRC32Config<4, 2>{}, name, "2x4 CRC32", reps));
+    api::Run(f(manipulator, CRC32Config<4, 1>{}, name, "1x4 CRC32", reps));
+
     api::Run(f(manipulator, CRC32Config<2, 8>{}, name, "8x2 CRC32", reps));
     api::Run(f(manipulator, CRC32Config<2, 6>{}, name, "6x2 CRC32", reps));
     api::Run(f(manipulator, CRC32Config<2, 4>{}, name, "4x2 CRC32", reps));
     api::Run(f(manipulator, CRC32Config<2, 3>{}, name, "3x2 CRC32", reps));
     api::Run(f(manipulator, CRC32Config<2, 2>{}, name, "2x2 CRC32", reps));
     api::Run(f(manipulator, CRC32Config<2, 1>{}, name, "1x2 CRC32", reps));
-#else
-    api::Run(f(manipulator, CRC32Config<8, 2>{}, name, "2x8 CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<8, 1>{}, name, "1x8 CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<4, 4>{}, name, "4x4 CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<4, 2>{}, name, "2x4 CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<4, 1>{}, name, "1x4 CRC32", reps));
-#endif
 #endif
 
 #ifndef CHECKERS_FULL
     api::Run(f(manipulator, TabConfig<8, 1>{}, name, "1x8 Tab", reps));
 #else
-#ifdef ODD_CONFIGS
+    api::Run(f(manipulator, TabConfig<8, 2>{}, name, "2x8 Tab", reps));
+    api::Run(f(manipulator, TabConfig<8, 1>{}, name, "1x8 Tab", reps));
+
+    api::Run(f(manipulator, TabConfig<4, 4>{}, name, "4x4 Tab", reps));
+    api::Run(f(manipulator, TabConfig<4, 2>{}, name, "2x4 Tab", reps));
+    api::Run(f(manipulator, TabConfig<4, 1>{}, name, "1x4 Tab", reps));
+
     api::Run(f(manipulator, TabConfig<2, 8>{}, name, "8x2 Tab", reps));
     api::Run(f(manipulator, TabConfig<2, 6>{}, name, "6x2 Tab", reps));
     api::Run(f(manipulator, TabConfig<2, 4>{}, name, "4x2 Tab", reps));
     api::Run(f(manipulator, TabConfig<2, 3>{}, name, "3x2 Tab", reps));
     api::Run(f(manipulator, TabConfig<2, 2>{}, name, "2x2 Tab", reps));
     api::Run(f(manipulator, TabConfig<2, 1>{}, name, "1x2 Tab", reps));
-#else
-    api::Run(f(manipulator, TabConfig<8, 2>{}, name, "2x8 Tab", reps));
-    api::Run(f(manipulator, TabConfig<8, 1>{}, name, "1x8 Tab", reps));
-    api::Run(f(manipulator, TabConfig<4, 4>{}, name, "4x4 Tab", reps));
-    api::Run(f(manipulator, TabConfig<4, 2>{}, name, "2x4 Tab", reps));
-    api::Run(f(manipulator, TabConfig<4, 1>{}, name, "1x4 Tab", reps));
-#endif
 #endif
 };
 
