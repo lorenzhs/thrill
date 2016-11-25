@@ -57,7 +57,7 @@ class ReduceCheckerMinireduction : public noncopynonmove
     static constexpr size_t num_parallel = Config::num_parallel;
 
     //! hash value type
-    using hash_t = decltype(hash_fn()(Key { }));
+    using hash_t = decltype(std::declval<hash_fn>() (std::declval<Key>()));
     //! Check that hash function produces enough data
     static_assert(bucket_bits <= 8 * sizeof(hash_t),
                   "hash_fn produces fewer bits than needed to discern buckets");
