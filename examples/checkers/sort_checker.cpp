@@ -145,10 +145,8 @@ auto run = [](const auto &manipulator, const std::string &name,
     api::Run(sort_random(manipulator, Hash<16>{}, name, "CRC32-16", reps));
 #endif
     api::Run(sort_random(manipulator, Hash<8>{}, name, "CRC32-8", reps));
-#ifdef CHECKERS_FULL
     api::Run(sort_random(manipulator, Hash<4>{}, name, "CRC32-4", reps));
     api::Run(sort_random(manipulator, Hash<2>{}, name, "CRC32-2", reps));
-#endif
 };
 
 // yikes, preprocessor
@@ -159,8 +157,8 @@ auto run = [](const auto &manipulator, const std::string &name,
 #define TEST_CHECK_T(NAME, FULL) run(checkers::SortManipulator ## FULL(), #NAME)
 
 int main() {
-    api::Run(sort_unchecked(default_reps));
-    TEST_CHECK_A(Dummy, std::min(default_reps, (size_t)100));
+    //api::Run(sort_unchecked(default_reps));
+    //TEST_CHECK_A(Dummy, std::min(default_reps, (size_t)100));
     TEST_CHECK(IncFirst);
     // TEST_CHECK(RandFirst);  // disabled: random value is easily caught
     // TEST_CHECK(DropLast);  // disabled: always caught by size check
