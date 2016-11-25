@@ -14,6 +14,7 @@
 #include <thrill/api/sort.hpp>
 #include <thrill/checkers/driver.hpp>
 #include <thrill/checkers/sort.hpp>
+#include <thrill/common/hash.hpp>
 #include <thrill/common/logger.hpp>
 
 #include <algorithm>
@@ -34,27 +35,32 @@ thread_local static int my_rank = -1;
 #define RLOG LOGC(my_rank == 0)
 #define sRLOG sLOGC(my_rank == 0)
 
-auto sort_random = [](const auto &manipulator, const std::string& name,
+auto sort_random = [](const auto &manipulator, const auto &hash,
+                      const std::string& manip_name,
+                      const std::string& config_name,
                       size_t reps) {
     using Value = int;
     using Compare = std::less<Value>;
     using Manipulator = std::decay_t<decltype(manipulator)>;
-    using Checker = checkers::SortChecker<Value, Compare>;
+    using HashFn = std::decay_t<decltype(hash)>;
+    using Checker = checkers::SortChecker<Value, Compare, HashFn>;
     using Driver = checkers::Driver<Checker, Manipulator>;
 
-    return [reps, name](Context& ctx) {
+    return [reps, manip_name, config_name](Context& ctx) {
         std::default_random_engine generator(std::random_device { } ());
         std::uniform_int_distribution<Value> distribution(0, 10000);
 
         ctx.enable_consume();
         if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
 
-        sRLOG << "Running" << name << "tests," << reps << "reps";
+        sRLOG << "Running sort tests with" << manip_name << "manip and"
+              << config_name << "config," << reps << "reps";
 
         common::StatsTimerStopped run_timer, check_timer;
         size_t failures = 0, dummy = 0, manips = 0;
         for (size_t i = 0; i < reps; ++i) {
             auto driver = std::make_shared<Driver>();
+            driver->silence();
 
             // Synchronize with barrier
             ctx.net.Barrier();
@@ -79,12 +85,16 @@ auto sort_random = [](const auto &manipulator, const std::string& name,
             if (success.second) { manips++; }
         }
 
-        RLOG << name << ": " << failures << " out of " << reps
-             << " tests failed; " << manips << " manipulations";
+        RLOG << "Sort with " << manip_name << " manip and "
+             << config_name << " config: "
+             << (failures > 0 ? common::log::fg_red() : "")
+             << failures << " / " << reps << " tests failed; "
+             << manips << " manipulations" << common::log::reset();
 
         sRLOG
-            << "Sort:" << run_timer.Microseconds()/(1000.0*reps)
-            << "ms; Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms";
+            << "Sort:" << run_timer.Microseconds()/(1000.0*reps) << "ms;"
+            << "Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms;"
+            << "Config:" << config_name << "\n";
     };
 };
 
@@ -100,7 +110,7 @@ auto sort_unchecked = [](size_t reps = 100) {
         ctx.enable_consume();
         if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
 
-        sRLOG << "Running tests without checker," << reps << "reps";
+        sRLOG << "Running sort tests without checker," << reps << "reps";
 
         common::StatsTimerStopped run_timer;
         size_t dummy = 0;
@@ -120,14 +130,25 @@ auto sort_unchecked = [](size_t reps = 100) {
         }
 
         sRLOG << "Sort:" << run_timer.Microseconds()/(1000.0*reps)
-              << "ms (no checking, no manipulation)";
+              << "ms (no checking, no manipulation)\n";
     };
 };
 
+template <size_t bits>
+using Hash = common::masked_hash<int, bits>;
 
 auto run = [](const auto &manipulator, const std::string &name,
               size_t reps = default_reps) {
-    api::Run(sort_random(manipulator, name, reps));
+
+#ifdef CHECKERS_FULL
+    api::Run(sort_random(manipulator, Hash<32>{}, name, "CRC32-32", reps));
+    api::Run(sort_random(manipulator, Hash<16>{}, name, "CRC32-16", reps));
+#endif
+    api::Run(sort_random(manipulator, Hash<8>{}, name, "CRC32-8", reps));
+#ifdef CHECKERS_FULL
+    api::Run(sort_random(manipulator, Hash<4>{}, name, "CRC32-4", reps));
+    api::Run(sort_random(manipulator, Hash<2>{}, name, "CRC32-2", reps));
+#endif
 };
 
 // yikes, preprocessor
@@ -141,13 +162,13 @@ int main() {
     api::Run(sort_unchecked(default_reps));
     TEST_CHECK_A(Dummy, std::min(default_reps, (size_t)100));
     TEST_CHECK(IncFirst);
-    TEST_CHECK(RandFirst);
+    // TEST_CHECK(RandFirst);  // disabled: random value is easily caught
     // TEST_CHECK(DropLast);  // disabled: always caught by size check
     TEST_CHECK(ResetToDefault);
     // TEST_CHECK(AddToEmpty);  // disabled: always caught by size check
     TEST_CHECK(SetEqual);
     // TEST_CHECK(DuplicateLast);  // disabled: always caught by size check
-    TEST_CHECK_T(MoveToNextBlock, MoveToNextBlock<int>);
+    // TEST_CHECK_T(MoveToNextBlock, MoveToNextBlock<int>); // disabled: boring
 }
 
 /******************************************************************************/
