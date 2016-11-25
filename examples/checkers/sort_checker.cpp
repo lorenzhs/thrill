@@ -139,12 +139,14 @@ auto run = [](const auto &manipulator, const std::string &name,
 
 int main() {
     api::Run(sort_unchecked(default_reps));
-    TEST_CHECK(Dummy);
-    TEST_CHECK(DropLast);
+    TEST_CHECK_A(Dummy, std::min(default_reps, (size_t)100));
+    TEST_CHECK(IncFirst);
+    TEST_CHECK(RandFirst);
+    // TEST_CHECK(DropLast);  // disabled: always caught by size check
     TEST_CHECK(ResetToDefault);
-    TEST_CHECK(AddToEmpty);
+    // TEST_CHECK(AddToEmpty);  // disabled: always caught by size check
     TEST_CHECK(SetEqual);
-    TEST_CHECK(DuplicateLast);
+    // TEST_CHECK(DuplicateLast);  // disabled: always caught by size check
     TEST_CHECK_T(MoveToNextBlock, MoveToNextBlock<int>);
 }
 

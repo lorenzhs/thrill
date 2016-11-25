@@ -242,6 +242,34 @@ struct SortManipulatorResetToDefault : public ManipulatorBase {
     }
 };
 
+//! Reset first element to default-constructed value
+struct SortManipulatorIncFirst : public ManipulatorBase {
+    template <typename ValueType>
+    void operator () (std::vector<ValueType>& vec) {
+        if (vec.size() > 0) {
+            vec[0]++;
+            made_changes_ = true;
+        }
+    }
+};
+
+
+//! Reset first element to default-constructed value
+struct SortManipulatorRandFirst : public ManipulatorBase {
+    template <typename ValueType>
+    void operator () (std::vector<ValueType>& vec) {
+        if (vec.size() > 0) {
+            ValueType old = vec[0];
+            do {
+                vec[0] = static_cast<ValueType>(rng());
+            } while (vec[0] == old);
+            made_changes_ = true;
+        }
+    }
+private:
+    std::mt19937 rng { std::random_device { } () };
+};
+
 //! Duplicate the last element of the first (local) block
 struct SortManipulatorDuplicateLast : public ManipulatorBase {
     template <typename ValueType>
