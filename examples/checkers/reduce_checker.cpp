@@ -154,7 +154,7 @@ auto run = [](const auto &manipulator, const std::string& name,
 
     api::Run(f(manipulator, CRC32Config<8, 4>{}, name, "4x8 CRC32", reps));
 #ifdef CHECKERS_FULL
-#ifdef ODD_CONFIGs
+#ifdef ODD_CONFIGS
     api::Run(f(manipulator, CRC32Config<2, 1>{}, name, "1x2 CRC32", reps));
     api::Run(f(manipulator, CRC32Config<2, 2>{}, name, "2x2 CRC32", reps));
     api::Run(f(manipulator, CRC32Config<2, 3>{}, name, "3x2 CRC32", reps));
@@ -173,7 +173,7 @@ auto run = [](const auto &manipulator, const std::string& name,
 
     api::Run(f(manipulator, TabConfig<8, 4>{}, name, "4x8 Tab", reps));
 #ifdef CHECKERS_FULL
-#ifdef ODD_CONFIGs
+#ifdef ODD_CONFIGS
     api::Run(f(manipulator, TabConfig<2, 1>{}, name, "1x2 Tab", reps));
     api::Run(f(manipulator, TabConfig<2, 2>{}, name, "2x2 Tab", reps));
     api::Run(f(manipulator, TabConfig<2, 3>{}, name, "3x2 Tab", reps));
