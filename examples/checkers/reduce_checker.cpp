@@ -193,6 +193,8 @@ auto run = [](const auto &manipulator, const std::string& name,
 // yikes, preprocessor
 #define TEST_CHECK(MANIP) run(checkers::ReduceManipulator ## MANIP(), #MANIP)
 #define TEST_CHECK_I(MANIP, ITS) run(checkers::ReduceManipulator ## MANIP(), #MANIP, ITS)
+// run with template parameter
+#define TEST_CHECK_T(NAME, FULL) run(checkers::ReduceManipulator ## FULL(), #NAME)
 
 namespace std {
 template <typename T, typename U>
@@ -204,10 +206,11 @@ ostream& operator << (ostream& os, const pair<T, U>& p) {
 int main() {
     //api::Run(reduce_by_key_unchecked(default_reps));
     //TEST_CHECK_I(Dummy, std::min(default_reps, (size_t)100));
-    TEST_CHECK(IncDec);
-    TEST_CHECK(Inc2Dec2);
     TEST_CHECK(RandFirstKey);
     TEST_CHECK(SwitchValues);
+    TEST_CHECK_T(IncDec1, IncDec<1>);
+    TEST_CHECK_T(IncDec2, IncDec<2>);
+    TEST_CHECK_T(IncDec3, IncDec<3>);
     // TEST_CHECK(DropFirst); // disabled because always detected
     // TEST_CHECK(IncFirst); // disabled because always detected
     // TEST_CHECK(RandFirst); // disabled because always detected

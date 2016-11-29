@@ -293,19 +293,42 @@ struct ReduceManipulatorBase : public ManipulatorBase {
 
     //! Skip all items whose key is the default
     template <typename It, typename Config>
-    It skip_empty_key(It begin, It end, Config config) {
+    It skip_empty_key(It begin, It end, Config config) const {
         while (begin < end && config.IsDefaultKey(*begin)) ++begin;
         return begin;
     }
 
     //! Skip all items whose key is the default or equal to begin's key
     template <typename It, typename Config>
-    It skip_to_next_key(It begin, It end, Config config) {
+    It skip_to_next_key(It begin, It end, Config config) const {
         It next = begin + 1;
         while (next < end && (config.IsDefaultKey(*next) ||
                               config.key_exq(*next, *begin)))
                ++next;
         return next;
+    }
+
+    template <typename It, typename Config>
+    std::vector<It> get_distinct_keys(It begin, It end, size_t n, Config config) const {
+        std::vector<It> result(n);
+        result[0] = skip_to_next_key(begin, end, config);
+
+        auto is_first_occurrence = [&config, &result](size_t idx) {
+            for (size_t pos = 0; pos < idx; ++pos) {
+                if (config.key_exq(*result[pos], *result[idx]))
+                    return false;
+            }
+            return true;
+        };
+
+        for (size_t i = 1; i < n; ++i) {
+            result[i] = result[i-1];
+            do {
+                result[i] = skip_to_next_key(result[i], end, config);
+            } while (result[i] < end && !is_first_occurrence(i));
+        }
+
+        return result;
     }
 
 
@@ -375,50 +398,25 @@ struct ReduceManipulatorIncFirst
     }
 };
 
-//! Increments value of first element and decrements that of second
+//! Of the first `2n` elements with distinct keys, increments value of first `n`
+//! elements and decrements that of next `n`
+template <size_t n = 1>
 struct ReduceManipulatorIncDec
-    : public ReduceManipulatorBase<ReduceManipulatorIncDec>{
+    : public ReduceManipulatorBase< ReduceManipulatorIncDec<n> >
+{
     template <typename It, typename Config>
     std::pair<It, It> manipulate(It begin, It end, Config config) {
-        It next = skip_to_next_key(begin, end, config);
-        if (next < end) {
+        auto arr = this->get_distinct_keys(begin, end, 2*n, config);
+
+        if (arr.back() < end) {
             sLOG << "Manipulating" << end - begin
-                 << "elements, incrementing first:" << maybe_print(*begin)
-                 << "and decrementing second:" << maybe_print(*next);
-            begin->second++;
-            next->second--;
-            made_changes_ = true;
-        }
-        return std::make_pair(begin, end);
-    }
-};
-
-//! Increments value of first two elements and decrements that of next two
-struct ReduceManipulatorInc2Dec2
-    : public ReduceManipulatorBase<ReduceManipulatorInc2Dec2>{
-    template <typename It, typename Config>
-    std::pair<It, It> manipulate(It begin, It end, Config config) {
-        // stupidly complex skipping to get four distinct keys
-        It two = skip_to_next_key(begin, end, config), thr = two;
-
-        do { thr = skip_to_next_key(thr, end, config); }
-        while (config.key_exq(*begin, *thr) || config.key_exq(*two, *thr));
-
-        It fou = thr;
-        do { fou = skip_to_next_key(fou, end, config); }
-        while (config.key_exq(*begin, *fou) || config.key_exq(*two, *fou) ||
-               config.key_exq(*thr, *fou));
-
-        if (fou < end) {
-            sLOG << "Manipulating" << end - begin
-                 << "elements, incrementing first two:" << maybe_print(*begin)
-                 << maybe_print(*two) << "and decrementing next two:"
-                 << maybe_print(*thr) << maybe_print(*fou);
-            begin->second++;
-            two->second++;
-            thr->second--;
-            fou->second--;
-            made_changes_ = true;
+                 << "elements, incrementing first" << n
+                 << "and decrementing second" << n << "of" << maybe_print(arr);
+            for (size_t i = 0; i < n; ++i) {
+                arr[i]->second++;
+                arr[n+i]->second--;
+            }
+            this->made_changes_ = true;  // this-> required for unknown reasons
         }
         return std::make_pair(begin, end);
     }
