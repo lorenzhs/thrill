@@ -204,6 +204,8 @@ ostream& operator << (ostream& os, const pair<T, U>& p) {
 int main() {
     //api::Run(reduce_by_key_unchecked(default_reps));
     //TEST_CHECK_I(Dummy, std::min(default_reps, (size_t)100));
+    TEST_CHECK(IncDec);
+    TEST_CHECK(Inc2Dec2);
     TEST_CHECK(RandFirstKey);
     TEST_CHECK(SwitchValues);
     // TEST_CHECK(DropFirst); // disabled because always detected

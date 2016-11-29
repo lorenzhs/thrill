@@ -272,7 +272,12 @@ struct ReduceManipulatorConfig {
     }
 
     bool IsDefaultKey(const TableItem &t) const {
-        return GetKey(t) == Key();
+        return key_eq(GetKey(t), Key());
+    }
+
+    //! Extract and Equality check in one
+    bool key_exq(const TableItem &v1, const TableItem &v2) const {
+        return key_eq(GetKey(v1), GetKey(v2));
     }
 
     const KeyEx key_ex;
@@ -289,9 +294,18 @@ struct ReduceManipulatorBase : public ManipulatorBase {
     //! Skip all items whose key is the default
     template <typename It, typename Config>
     It skip_empty_key(It begin, It end, Config config) {
-        while (begin < end && config.key_eq(
-                   config.GetKey(*begin), typename Config::Key())) ++begin;
+        while (begin < end && config.IsDefaultKey(*begin)) ++begin;
         return begin;
+    }
+
+    //! Skip all items whose key is the default or equal to begin's key
+    template <typename It, typename Config>
+    It skip_to_next_key(It begin, It end, Config config) {
+        It next = begin + 1;
+        while (next < end && (config.IsDefaultKey(*next) ||
+                              config.key_exq(*next, *begin)))
+               ++next;
+        return next;
     }
 
 
@@ -360,6 +374,56 @@ struct ReduceManipulatorIncFirst
         return std::make_pair(begin, end);
     }
 };
+
+//! Increments value of first element and decrements that of second
+struct ReduceManipulatorIncDec
+    : public ReduceManipulatorBase<ReduceManipulatorIncDec>{
+    template <typename It, typename Config>
+    std::pair<It, It> manipulate(It begin, It end, Config config) {
+        It next = skip_to_next_key(begin, end, config);
+        if (next < end) {
+            sLOG << "Manipulating" << end - begin
+                 << "elements, incrementing first:" << maybe_print(*begin)
+                 << "and decrementing second:" << maybe_print(*next);
+            begin->second++;
+            next->second--;
+            made_changes_ = true;
+        }
+        return std::make_pair(begin, end);
+    }
+};
+
+//! Increments value of first two elements and decrements that of next two
+struct ReduceManipulatorInc2Dec2
+    : public ReduceManipulatorBase<ReduceManipulatorInc2Dec2>{
+    template <typename It, typename Config>
+    std::pair<It, It> manipulate(It begin, It end, Config config) {
+        // stupidly complex skipping to get four distinct keys
+        It two = skip_to_next_key(begin, end, config), thr = two;
+
+        do { thr = skip_to_next_key(thr, end, config); }
+        while (config.key_exq(*begin, *thr) || config.key_exq(*two, *thr));
+
+        It fou = thr;
+        do { fou = skip_to_next_key(fou, end, config); }
+        while (config.key_exq(*begin, *fou) || config.key_exq(*two, *fou) ||
+               config.key_exq(*thr, *fou));
+
+        if (fou < end) {
+            sLOG << "Manipulating" << end - begin
+                 << "elements, incrementing first two:" << maybe_print(*begin)
+                 << maybe_print(*two) << "and decrementing next two:"
+                 << maybe_print(*thr) << maybe_print(*fou);
+            begin->second++;
+            two->second++;
+            thr->second--;
+            fou->second--;
+            made_changes_ = true;
+        }
+        return std::make_pair(begin, end);
+    }
+};
+
 
 //! Increments value of first element
 struct ReduceManipulatorRandFirst
