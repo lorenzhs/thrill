@@ -150,10 +150,10 @@ auto run = [](const auto& manipulator, const std::string& name, size_t reps) {
 };
 
 // yikes, preprocessor
-#define TEST_CHECK(MANIP) \
-    run(checkers::SortManipulator ## MANIP(), #MANIP, reps)
-#define TEST_CHECK_A(MANIP, ...) \
-    run(checkers::SortManipulator ## MANIP(), #MANIP, __VA_ARGS__)
+#define TEST_CHECK(MANIP) if(run_ ## MANIP) \
+        run(checkers::SortManipulator ## MANIP(), #MANIP, reps)
+#define TEST_CHECK_A(MANIP, ...) if(run_ ## MANIP) \
+        run(checkers::SortManipulator ## MANIP(), #MANIP, __VA_ARGS__)
 
 // run with template parameter
 #define TEST_CHECK_T(NAME, FULL) \
@@ -165,13 +165,23 @@ int main(int argc, char** argv) {
     size_t reps = default_reps;
     clp.AddSizeT('n', "iterations", reps, "iterations");
 
+    bool run_unchecked = false, run_Dummy = false, run_IncFirst = false,
+        run_RandFirst = false,  run_ResetToDefault = false,
+        run_SetEqual = false;
+    clp.AddFlag('u', "unchecked", run_unchecked, "run unchecked");
+    clp.AddFlag('d', "Dummy", run_Dummy, "run Dummy manip");
+    clp.AddFlag('i', "IncFirst", run_IncFirst, "run IncFirst manip");
+    clp.AddFlag('f', "RandFirst", run_RandFirst, "run RandFirst manip (boring)");
+    clp.AddFlag('r', "ResetToDefault", run_ResetToDefault, "run ResetToDefault manip");
+    clp.AddFlag('s', "SetEqual", run_SetEqual, "run SetEqual manip");
+
     if (!clp.Process(argc, argv)) return -1;
     clp.PrintResult();
 
-    // api::Run(sort_unchecked(reps));
-    // TEST_CHECK_A(Dummy, std::min(reps, (size_t)100));
+    if (run_unchecked) api::Run(sort_unchecked(reps));
+    TEST_CHECK_A(Dummy, std::min(reps, (size_t)100));
     TEST_CHECK(IncFirst);
-    // TEST_CHECK(RandFirst);  // disabled: random value is easily caught
+    TEST_CHECK(RandFirst);  // random value is easily caught
     // TEST_CHECK(DropLast);  // disabled: always caught by size check
     TEST_CHECK(ResetToDefault);
     // TEST_CHECK(AddToEmpty);  // disabled: always caught by size check
