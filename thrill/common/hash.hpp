@@ -185,8 +185,7 @@ uint32_t crc32_slicing_by_8(uint32_t crc, const void* data, size_t length);
  */
 template <typename ValueType>
 struct hash_crc32_fallback {
-    uint32_t operator () (const ValueType& val, uint32_t crc = 0xffffffff) const
-    {
+    uint32_t operator () (const ValueType& val, uint32_t crc = 0xffffffff) const {
         const char* ptr = hash_helper<ValueType>::ptr(val);
         size_t size = hash_helper<ValueType>::size(val);
         return crc32_slicing_by_8(crc, ptr, size);
@@ -315,12 +314,11 @@ protected:
 template <typename T>
 using hash_tabulated = _detail::tabulation_hashing<sizeof(T)>;
 
-
 template <typename ValueType, size_t bits = 32,
           typename Hash = hash_crc32<ValueType> >
 struct masked_hash {
     static constexpr size_t Bits = bits;  // export
-    using hash_t = decltype(std::declval<Hash>() (std::declval<ValueType>()));
+    using hash_t = decltype(std::declval<Hash>()(std::declval<ValueType>()));
 
     static_assert(bits <= 8 * sizeof(hash_t), "Not enough bits in Hash");
     static constexpr hash_t mask = static_cast<hash_t>((1UL << bits) - 1);
@@ -328,6 +326,7 @@ struct masked_hash {
     inline hash_t operator () (const ValueType& val) const {
         return hash(val) & mask;
     }
+
 private:
     Hash hash;
 };

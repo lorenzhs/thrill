@@ -36,7 +36,7 @@ thread_local static int my_rank = -1;
 #define RLOG LOGC(my_rank == 0)
 #define sRLOG sLOGC(my_rank == 0)
 
-auto sort_random = [](const auto &manipulator, const auto &hash,
+auto sort_random = [](const auto& manipulator, const auto& hash,
                       const std::string& manip_name,
                       const std::string& config_name,
                       size_t reps) {
@@ -138,7 +138,7 @@ auto sort_unchecked = [](size_t reps = 100) {
 template <size_t bits>
 using Hash = common::masked_hash<int, bits>;
 
-auto run = [](const auto &manipulator, const std::string &name, size_t reps) {
+auto run = [](const auto& manipulator, const std::string& name, size_t reps) {
 
 #ifdef CHECKERS_FULL
     //api::Run(sort_random(manipulator, Hash<32>{}, name, "CRC32-32", reps));
@@ -159,7 +159,7 @@ auto run = [](const auto &manipulator, const std::string &name, size_t reps) {
 #define TEST_CHECK_T(NAME, FULL) \
     run(checkers::SortManipulator ## FULL(), #NAME, reps)
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
     thrill::common::CmdlineParser clp;
 
     size_t reps = default_reps;
@@ -168,8 +168,8 @@ int main(int argc, char **argv) {
     if (!clp.Process(argc, argv)) return -1;
     clp.PrintResult();
 
-    //api::Run(sort_unchecked(reps));
-    //TEST_CHECK_A(Dummy, std::min(reps, (size_t)100));
+    // api::Run(sort_unchecked(reps));
+    // TEST_CHECK_A(Dummy, std::min(reps, (size_t)100));
     TEST_CHECK(IncFirst);
     // TEST_CHECK(RandFirst);  // disabled: random value is easily caught
     // TEST_CHECK(DropLast);  // disabled: always caught by size check

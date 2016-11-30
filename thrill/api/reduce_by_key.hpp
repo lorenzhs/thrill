@@ -96,7 +96,7 @@ private:
             return node_->PushItem(item);
         }
 
-        void operator () (const ValueType& item, const TableItem &pair) const {
+        void operator () (const ValueType& item, const TableItem& pair) const {
             checker_.add_post(pair);
             return node_->PushItem(item);
         }

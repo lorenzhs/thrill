@@ -357,7 +357,7 @@ public:
             checkers::ReduceManipulatorConfig<
                 KeyExtractor, KeyEqualFunction,
                 ReduceMakeTableItem<Value, TableItem, VolatileKey> >
-                cfg(this->key_extractor(), this->key_equal_function());
+            cfg(this->key_extractor(), this->key_equal_function());
             std::tie(iter, end) = this->manipulator_(iter, end, cfg);
         }
 

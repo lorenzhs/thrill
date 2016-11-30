@@ -961,7 +961,7 @@ bool CmdlineParser::Process(
                                 os << "-" << arg[offset] << "\" at position "
                                    << offset << " in option sequence \"";
                             }
-                            os << arg <<  "\"." << std::endl << std::endl;
+                            os << arg << "\"." << std::endl << std::endl;
                             PrintUsage(os);
                             return false;
                         }

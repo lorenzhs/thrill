@@ -38,7 +38,7 @@ thread_local int my_rank = -1;
 #define sRLOG sLOGC(my_rank == 0)
 
 auto reduce_by_key_test_factory = [](
-    const auto &manipulator, const auto &config,
+    const auto& manipulator, const auto& config,
     const std::string& manip_name,
     const std::string& config_name,
     size_t reps)
@@ -209,22 +209,23 @@ auto run = [](const auto &manipulator, const std::string& name, size_t reps) {
 };
 
 // yikes, preprocessor
-#define TEST_CHECK(MANIP) if(run_ ## MANIP) \
-    run(checkers::ReduceManipulator ## MANIP(), #MANIP, reps)
-#define TEST_CHECK_I(MANIP, ITS) if(run_ ## MANIP) \
-    run(checkers::ReduceManipulator ## MANIP(), #MANIP, ITS)
+#define TEST_CHECK(MANIP) if (run_ ## MANIP) \
+        run(checkers::ReduceManipulator ## MANIP(), #MANIP, reps)
+#define TEST_CHECK_I(MANIP, ITS) if (run_ ## MANIP) \
+        run(checkers::ReduceManipulator ## MANIP(), #MANIP, ITS)
 // run with template parameter
-#define TEST_CHECK_T(NAME, FULL) if(run_ ## NAME) \
-    run(checkers::ReduceManipulator ## FULL(), #NAME, reps)
+#define TEST_CHECK_T(NAME, FULL) if (run_ ## NAME) \
+        run(checkers::ReduceManipulator ## FULL(), #NAME, reps)
 
 namespace std {
 template <typename T, typename U>
 ostream& operator << (ostream& os, const pair<T, U>& p) {
     return os << '(' << p.first << ',' << p.second << ')';
 }
+
 } // namespace std
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
     thrill::common::CmdlineParser clp;
 
     size_t reps = default_reps;

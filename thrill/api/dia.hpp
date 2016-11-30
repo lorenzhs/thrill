@@ -838,7 +838,7 @@ public:
               typename KeyHashFunction, typename KeyEqualFunction,
               typename CheckingDriver = checkers::Driver<
                   checkers::ReduceCheckerDummy,
-                  checkers::ReduceManipulatorDummy>>
+                  checkers::ReduceManipulatorDummy> >
     auto ReduceByKey(
         const KeyExtractor &key_extractor,
         const ReduceFunction &reduce_function,

@@ -25,6 +25,7 @@ struct ManipulatorBase : public noncopynonmove {
     bool made_changes() const { return made_changes_; }
 
     void reset() { made_changes_ = false; }
+
 protected:
     bool made_changes_ = false;
 };

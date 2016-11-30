@@ -23,7 +23,7 @@ namespace checkers {
 
 template <typename Integral>
 struct checked_plus {
-    Integral operator()(const Integral &i1, const Integral &i2) const {
+    Integral operator () (const Integral& i1, const Integral& i2) const {
         Integral result;
         if (__builtin_add_overflow(i1, i2, &result)) {
             sLOG1 << "Add overflow:" << i1 << "+" << i2 << "!=" << result;
@@ -54,24 +54,6 @@ struct reduce_checkable<common::TupleReduceIndex<Index, Tuple, Op> >
 template <typename ReduceFunction>
 constexpr bool reduce_checkable_v = reduce_checkable<ReduceFunction>::value;
 
-template<typename T, typename = void>
-struct is_iterator
-{
-   static constexpr bool value = false;
-};
-
-template<typename T>
-struct is_iterator<T, typename std::enable_if_t<
-                          !std::is_same<
-                              typename std::iterator_traits<T>::value_type,
-                              void>::value> >
-{
-   static constexpr bool value = true;
-};
-
-template <typename T>
-constexpr bool is_iterator_v = is_iterator<T>::value;
-
 struct noncopynonmove {
     //! default-constructible
     noncopynonmove() = default;
@@ -87,7 +69,7 @@ struct noncopynonmove {
 
 //! Type trait to check whether a type can be printed to an std::ostream
 template <typename T, typename Result = void>
-struct is_printable : std::false_type {};
+struct is_printable : std::false_type { };
 
 template <typename T>
 struct is_printable<T,
@@ -111,7 +93,7 @@ maybe_print(T const& t) {
 }
 
 //! Fallback for non-printable types, prints "✖"
-template<typename T>
+template <typename T>
 typename std::enable_if_t<!is_printable<T>::value, std::string>
 maybe_print(T const&) {
     return "✖";

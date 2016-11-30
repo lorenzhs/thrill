@@ -253,7 +253,6 @@ struct SortManipulatorIncFirst : public ManipulatorBase {
     }
 };
 
-
 //! Reset first element to default-constructed value
 struct SortManipulatorRandFirst : public ManipulatorBase {
     template <typename ValueType>
@@ -266,6 +265,7 @@ struct SortManipulatorRandFirst : public ManipulatorBase {
             made_changes_ = true;
         }
     }
+
 private:
     std::mt19937 rng { std::random_device { } () };
 };

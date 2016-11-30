@@ -38,7 +38,7 @@ struct MinireductionConfig {
 
 template <typename Key>
 using DefaultMinireductionConfig =
-    MinireductionConfig<common::hash_crc32<Key>, 8, 4>;
+          MinireductionConfig<common::hash_crc32<Key>, 8, 4>;
 
 namespace _detail {
 //! Reduce checker minireduction helper
@@ -57,7 +57,7 @@ class ReduceCheckerMinireduction : public noncopynonmove
     static constexpr size_t num_parallel = Config::num_parallel;
 
     //! hash value type
-    using hash_t = decltype(std::declval<hash_fn>() (std::declval<Key>()));
+    using hash_t = decltype(std::declval<hash_fn>()(std::declval<Key>()));
     //! Check that hash function produces enough data
     static_assert(bucket_bits <= 8 * sizeof(hash_t),
                   "hash_fn produces fewer bits than needed to discern buckets");
@@ -197,7 +197,7 @@ class ReduceChecker<Key, Value, ReduceFunction, Config,
 {
     using KeyValuePair = std::pair<Key, Value>;
     using Minireduction = _detail::ReduceCheckerMinireduction<
-        Key, Value, ReduceFunction, Config>;
+              Key, Value, ReduceFunction, Config>;
     static constexpr bool debug = false;
 
 public:
@@ -264,19 +264,19 @@ struct ReduceManipulatorConfig {
     using Value = typename RMTI::Value;
     using TableItem = typename RMTI::TableItem;
 
-    ReduceManipulatorConfig(const KeyEx &key_ex_, const KeyEq &key_eq_)
-        : key_ex(key_ex_), key_eq(key_eq_) {}
+    ReduceManipulatorConfig(const KeyEx& key_ex_, const KeyEq& key_eq_)
+        : key_ex(key_ex_), key_eq(key_eq_) { }
 
     auto GetKey(const TableItem &t) const {
         return RMTI::GetKey(t, key_ex);
     }
 
-    bool IsDefaultKey(const TableItem &t) const {
+    bool IsDefaultKey(const TableItem& t) const {
         return key_eq(GetKey(t), Key());
     }
 
     //! Extract and Equality check in one
-    bool key_exq(const TableItem &v1, const TableItem &v2) const {
+    bool key_exq(const TableItem& v1, const TableItem& v2) const {
         return key_eq(GetKey(v1), GetKey(v2));
     }
 
@@ -304,7 +304,7 @@ struct ReduceManipulatorBase : public ManipulatorBase {
         It next = begin + 1;
         while (next < end && (config.IsDefaultKey(*next) ||
                               config.key_exq(*next, *begin)))
-               ++next;
+            ++next;
         return next;
     }
 
@@ -322,7 +322,7 @@ struct ReduceManipulatorBase : public ManipulatorBase {
         };
 
         for (size_t i = 1; i < n; ++i) {
-            result[i] = result[i-1];
+            result[i] = result[i - 1];
             do {
                 result[i] = skip_to_next_key(result[i], end, config);
             } while (result[i] < end && !is_first_occurrence(i));
@@ -330,7 +330,6 @@ struct ReduceManipulatorBase : public ManipulatorBase {
 
         return result;
     }
-
 
     //! No-op manipulator
     template <typename It, typename Config>
@@ -355,7 +354,8 @@ struct ReduceManipulatorBase : public ManipulatorBase {
 
         if (made_changes()) {
             return ret;
-        } else {
+        }
+        else {
             return std::make_pair(begin, end);
         }
     }
@@ -402,11 +402,10 @@ struct ReduceManipulatorIncFirst
 //! elements and decrements that of next `n`
 template <size_t n = 1>
 struct ReduceManipulatorIncDec
-    : public ReduceManipulatorBase< ReduceManipulatorIncDec<n> >
-{
+    : public ReduceManipulatorBase<ReduceManipulatorIncDec<n> >{
     template <typename It, typename Config>
     std::pair<It, It> manipulate(It begin, It end, Config config) {
-        auto arr = this->get_distinct_keys(begin, end, 2*n, config);
+        auto arr = this->get_distinct_keys(begin, end, 2 * n, config);
 
         if (arr.back() < end) {
             sLOG << "Manipulating" << end - begin
@@ -414,14 +413,13 @@ struct ReduceManipulatorIncDec
                  << "and decrementing second" << n << "of" << maybe_print(arr);
             for (size_t i = 0; i < n; ++i) {
                 arr[i]->second++;
-                arr[n+i]->second--;
+                arr[n + i]->second--;
             }
             this->made_changes_ = true;  // this-> required for unknown reasons
         }
         return std::make_pair(begin, end);
     }
 };
-
 
 //! Increments value of first element
 struct ReduceManipulatorRandFirst
