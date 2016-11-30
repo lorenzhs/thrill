@@ -191,12 +191,12 @@ auto run = [](const auto &manipulator, const std::string& name, size_t reps) {
 };
 
 // yikes, preprocessor
-#define TEST_CHECK(MANIP) \
+#define TEST_CHECK(MANIP) if(run_ ## MANIP) \
     run(checkers::ReduceManipulator ## MANIP(), #MANIP, reps)
-#define TEST_CHECK_I(MANIP, ITS) \
+#define TEST_CHECK_I(MANIP, ITS) if(run_ ## MANIP) \
     run(checkers::ReduceManipulator ## MANIP(), #MANIP, ITS)
 // run with template parameter
-#define TEST_CHECK_T(NAME, FULL) \
+#define TEST_CHECK_T(NAME, FULL) if(run_ ## NAME) \
     run(checkers::ReduceManipulator ## FULL(), #NAME, reps)
 
 namespace std {
@@ -212,16 +212,32 @@ int main(int argc, char **argv) {
     size_t reps = default_reps;
     clp.AddSizeT('n', "iterations", reps, "iterations");
 
+    bool run_unchecked = false, run_Dummy = false, run_RandFirstKey = false,
+        run_SwitchValues = false, run_IncDec1 = false, run_IncDec2 = false,
+        run_IncDec4 = false, run_IncDec8 = false, run_IncFirstKey = false;
+    clp.AddFlag('u', "unchecked", run_unchecked, "run unchecked");
+    clp.AddFlag('d', "Dummy", run_Dummy, "run Dummy manip");
+    clp.AddFlag('r', "RandFirstKey", run_RandFirstKey, "run RandFirstKey manip");
+    clp.AddFlag('s', "SwitchValues", run_SwitchValues, "run SwitchValues manip");
+    clp.AddFlag('1', "IncDec1", run_IncDec1, "run IncDec1 manip");
+    clp.AddFlag('2', "IncDec2", run_IncDec2, "run IncDec2 manip");
+    clp.AddFlag('4', "IncDec4", run_IncDec4, "run IncDec4 manip");
+    clp.AddFlag('8', "IncDec8", run_IncDec8, "run IncDec8 manip");
+    clp.AddFlag('i', "IncFirstKey", run_IncFirstKey, "run IncFirstKey manip");
+
     if (!clp.Process(argc, argv)) return -1;
     clp.PrintResult();
 
-    //api::Run(reduce_by_key_unchecked(reps));
-    //TEST_CHECK_I(Dummy, std::min(reps, (size_t)100));
+#ifdef CHECKERS_FULL
+    if (run_unchecked) api::Run(reduce_by_key_unchecked(reps));
+    TEST_CHECK_I(Dummy, std::min(reps, (size_t)100));
+#endif
     TEST_CHECK(RandFirstKey);
     TEST_CHECK(SwitchValues);
     TEST_CHECK_T(IncDec1, IncDec<1>);
     TEST_CHECK_T(IncDec2, IncDec<2>);
-    TEST_CHECK_T(IncDec3, IncDec<3>);
+    TEST_CHECK_T(IncDec4, IncDec<4>);
+    TEST_CHECK_T(IncDec8, IncDec<8>);
     // TEST_CHECK(DropFirst); // disabled because always detected
     // TEST_CHECK(IncFirst); // disabled because always detected
     // TEST_CHECK(RandFirst); // disabled because always detected
