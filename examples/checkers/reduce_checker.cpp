@@ -15,6 +15,7 @@
 #include <thrill/api/size.hpp>
 #include <thrill/checkers/driver.hpp>
 #include <thrill/checkers/reduce.hpp>
+#include <thrill/common/cmdline_parser.hpp>
 #include <thrill/common/logger.hpp>
 #include <thrill/common/stats_timer.hpp>
 
@@ -147,8 +148,7 @@ template <size_t bucket_bits, size_t num_parallel>
 using TabConfig = checkers::MinireductionConfig<common::hash_tabulated<T>,
                                                 bucket_bits, num_parallel>;
 
-auto run = [](const auto &manipulator, const std::string& name,
-              size_t reps = default_reps) {
+auto run = [](const auto &manipulator, const std::string& name, size_t reps) {
 
     auto& f = reduce_by_key_test_factory;
 
@@ -191,10 +191,13 @@ auto run = [](const auto &manipulator, const std::string& name,
 };
 
 // yikes, preprocessor
-#define TEST_CHECK(MANIP) run(checkers::ReduceManipulator ## MANIP(), #MANIP)
-#define TEST_CHECK_I(MANIP, ITS) run(checkers::ReduceManipulator ## MANIP(), #MANIP, ITS)
+#define TEST_CHECK(MANIP) \
+    run(checkers::ReduceManipulator ## MANIP(), #MANIP, reps)
+#define TEST_CHECK_I(MANIP, ITS) \
+    run(checkers::ReduceManipulator ## MANIP(), #MANIP, ITS)
 // run with template parameter
-#define TEST_CHECK_T(NAME, FULL) run(checkers::ReduceManipulator ## FULL(), #NAME)
+#define TEST_CHECK_T(NAME, FULL) \
+    run(checkers::ReduceManipulator ## FULL(), #NAME, reps)
 
 namespace std {
 template <typename T, typename U>
@@ -203,9 +206,17 @@ ostream& operator << (ostream& os, const pair<T, U>& p) {
 }
 } // namespace std
 
-int main() {
-    //api::Run(reduce_by_key_unchecked(default_reps));
-    //TEST_CHECK_I(Dummy, std::min(default_reps, (size_t)100));
+int main(int argc, char **argv) {
+    thrill::common::CmdlineParser clp;
+
+    size_t reps = default_reps;
+    clp.AddSizeT('n', "iterations", reps, "iterations");
+
+    if (!clp.Process(argc, argv)) return -1;
+    clp.PrintResult();
+
+    //api::Run(reduce_by_key_unchecked(reps));
+    //TEST_CHECK_I(Dummy, std::min(reps, (size_t)100));
     TEST_CHECK(RandFirstKey);
     TEST_CHECK(SwitchValues);
     TEST_CHECK_T(IncDec1, IncDec<1>);

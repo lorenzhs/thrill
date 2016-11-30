@@ -14,6 +14,7 @@
 #include <thrill/api/sort.hpp>
 #include <thrill/checkers/driver.hpp>
 #include <thrill/checkers/sort.hpp>
+#include <thrill/common/cmdline_parser.hpp>
 #include <thrill/common/hash.hpp>
 #include <thrill/common/logger.hpp>
 
@@ -137,8 +138,7 @@ auto sort_unchecked = [](size_t reps = 100) {
 template <size_t bits>
 using Hash = common::masked_hash<int, bits>;
 
-auto run = [](const auto &manipulator, const std::string &name,
-              size_t reps = default_reps) {
+auto run = [](const auto &manipulator, const std::string &name, size_t reps) {
 
 #ifdef CHECKERS_FULL
     //api::Run(sort_random(manipulator, Hash<32>{}, name, "CRC32-32", reps));
@@ -150,15 +150,26 @@ auto run = [](const auto &manipulator, const std::string &name,
 };
 
 // yikes, preprocessor
-#define TEST_CHECK(MANIP) run(checkers::SortManipulator ## MANIP(), #MANIP)
-#define TEST_CHECK_A(MANIP, ...) run(checkers::SortManipulator ## MANIP(), #MANIP, __VA_ARGS__)
+#define TEST_CHECK(MANIP) \
+    run(checkers::SortManipulator ## MANIP(), #MANIP, reps)
+#define TEST_CHECK_A(MANIP, ...) \
+    run(checkers::SortManipulator ## MANIP(), #MANIP, __VA_ARGS__)
 
 // run with template parameter
-#define TEST_CHECK_T(NAME, FULL) run(checkers::SortManipulator ## FULL(), #NAME)
+#define TEST_CHECK_T(NAME, FULL) \
+    run(checkers::SortManipulator ## FULL(), #NAME, reps)
 
-int main() {
-    //api::Run(sort_unchecked(default_reps));
-    //TEST_CHECK_A(Dummy, std::min(default_reps, (size_t)100));
+int main(int argc, char **argv) {
+    thrill::common::CmdlineParser clp;
+
+    size_t reps = default_reps;
+    clp.AddSizeT('n', "iterations", reps, "iterations");
+
+    if (!clp.Process(argc, argv)) return -1;
+    clp.PrintResult();
+
+    //api::Run(sort_unchecked(reps));
+    //TEST_CHECK_A(Dummy, std::min(reps, (size_t)100));
     TEST_CHECK(IncFirst);
     // TEST_CHECK(RandFirst);  // disabled: random value is easily caught
     // TEST_CHECK(DropLast);  // disabled: always caught by size check
