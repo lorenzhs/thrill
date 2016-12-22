@@ -44,6 +44,9 @@ if(MPI_FOUND)
 endif()
 
 add_library(thrill ${THRILL_SRCS})
-target_link_libraries(thrill ${THRILL_DEP_LIBRARIES})
+target_compile_definitions(thrill PUBLIC ${THRILL_DEFINITIONS})
+target_include_directories(thrill PUBLIC ${PROJECT_SOURCE_DIR})
+target_include_directories(thrill PUBLIC ${THRILL_INCLUDE_DIRS})
+target_link_libraries(thrill ${THRILL_LINK_LIBRARIES})
 
 ################################################################################

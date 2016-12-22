@@ -32,8 +32,30 @@ endif()
 option(CHECKERS_FULL
   "Build the full checker matrix" OFF)
 
-option(THRILL_USE_MPI
-  "Use (optional) MPI net backend." OFF)
+################################################################################
+### Options and Switches
+
+# BUILD_SHARED_LIBS is a standard CMake variable, but we declare it here to
+# make it prominent in the GUI.
+option(BUILD_SHARED_LIBS "Build shared libraries (DLLs)." OFF)
+
+option(THRILL_BUILD_EXAMPLES "Build thrill's examples." OFF)
+
+option(THRILL_BUILD_TESTS "Build thrill's tests and benchmarks." OFF)
+
+# THRILL_USE_ZLIB tristate switch
+set(THRILL_USE_ZLIB AUTO CACHE
+  STRING "Use (optional) zlib for transparent .gz compression/decompression.")
+set_property(CACHE THRILL_USE_ZLIB PROPERTY STRINGS AUTO ON OFF)
+
+# THRILL_USE_BZIP2 tristate switch
+set(THRILL_USE_BZIP2 AUTO CACHE
+  STRING "Use (optional) bzip2 for transparent .bz2 compression/decompression.")
+set_property(CACHE THRILL_USE_BZIP2 PROPERTY STRINGS AUTO ON OFF)
+
+# THRILL_USE_MPI tristate switch
+set(THRILL_USE_MPI AUTO CACHE STRING "Use (optional) MPI net backend.")
+set_property(CACHE THRILL_USE_MPI PROPERTY STRINGS AUTO ON OFF)
 
 option(THRILL_USE_TBB
   "Use (optional) Intel TBB library if available." ON)
@@ -59,22 +81,20 @@ option(THRILL_FULL_BUILD
 option(THRILL_TRY_COMPILE_HEADERS
   "Test header files for self-sufficiency: try to compile them." OFF)
 
-if(APPLE OR MSVC)
-  set(THRILL_USE_S3_DEFAULT OFF)
-else()
-  set(THRILL_USE_S3_DEFAULT ON)
-endif()
-
-option(THRILL_USE_S3
-  "Build libs3 as library. Enabled by default if all dependencies are found."
-  ${THRILL_USE_S3_DEFAULT})
+# THRILL_USE_S3 tristate switch
+set(THRILL_USE_S3 AUTO CACHE
+  STRING "Build libs3 as library. Enabled by default if all dependencies are found.")
+set_property(CACHE THRILL_USE_S3 PROPERTY STRINGS AUTO ON OFF)
 
 option(THRILL_USE_HDFS3
   "Download and build with libhdfs3 for hdfs:// support." OFF)
 
-# BUILD_SHARED_LIBS is a standard CMake variable, but we declare it here to
-# make it prominent in the GUI.
-option(BUILD_SHARED_LIBS "Build shared libraries (DLLs)." OFF)
+################################################################################
+
+# variables to collect compile-time definitions, include dirs, and libraries
+set(THRILL_DEFINITIONS "")
+set(THRILL_INCLUDE_DIRS "")
+set(THRILL_LINK_LIBRARIES "")
 
 if(NOT MSVC)
   # enable warnings
@@ -185,14 +205,14 @@ elseif(MSVC)
   # warning C4503: decorated name length exceeded, name was truncated
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4503")
   # disable lots of warnings about "unsecure" C runtime function
-  add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+  list(APPEND THRILL_DEFINITIONS "_CRT_SECURE_NO_WARNINGS")
   # disable "The POSIX name for this item is deprecated. Instead, use the ISO C
   # and C++ conformant name.", Nope. We will not.
-  add_definitions(-D_CRT_NONSTDC_NO_DEPRECATE)
+  list(APPEND THRILL_DEFINITIONS "_CRT_NONSTDC_NO_DEPRECATE")
   # disable lots of warnings about "unsecure" STL functions
-  add_definitions(-D_SCL_SECURE_NO_WARNINGS)
+  list(APPEND THRILL_DEFINITIONS "_SCL_SECURE_NO_WARNINGS")
   # windef.h bizzarly defines min and max as macros, unless this is defined.
-  add_definitions(-DNOMINMAX)
+  list(APPEND THRILL_DEFINITIONS "NOMINMAX")
 endif()
 
 if(THRILL_USE_IWYU)
@@ -330,7 +350,6 @@ if(NOT MSVC)
 endif()
 
 add_subdirectory(extlib/googletest/googletest)
-include_directories(SYSTEM ${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
 
 if(NOT MSVC)
   set(CMAKE_CXX_FLAGS "${GTEST_SAVE_CXX_FLAGS}")
@@ -349,13 +368,14 @@ set(THRILL_VALGRIND_OPTS
 include(CheckFunctionExists)
 check_function_exists(pipe2 THRILL_HAVE_PIPE2)
 if(THRILL_HAVE_PIPE2)
-  add_definitions(-DTHRILL_HAVE_PIPE2=1)
+  list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_PIPE2=1")
 endif()
 
 ###############################################################################
 # add cereal
 
-include_directories(SYSTEM ${CMAKE_CURRENT_SOURCE_DIR}/extlib/cereal/include)
+list(APPEND THRILL_INCLUDE_DIRS
+  "${CMAKE_CURRENT_SOURCE_DIR}/extlib/cereal/include")
 
 ###############################################################################
 # add highwayhash
@@ -368,11 +388,11 @@ include_directories(SYSTEM ${CMAKE_CURRENT_SOURCE_DIR}/extlib/highwayhash)
 # find pthreads
 
 find_package(Threads REQUIRED)
-set(THRILL_DEP_LIBRARIES ${CMAKE_THREAD_LIBS_INIT} ${THRILL_DEP_LIBRARIES})
+list(APPEND THRILL_LINK_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
 
 # use dl (dynamic linker library)
 
-set(THRILL_DEP_LIBRARIES ${THRILL_DEP_LIBRARIES} ${CMAKE_DL_LIBS})
+list(APPEND THRILL_LINK_LIBRARIES ${CMAKE_DL_LIBS})
 
 # try to find jemalloc (optional)
 
@@ -383,60 +403,84 @@ if(THRILL_USE_JEMALLOC)
     message(STATUS "jemalloc library found. No problem, it is optional,")
     message(STATUS "but consider installing it for systems with limited memory.")
   else()
-    include_directories(SYSTEM ${JEMALLOC_INCLUDE_DIRS})
-    set(THRILL_DEP_LIBRARIES ${JEMALLOC_LIBRARIES} ${THRILL_DEP_LIBRARIES})
-    add_definitions(-DTHRILL_HAVE_JEMALLOC=1)
+    list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_JEMALLOC=1")
+    list(APPEND THRILL_INCLUDE_DIRS ${JEMALLOC_INCLUDE_DIRS})
+    list(APPEND THRILL_LINK_LIBRARIES ${JEMALLOC_LIBRARIES})
   endif()
 endif()
 
-# use ZLIB for transparent gzip compression/decompression
+# use ZLIB for transparent .gz compression/decompression
 
-find_package(ZLIB)
-if(ZLIB_FOUND)
-  include_directories(SYSTEM ${ZLIB_INCLUDE_DIRS})
-  set(THRILL_DEP_LIBRARIES ${THRILL_DEP_LIBRARIES} ${ZLIB_LIBRARIES})
-  add_definitions(-DTHRILL_HAVE_ZLIB=1)
+if(THRILL_USE_ZLIB STREQUAL "AUTO")
+  find_package(ZLIB)
+  if(ZLIB_FOUND)
+    message("Using zlib for transparent .gz compression/decompression.")
+    set(THRILL_USE_ZLIB ON)
+  else()
+    message("zlib not available (optional).")
+    set(THRILL_USE_ZLIB OFF)
+  endif()
 endif()
 
-# use BZLIB for transparent gzip compression/decompression
+if(THRILL_USE_ZLIB)
+  find_package(ZLIB REQUIRED)
 
-find_package(BZip2)
-if(BZIP2_FOUND)
-  include_directories(SYSTEM ${BZIP2_INCLUDE_DIRS})
-  set(THRILL_DEP_LIBRARIES ${THRILL_DEP_LIBRARIES} ${BZIP2_LIBRARIES})
-  add_definitions(-DTHRILL_HAVE_BZIP2=1)
+  list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_ZLIB=1")
+  list(APPEND THRILL_INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
+  list(APPEND THRILL_LINK_LIBRARIES ${ZLIB_LIBRARIES})
+endif()
+
+# use BZLIB for transparent .bz2 compression/decompression
+
+if(THRILL_USE_BZIP2 STREQUAL "AUTO")
+  find_package(BZip2)
+  if(BZIP2_FOUND)
+    message("Using bzip2 for transparent .bz2 compression/decompression.")
+    set(THRILL_USE_BZIP2 ON)
+  else()
+    message("bzip2 not available (optional).")
+    set(THRILL_USE_BZIP2 OFF)
+  endif()
+endif()
+
+if(THRILL_USE_BZIP2)
+  find_package(BZip2 REQUIRED)
+
+  list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_BZIP2=1")
+  list(APPEND THRILL_INCLUDE_DIRS ${BZIP2_INCLUDE_DIRS})
+  list(APPEND THRILL_LINK_LIBRARIES ${BZIP2_LIBRARIES})
 endif()
 
 # try to find libS3 (optional)
 
-# test for all dependencies of libS3
-find_package(CURL)
-find_package(LibXml2)
-find_package(OpenSSL)
+if(THRILL_USE_S3 STREQUAL "AUTO")
+  # test for all dependencies of libS3
+  find_package(CURL)
+  find_package(LibXml2)
+  find_package(OpenSSL)
 
-# if libS3 is desired check if all dependencies were found
-if(THRILL_USE_S3)
-  if(NOT CURL_FOUND)
-    message(SEND_ERROR "libS3 requires libcurl, which was not found.")
-  endif()
-  if(NOT OPENSSL_FOUND)
-    message(SEND_ERROR "libS3 requires OpenSSL, which was not found.")
-  endif()
-  if(NOT LIBXML2_FOUND)
-    message(SEND_ERROR "libS3 requires libxml2, which was not found.")
+  if(CURL_FOUND AND LIBXML2_FOUND AND OPENSSL_FOUND)
+    message("All libS3 dependencies available.")
+    set(THRILL_USE_S3 ON)
+  else()
+    message("libS3 not built as not all dependencies available.")
+    set(THRILL_USE_S3 OFF)
   endif()
 endif()
 
-# if libS3 dependencies were found, build as external project
-if(THRILL_USE_S3 AND CURL_FOUND AND LIBXML2_FOUND AND OPENSSL_FOUND)
+if(THRILL_USE_S3)
+  find_package(CURL REQUIRED)
+  find_package(LibXml2 REQUIRED)
+  find_package(OpenSSL REQUIRED)
 
   # build libS3 as cmake library
   add_subdirectory(extlib/libs3)
 
   # add libS3 and dependencies to thrill's dependencies
-  set(THRILL_DEP_LIBRARIES ${THRILL_DEP_LIBRARIES} s3)
-  add_definitions(-DTHRILL_HAVE_LIBS3=1)
-  include_directories("extlib/libs3/libs3/inc/")
+  list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_LIBS3=1")
+  list(APPEND THRILL_INCLUDE_DIRS
+    "${CMAKE_CURRENT_SOURCE_DIR}/extlib/libs3/libs3/inc")
+  list(APPEND THRILL_LINK_LIBRARIES s3)
 
   # saved code to detect libs3 on the system. use this once multipart upload is
   # mainstream.
@@ -444,11 +488,11 @@ if(THRILL_USE_S3 AND CURL_FOUND AND LIBXML2_FOUND AND OPENSSL_FOUND)
   # find_package(LibS3)
   # if(NOT LibS3_FOUND)
   #   message(STATUS "libS3 not found. No problem, s3:// will not work.")
-  #   add_definitions(-DTHRILL_HAVE_LIBS3=0)
+  #   list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_LIBS3=0")
   # else()
-  #   include_directories(SYSTEM ${LibS3_INCLUDE_DIRS})
-  #   set(THRILL_DEP_LIBRARIES ${THRILL_DEP_LIBRARIES} ${LibS3_LIBRARIES})
-  #   add_definitions(-DTHRILL_HAVE_LIBS3=1)
+  #   list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_LIBS3=1")
+  #   list(APPEND THRILL_INCLUDE_DIRS ${LibS3_INCLUDE_DIRS})
+  #   list(APPEND THRILL_LINK_LIBRARIES ${LibS3_LIBRARIES})
   # endif()
 endif()
 
@@ -465,13 +509,13 @@ if(THRILL_USE_HDFS3)
 
   ExternalProject_Get_Property(libhdfs3 INSTALL_DIR)
 
-  include_directories(${INSTALL_DIR}/include)
+  list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_LIBHDFS3=1")
+  list(APPEND THRILL_INCLUDE_DIRS "${INSTALL_DIR}/include")
   add_library(hdfs3 UNKNOWN IMPORTED)
   set_target_properties(hdfs3 PROPERTIES
-    IMPORTED_LOCATION ${INSTALL_DIR}/lib/libhdfs3.so)
+    IMPORTED_LOCATION "${INSTALL_DIR}/lib/libhdfs3.so")
   add_dependencies(hdfs3 libhdfs3)
-  set(THRILL_DEP_LIBRARIES ${THRILL_DEP_LIBRARIES} hdfs3)
-  add_definitions(-DTHRILL_HAVE_LIBHDFS3=1)
+  list(APPEND THRILL_LINK_LIBRARIES hdfs3)
 
 endif()
 
@@ -483,30 +527,37 @@ endif()
 
 if(NOT TBB_FOUND)
   message(STATUS "Intel TBB not found. No problem, using slower replacements.")
-  add_definitions(-DTHRILL_HAVE_INTELTBB=0)
+  list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_INTELTBB=0")
 elseif(TBB_INTERFACE_VERSION LESS 8000)
   message(STATUS "Intel TBB ${TBB_INTERFACE_VERSION} is too old. "
     "No problem, using slower replacements.")
-  add_definitions(-DTHRILL_HAVE_INTELTBB=0)
+  list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_INTELTBB=0")
 else(NOT TBB_FOUND)
-  include_directories(SYSTEM ${TBB_INCLUDE_DIRS})
+  list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_INTELTBB=1")
+  list(APPEND THRILL_INCLUDE_DIRS ${TBB_INCLUDE_DIRS})
   link_directories(${TBB_LIBRARY_DIRS})
-  set(THRILL_DEP_LIBRARIES ${TBB_LIBRARIES} ${THRILL_DEP_LIBRARIES})
-  add_definitions(-DTHRILL_HAVE_INTELTBB=1)
+  list(APPEND THRILL_LINK_LIBRARIES ${TBB_LIBRARIES})
 endif()
 
 # use MPI library (optional)
 
-if(THRILL_USE_MPI)
+if(THRILL_USE_MPI STREQUAL "AUTO")
   find_package(MPI)
 
   if(NOT MPI_FOUND)
     message(STATUS "No MPI library found. No problem, it is optional.")
+    set(THRILL_USE_MPI OFF)
   else()
-    include_directories(SYSTEM ${MPI_INCLUDE_PATH})
-    set(THRILL_DEP_LIBRARIES ${MPI_LIBRARIES} ${THRILL_DEP_LIBRARIES})
-    add_definitions(-DTHRILL_HAVE_NET_MPI=1)
+    set(THRILL_USE_MPI ON)
   endif()
+endif()
+
+if(THRILL_USE_MPI)
+  find_package(MPI REQUIRED)
+
+  list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_HAVE_NET_MPI=1")
+  list(APPEND THRILL_INCLUDE_DIRS ${MPI_INCLUDE_PATH})
+  list(APPEND THRILL_LINK_LIBRARIES ${MPI_LIBRARIES})
 endif()
 
 # build Infiniband/MPI net backend (optional)
@@ -520,8 +571,8 @@ endif()
 
 find_package(Boost 1.42.0 COMPONENTS)
 if(Boost_FOUND)
-  include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
-  set(THRILL_DEP_LIBRARIES ${Boost_LIBRARIES} ${THRILL_DEP_LIBRARIES})
+  list(APPEND THRILL_INCLUDE_DIRS ${Boost_INCLUDE_DIRS})
+  list(APPEND THRILL_LINK_LIBRARIES ${Boost_LIBRARIES})
 endif()
 
 ################################################################################
@@ -583,19 +634,21 @@ endmacro(thrill_test_multiple)
 ################################################################################
 ### Descend into Subdirectories
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-
 # descend into library source
 add_subdirectory(thrill)
 
-# descend into testsuite
-add_subdirectory(tests)
+if(THRILL_BUILD_TESTS)
+  # descend into testsuite
+  add_subdirectory(tests)
 
-# descend into benchmarks and examples programs
-add_subdirectory(benchmarks)
+  # descend into benchmarks and examples programs
+  add_subdirectory(benchmarks)
+endif()
 
-# descend into examples source
-add_subdirectory(examples)
+if(THRILL_BUILD_EXAMPLES)
+  # descend into examples source
+  add_subdirectory(examples)
+endif()
 
 # build frontends
 add_subdirectory(frontends)
@@ -613,7 +666,7 @@ if(THRILL_TRY_COMPILE_HEADERS)
   set(CMAKE_REQUIRED_INCLUDES ${CMAKE_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/extlib/cereal/include)
   set(CMAKE_REQUIRED_LIBRARIES
-    ${CMAKE_BINARY_DIR}/thrill/libthrill.a ${THRILL_DEP_LIBRARIES})
+    ${CMAKE_BINARY_DIR}/thrill/libthrill.a ${THRILL_LINK_LIBRARIES})
 
   file(GLOB_RECURSE header_files FOLLOW_SYMLINKS "thrill/*.hpp")
   list(SORT header_files)

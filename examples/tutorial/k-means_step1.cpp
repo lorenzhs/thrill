@@ -19,6 +19,8 @@
 #include <ostream>
 #include <random>
 
+using thrill::DIA;
+
 //! [Point class]
 //! A 2-dimensional point with double precision
 struct Point {
@@ -41,7 +43,7 @@ void Process(thrill::Context& ctx) {
     std::uniform_real_distribution<double> gen(0.0, 1000.0);
 
     // generate 100 random points using uniform distribution
-    auto points =
+    DIA<Point> points =
         Generate(
             ctx, /* size */ 100,
             [&](const size_t& /* index */) {
