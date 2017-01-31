@@ -19,7 +19,6 @@
 #include <thrill/api/equal_to_dia.hpp>
 #include <thrill/api/gather.hpp>
 #include <thrill/api/generate.hpp>
-#include <thrill/api/generate_from_file.hpp>
 #include <thrill/api/max.hpp>
 #include <thrill/api/min.hpp>
 #include <thrill/api/prefixsum.hpp>
@@ -548,38 +547,6 @@ TEST(Operations, PrefixSumFacultyCorrectResults) {
             }
 
             ASSERT_EQ(10u, out_vec.size());
-        };
-
-    api::RunLocalTests(start_func);
-}
-
-TEST(Operations, GenerateAndSumHaveEqualAmount1) {
-
-    std::default_random_engine generator(std::random_device { } ());
-    std::uniform_int_distribution<int> distribution(1000, 10000);
-
-    size_t generate_size = distribution(generator);
-
-    auto start_func =
-        [generate_size](Context& ctx) {
-
-            auto input = GenerateFromFile(
-                ctx,
-                "inputs/test1",
-                [](const std::string& line) {
-                    return std::stoi(line);
-                },
-                generate_size);
-
-            auto ones = input.Map([](int) {
-                                      return 1;
-                                  });
-
-            auto add_function = [](int in1, int in2) {
-                                    return in1 + in2;
-                                };
-
-            ASSERT_EQ((int)generate_size + 42, ones.Sum(add_function, 42));
         };
 
     api::RunLocalTests(start_func);

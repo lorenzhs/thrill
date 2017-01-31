@@ -17,13 +17,13 @@ using namespace thrill;
 
 template <typename T>
 void check_hash(uint32_t reference, const T& val) {
-    common::hash_crc32_fallback<T> h;
+    common::HashCrc32Fallback<T> h;
     uint32_t crc = h(val);
     ASSERT_EQ(reference, crc);
 
 #ifdef THRILL_HAVE_SSE4_2
     // SSE4.2 is enabled, check that one as well
-    common::hash_crc32_intel<T> h2;
+    common::HashCrc32Sse42<T> h2;
     uint32_t crc2 = h2(val);
     ASSERT_EQ(reference, crc2);
 #endif

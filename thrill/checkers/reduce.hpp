@@ -38,7 +38,7 @@ struct MinireductionConfig {
 
 template <typename Key>
 using DefaultMinireductionConfig =
-          MinireductionConfig<common::hash_crc32<Key>, 8, 4>;
+          MinireductionConfig<common::HashCrc32<Key>, 8, 4>;
 
 namespace _detail {
 //! Reduce checker minireduction helper

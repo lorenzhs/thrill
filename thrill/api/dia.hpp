@@ -862,6 +862,8 @@ public:
      * DIA consists of the PostOp of Reduce, as a reduced element can directly
      * be chained to the following LOps.
      *
+     * \param volatile_key_tag tag
+     *
      * \param key_extractor Key extractor function, which maps each element to a
      * key of possibly different type.
      *
@@ -885,7 +887,7 @@ public:
                   checkers::ReduceCheckerDummy,
                   checkers::ReduceManipulatorDummy> >
     auto ReduceByKey(
-        struct VolatileKeyTag const &,
+        struct VolatileKeyTag const & volatile_key_tag,
         const KeyExtractor &key_extractor,
         const ReduceFunction &reduce_function,
         const ReduceConfig& reduce_config = ReduceConfig(),
@@ -905,6 +907,8 @@ public:
      * Reduce links to this newly created DIANode. The stack_ of the returned
      * DIA consists of the PostOp of Reduce, as a reduced element can directly
      * be chained to the following LOps.
+     *
+     * \param volatile_key_tag tag
      *
      * \param key_extractor Key extractor function, which maps each element to a
      * key of possibly different type.
@@ -929,7 +933,7 @@ public:
                   checkers::ReduceCheckerDummy,
                   checkers::ReduceManipulatorDummy> >
     auto ReduceByKey(
-        struct VolatileKeyTag const &,
+        struct VolatileKeyTag const & volatile_key_tag,
         const KeyExtractor &key_extractor,
         const ReduceFunction &reduce_function,
         const ReduceConfig &reduce_config,

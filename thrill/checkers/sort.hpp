@@ -55,7 +55,7 @@ public:
  */
 template <typename ValueType,
           typename CompareFunction,
-          typename Hash = common::hash_crc32<ValueType> >
+          typename Hash = common::HashCrc32<ValueType> >
 class SortChecker : public noncopynonmove
 {
     static const bool debug = false;

@@ -34,7 +34,6 @@ print "#include <$_>\n" foreach sort glob("thrill/api/"."*.hpp");
 #include <thrill/api/function_stack.hpp>
 #include <thrill/api/gather.hpp>
 #include <thrill/api/generate.hpp>
-#include <thrill/api/generate_from_file.hpp>
 #include <thrill/api/group_by_iterator.hpp>
 #include <thrill/api/group_by_key.hpp>
 #include <thrill/api/group_to_index.hpp>
@@ -59,6 +58,7 @@ print "#include <$_>\n" foreach sort glob("thrill/api/"."*.hpp");
 #include <thrill/api/write_lines.hpp>
 #include <thrill/api/write_lines_one.hpp>
 #include <thrill/api/zip.hpp>
+#include <thrill/api/zip_window.hpp>
 #include <thrill/api/zip_with_index.hpp>
 // [[[end]]]
 

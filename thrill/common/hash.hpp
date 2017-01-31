@@ -20,7 +20,7 @@
 #include <string>
 #include <type_traits>
 
-#include "config.hpp"
+#include <thrill/common/config.hpp>
 
 #ifdef THRILL_HAVE_SSE4_2
 #include <smmintrin.h> // crc32 instructions
@@ -35,7 +35,7 @@ namespace common {
  * higher)
  */
 template <typename To, typename From>
-struct alias_cast_t {
+struct alias_cast_helper {
     static_assert(sizeof(To) == sizeof(From),
                   "Cannot cast types of different sizes");
     union {
@@ -46,14 +46,14 @@ struct alias_cast_t {
 
 template <typename To, typename From>
 To& alias_cast(From& raw_data) {
-    alias_cast_t<To, From> ac;
+    alias_cast_helper<To, From> ac;
     ac.in = &raw_data;
     return *ac.out;
 }
 
 template <typename To, typename From>
 const To& alias_cast(const From& raw_data) {
-    alias_cast_t<const To, const From> ac;
+    alias_cast_helper<const To, const From> ac;
     ac.in = &raw_data;
     return *ac.out;
 }
@@ -79,7 +79,7 @@ static inline uint64_t Hash128to64(const uint64_t upper, const uint64_t lower) {
  * This hash gives no guarantees on the cryptographic suitability nor the
  * quality of randomness produced, and the mapping may change in the future.
  */
-static inline uint32_t hash64To32(uint64_t key) {
+static inline uint32_t Hash64to32(uint64_t key) {
     key = (~key) + (key << 18);
     key = key ^ (key >> 31);
     key = key * 21;
@@ -96,14 +96,14 @@ static inline uint32_t hash64To32(uint64_t key) {
  * for heap-allocated types. Some default overrides are provided.
  */
 template <typename T>
-struct hash_helper {
+struct HashDataSwitch {
     static const char * ptr(const T& x)
     { return reinterpret_cast<const char*>(&x); }
     static size_t     size(const T&) { return sizeof(T); }
 };
 
 template <>
-struct hash_helper<std::string>{
+struct HashDataSwitch<std::string>{
     static const char * ptr(const std::string& s) { return s.c_str(); }
     static size_t size(const std::string& s) { return s.length(); }
 };
@@ -112,11 +112,11 @@ struct hash_helper<std::string>{
 /**
  * A CRC32C hasher using SSE4.2 intrinsics.
  *
- * Note that you need to provide specializations of hash_helper if you want to
- * hash types with heap storage.
+ * Note that you need to provide specializations of HashDataSwitch if you want
+ * to hash types with heap storage.
  */
 template <typename ValueType>
-struct hash_crc32_intel {
+struct HashCrc32Sse42 {
     // Hash data with Intel's CRC32C instructions
     // Copyright 2008,2009,2010 Massachusetts Institute of Technology.
     // For constant sizes, this is neatly optimized away at higher optimization
@@ -164,10 +164,9 @@ struct hash_crc32_intel {
         return crc;
     }
 
-    inline uint32_t operator () (const ValueType& val,
-                                 uint32_t crc = 0xffffffff) const {
-        const char* ptr = hash_helper<ValueType>::ptr(val);
-        size_t size = hash_helper<ValueType>::size(val);
+    uint32_t operator () (const ValueType& val, uint32_t crc = 0xffffffff) const {
+        const char* ptr = HashDataSwitch<ValueType>::ptr(val);
+        size_t size = HashDataSwitch<ValueType>::size(val);
         return hash_bytes(ptr, size, crc);
     }
 };
@@ -180,14 +179,14 @@ uint32_t crc32_slicing_by_8(uint32_t crc, const void* data, size_t length);
 /**
  * Fallback CRC32C implementation in software.
  *
- * Note that you need to provide specializations of hash_helper if you want to
+ * Note that you need to provide specializations of HashDataSwitch if you want to
  * hash types with heap storage.
  */
 template <typename ValueType>
-struct hash_crc32_fallback {
+struct HashCrc32Fallback {
     uint32_t operator () (const ValueType& val, uint32_t crc = 0xffffffff) const {
-        const char* ptr = hash_helper<ValueType>::ptr(val);
-        size_t size = hash_helper<ValueType>::size(val);
+        const char* ptr = HashDataSwitch<ValueType>::ptr(val);
+        size_t size = HashDataSwitch<ValueType>::size(val);
         return crc32_slicing_by_8(crc, ptr, size);
     }
 };
@@ -196,10 +195,10 @@ struct hash_crc32_fallback {
 // four to five times faster than the software fallback (less for small sizes).
 #ifdef THRILL_HAVE_SSE4_2
 template <typename T>
-using hash_crc32 = hash_crc32_intel<T>;
+using HashCrc32 = HashCrc32Sse42<T>;
 #else
 template <typename T>
-using hash_crc32 = hash_crc32_fallback<T>;
+using HashCrc32 = HashCrc32Fallback<T>;
 #endif
 
 namespace _detail {
@@ -214,7 +213,6 @@ struct Highway_SSE41 {
 struct Highway_Scalar {
     static uint64_t hash_bytes(const u64(&)[4], const char*, const size_t);
 };
-
 } // namespace _detail
 
 /**
@@ -222,8 +220,8 @@ struct Highway_Scalar {
  *
  * See https://github.com/google/highwayhash
  *
- * Note that you need to provide specializations of hash_helper if you want to
- * hash types with heap storage.
+ * Note that you need to provide specializations of HashDataSwitch if you want
+ * to hash types with heap storage.
  */
 template <typename ValueType>
 struct hash_highway {
@@ -251,8 +249,8 @@ struct hash_highway {
     }
 
     uint64_t operator () (const ValueType& val) const {
-        const char* ptr = hash_helper<ValueType>::ptr(val);
-        size_t size = hash_helper<ValueType>::size(val);
+        const char* ptr = HashDataSwitch<ValueType>::ptr(val);
+        size_t size = HashDataSwitch<ValueType>::size(val);
         return hasher::hash_bytes(key_, ptr, size);
     }
 
@@ -268,10 +266,10 @@ private:
  * and XOR'ing the values in the data[i]-th position of the i-th table, with i
  * ranging from 0 to size - 1.
  */
-namespace _detail {
+
 template <size_t size, typename hash_t = uint32_t,
           typename prng_t = std::mt19937>
-class tabulation_hashing
+class TabulationHashing
 {
 public:
     using hash_type = hash_t;  // make public
@@ -279,7 +277,7 @@ public:
     using Subtable = std::array<hash_type, 256>;
     using Table = std::array<Subtable, size>;
 
-    tabulation_hashing(size_t seed = 0) { init(seed); }
+    TabulationHashing(size_t seed = 0) { init(seed); }
 
     //! (re-)initialize the table by filling it with random values
     void init(const size_t seed) {
@@ -308,14 +306,12 @@ protected:
     Table table;
 };
 
-} // namespace _detail
-
 //! Tabulation hashing
 template <typename T>
-using hash_tabulated = _detail::tabulation_hashing<sizeof(T)>;
+using HashTabulated = TabulationHashing<sizeof(T)>;
 
 template <typename ValueType, size_t bits = 32,
-          typename Hash = hash_crc32<ValueType> >
+          typename Hash = HashCrc32<ValueType> >
 struct masked_hash {
     static constexpr size_t Bits = bits;  // export
     using hash_t = decltype(std::declval<Hash>()(std::declval<ValueType>()));

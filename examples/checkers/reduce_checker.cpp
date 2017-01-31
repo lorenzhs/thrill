@@ -141,11 +141,11 @@ auto reduce_by_key_unchecked = [](size_t reps) {
 using T = size_t;
 
 template <size_t bucket_bits, size_t num_parallel>
-using CRC32Config = checkers::MinireductionConfig<common::hash_crc32<T>,
+using CRC32Config = checkers::MinireductionConfig<common::HashCrc32<T>,
                                                   bucket_bits, num_parallel>;
 
 template <size_t bucket_bits, size_t num_parallel>
-using TabConfig = checkers::MinireductionConfig<common::hash_tabulated<T>,
+using TabConfig = checkers::MinireductionConfig<common::HashTabulated<T>,
                                                 bucket_bits, num_parallel>;
 
 auto run = [](const auto &manipulator, const std::string& name, size_t reps) {

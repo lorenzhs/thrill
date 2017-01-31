@@ -26,7 +26,7 @@
  *  Tables for software CRC generation
  */
 
-#include "hash.hpp"
+#include <thrill/common/hash.hpp>
 
 #if defined(THRILL_HAVE_AVX2)
 #include <highwayhash/highway_tree_hash.h>
