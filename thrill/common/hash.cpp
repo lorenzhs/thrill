@@ -28,38 +28,19 @@
 
 #include <thrill/common/hash.hpp>
 
-#if defined(THRILL_HAVE_AVX2)
-#include <highwayhash/highway_tree_hash.h>
-#elif defined(THRILL_HAVE_SSE4_1)
-#include <highwayhash/sse41_highway_tree_hash.h>
-#else
-#include <highwayhash/scalar_highway_tree_hash.h>
-#endif
+#include <highwayhash/highwayhash_target.h>
+#include <highwayhash/instruction_sets.h>
 
 namespace thrill {
 namespace common {
 
-// Implementation switch for HighwayHash
-namespace _detail {
-using namespace highwayhash;
-#if defined(THRILL_HAVE_AVX2)
-uint64_t Highway_AVX2::hash_bytes(const uint64(&key)[4], const char* bytes,
-                                  const size_t size) {
-    return ComputeHash<HighwayTreeHashState>(key, bytes, size);
+uint64_t highway_hash_bytes(const uint64_t (&key)[4], const char* bytes,
+                             const size_t size) {
+    highwayhash::HHResult64 result;
+    highwayhash::InstructionSets::Run<highwayhash::HighwayHash>(
+        key, bytes, size, &result, /*unused=*/0);
+    return result;
 }
-#elif defined(THRILL_HAVE_SSE4_1)
-uint64_t Highway_SSE41::hash_bytes(const uint64(&key)[4], const char* bytes,
-                                   const size_t size) {
-    return ComputeHash<SSE41HighwayTreeHashState>(key, bytes, size);
-}
-#else
-uint64_t Highway_Scalar::hash_bytes(const uint64(&key)[4], const char* bytes,
-                                    const size_t size) {
-    return ComputeHash<ScalarHighwayTreeHashState>(key, bytes, size);
-}
-#endif
-
-} // namespace _detail
 
 /* Tables generated with code like the following:
 
