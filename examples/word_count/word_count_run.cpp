@@ -12,12 +12,14 @@
 #include <examples/word_count/random_text_writer.hpp>
 #include <examples/word_count/word_count.hpp>
 
+#include <thrill/api/cache.hpp>
 #include <thrill/api/generate.hpp>
 #include <thrill/api/read_lines.hpp>
 #include <thrill/api/size.hpp>
 #include <thrill/api/write_lines.hpp>
 #include <thrill/common/cmdline_parser.hpp>
 #include <thrill/common/logger.hpp>
+#include <thrill/common/stats_timer.hpp>
 #include <thrill/common/string.hpp>
 
 #include <algorithm>
@@ -37,6 +39,8 @@ static void RunWordCount(
     const std::vector<std::string>& input_filelist, const std::string& output) {
     ctx.enable_consume();
 
+    common::StatsTimerStart timer;
+
     auto lines = ReadLines(ctx, input_filelist);
 
     auto word_pairs = WordCount(lines);
@@ -49,7 +53,17 @@ static void RunWordCount(
         .WriteLines(output);
     }
     else {
-        word_pairs.Size();
+        word_pairs.Execute();
+        ctx.net.Barrier();
+        if (ctx.my_rank() == 0) {
+            auto traffic = ctx.net_manager().Traffic();
+            LOG1 << "RESULT"
+                 << " benchmark=wordcount"
+                 << " time=" << timer.Milliseconds()
+                 << " files=" << input_filelist.size()
+                 << " traffic=" << traffic.first + traffic.second
+                 << " machines=" << ctx.num_hosts();
+        }
     }
 }
 
@@ -57,6 +71,8 @@ static void RunHashWordCount(
     api::Context& ctx,
     const std::vector<std::string>& input_filelist, const std::string& output) {
     ctx.enable_consume();
+
+    common::StatsTimerStart timer;
 
     auto lines = ReadLines(ctx, input_filelist);
 
@@ -71,6 +87,16 @@ static void RunHashWordCount(
     }
     else {
         word_pairs.Execute();
+        ctx.net.Barrier();
+        if (ctx.my_rank() == 0) {
+            auto traffic = ctx.net_manager().Traffic();
+            LOG1 << "RESULT"
+                 << " benchmark=wordcount_hash"
+                 << " time=" << timer.Milliseconds()
+                 << " files=" << input_filelist.size()
+                 << " traffic= " << traffic.first + traffic.second
+                 << " machines=" << ctx.num_hosts();
+        }
     }
 }
 
@@ -174,9 +200,9 @@ int main(int argc, char* argv[]) {
             }
             else {
                 if (hash_words)
-                    RunWordCount(ctx, input, output);
-                else
                     RunHashWordCount(ctx, input, output);
+                else
+                    RunWordCount(ctx, input, output);
             }
         });
 }

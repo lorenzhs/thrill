@@ -105,9 +105,9 @@ if(NOT MSVC)
 
   # enable -march=native on Debug and Release builds
   include(CheckCXXCompilerFlag)
-  check_cxx_compiler_flag(-march=native THRILL_HAS_MARCH_NATIVE)
+  check_cxx_compiler_flag("-march=native" THRILL_HAS_MARCH_NATIVE)
   if(THRILL_HAS_MARCH_NATIVE)
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
   endif()
 
   # remove -rdynamic from linker flags (smaller binaries which cannot be loaded
@@ -150,9 +150,7 @@ if(NOT MSVC)
   endif()
   # enable extra warnings on clang
   if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    # Only enable -Wshadow in clang, gcc enables it to folded lambdas as well,
-    # resulting in a lot of false positives
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wdeprecated -Wshadow")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wdeprecated")
     #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wabstract-vbase-init")
   endif()
 

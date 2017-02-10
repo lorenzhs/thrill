@@ -15,6 +15,7 @@
 #define THRILL_CHECKERS_REDUCE_HEADER
 
 #include <thrill/api/context.hpp>
+#include <thrill/checkers/driver.hpp>
 #include <thrill/checkers/functional.hpp>
 #include <thrill/checkers/manipulator.hpp>
 #include <thrill/common/defines.hpp>
@@ -492,6 +493,8 @@ struct ReduceManipulatorSwitchValues
         return std::make_pair(begin, end);
     }
 };
+
+using DummyReduceDriver = Driver<ReduceCheckerDummy, ReduceManipulatorDummy>;
 
 } // namespace checkers
 } // namespace thrill

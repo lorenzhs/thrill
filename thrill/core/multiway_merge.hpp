@@ -15,6 +15,7 @@
 #include <thrill/core/losertree.hpp>
 
 #include <algorithm>
+#include <functional>
 #include <utility>
 #include <vector>
 
@@ -60,6 +61,26 @@ public:
         return (remaining_inputs_ != 0);
     }
 
+    std::pair<ValueType, unsigned> NextWithSource() {
+        // take next smallest element out
+        unsigned top = lt_.min_source();
+        ValueType res = std::move(current_[top].second);
+
+        if (THRILL_LIKELY(readers_[top].HasNext())) {
+            current_[top].first = true;
+            current_[top].second = readers_[top].template Next<ValueType>();
+            lt_.delete_min_insert(&current_[top].second, false);
+        }
+        else {
+            current_[top].first = false;
+            lt_.delete_min_insert(nullptr, true);
+            assert(remaining_inputs_ > 0);
+            --remaining_inputs_;
+        }
+
+        return std::make_pair(res, top);
+    }
+
     ValueType Next() {
 
         // take next smallest element out
@@ -103,15 +124,15 @@ private:
  * \tparam Sentinels The sequences have a sentinel element.
  * \return End iterator of output sequence.
  */
-template <typename ValueType, typename ReaderIterator, typename Comparator>
+template <typename ValueType, typename ReaderIterator,
+          typename Comparator = std::less<ValueType> >
 auto make_multiway_merge_tree(
     ReaderIterator seqs_begin, ReaderIterator seqs_end,
-    const Comparator &comp) {
+    const Comparator& comp = Comparator()) {
 
     assert(seqs_end - seqs_begin >= 1);
-    return MultiwayMergeTree<
-        ValueType, ReaderIterator,
-        Comparator>(seqs_begin, seqs_end, comp);
+    return MultiwayMergeTree<ValueType, ReaderIterator, Comparator>(
+        seqs_begin, seqs_end, comp);
 }
 
 } // namespace core

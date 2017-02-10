@@ -187,8 +187,10 @@ public:
      * fill ratio per partition is reached.
      *
      * \param kv Value to be inserted into the table.
+     *
+     * \return true if a new key was inserted to the table
      */
-    void Insert(const TableItem& kv) {
+    bool Insert(const TableItem& kv) {
 
         while (THRILL_UNLIKELY(mem::memory_exceeded && num_items_ != 0))
             SpillAnyPartition();
@@ -200,6 +202,7 @@ public:
         assert(h.partition_id < num_partitions_);
 
         if (THRILL_UNLIKELY(key_equal_function_(key(kv), Key()))) {
+            bool new_unique = false;
             // handle pairs with sentinel key specially by reducing into last
             // element of items.
             TableItem& sentinel = items_[num_buckets_];
@@ -207,6 +210,7 @@ public:
                 // first occurrence of sentinel key
                 new (&sentinel)TableItem(kv);
                 sentinel_partition_ = h.partition_id;
+                new_unique = true;
             }
             else {
                 sentinel = reduce(sentinel, kv);
@@ -220,7 +224,7 @@ public:
                 SpillPartition(h.partition_id);
             }
 
-            return;
+            return new_unique;
         }
 
         // calculate local index depending on the current subtable's size
@@ -237,7 +241,7 @@ public:
             if (key_equal_function_(key(*iter), key(kv)))
             {
                 *iter = reduce(*iter, kv);
-                return;
+                return false;
             }
 
             ++iter;
@@ -269,6 +273,8 @@ public:
                 << " among " << partition_size_[h.partition_id];
             SpillPartition(h.partition_id);
         }
+
+        return true;
     }
 
     //! Deallocate items and memory
