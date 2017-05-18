@@ -14,9 +14,9 @@
 #include <thrill/api/sort.hpp>
 #include <thrill/checkers/driver.hpp>
 #include <thrill/checkers/sort.hpp>
-#include <thrill/common/cmdline_parser.hpp>
 #include <thrill/common/hash.hpp>
 #include <thrill/common/logger.hpp>
+#include <tlx/cmdline_parser.hpp>
 
 #include <algorithm>
 #include <functional>
@@ -160,23 +160,23 @@ auto run = [](const auto& manipulator, const std::string& name, size_t reps) {
     run(checkers::SortManipulator ## FULL(), #NAME, reps)
 
 int main(int argc, char** argv) {
-    thrill::common::CmdlineParser clp;
+    tlx::CmdlineParser clp;
 
     size_t reps = default_reps;
-    clp.AddSizeT('n', "iterations", reps, "iterations");
+    clp.add_size_t('n', "iterations", reps, "iterations");
 
     bool run_unchecked = false, run_Dummy = false, run_IncFirst = false,
         run_RandFirst = false,  run_ResetToDefault = false,
         run_SetEqual = false;
-    clp.AddFlag('u', "unchecked", run_unchecked, "run unchecked");
-    clp.AddFlag('d', "Dummy", run_Dummy, "run Dummy manip");
-    clp.AddFlag('i', "IncFirst", run_IncFirst, "run IncFirst manip");
-    clp.AddFlag('f', "RandFirst", run_RandFirst, "run RandFirst manip (boring)");
-    clp.AddFlag('r', "ResetToDefault", run_ResetToDefault, "run ResetToDefault manip");
-    clp.AddFlag('s', "SetEqual", run_SetEqual, "run SetEqual manip");
+    clp.add_flag('u', "unchecked", run_unchecked, "run unchecked");
+    clp.add_flag('d', "Dummy", run_Dummy, "run Dummy manip");
+    clp.add_flag('i', "IncFirst", run_IncFirst, "run IncFirst manip");
+    clp.add_flag('f', "RandFirst", run_RandFirst, "run RandFirst manip (boring)");
+    clp.add_flag('r', "ResetToDefault", run_ResetToDefault, "run ResetToDefault manip");
+    clp.add_flag('s', "SetEqual", run_SetEqual, "run SetEqual manip");
 
-    if (!clp.Process(argc, argv)) return -1;
-    clp.PrintResult();
+    if (!clp.process(argc, argv)) return -1;
+    clp.print_result();
 
     if (run_unchecked) api::Run(sort_unchecked(reps));
     TEST_CHECK_A(Dummy, std::min(reps, (size_t)100));

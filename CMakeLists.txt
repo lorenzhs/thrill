@@ -370,8 +370,8 @@ endif()
 ###############################################################################
 # add cereal
 
-list(APPEND THRILL_INCLUDE_DIRS
-  "${CMAKE_CURRENT_SOURCE_DIR}/extlib/cereal/include")
+set(THRILL_INCLUDE_DIRS
+  "${CMAKE_CURRENT_SOURCE_DIR}/extlib/cereal/include" ${THRILL_INCLUDE_DIRS})
 
 ###############################################################################
 # add highwayhash
@@ -386,11 +386,19 @@ list(APPEND THRILL_LINK_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR}/extlib/highwayhash
 # find pthreads
 
 find_package(Threads REQUIRED)
-list(APPEND THRILL_LINK_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
+set(THRILL_LINK_LIBRARIES ${CMAKE_THREAD_LIBS_INIT} ${THRILL_LINK_LIBRARIES})
+if(CMAKE_USE_PTHREADS_INIT)
+  set(THRILL_LINK_LIBRARIES pthread ${THRILL_LINK_LIBRARIES})
+endif()
 
 # use dl (dynamic linker library)
 
-list(APPEND THRILL_LINK_LIBRARIES ${CMAKE_DL_LIBS})
+set(THRILL_LINK_LIBRARIES ${CMAKE_DL_LIBS} ${THRILL_LINK_LIBRARIES})
+
+# use tlx
+
+add_subdirectory(extlib/tlx)
+set(THRILL_LINK_LIBRARIES tlx ${THRILL_LINK_LIBRARIES})
 
 # try to find jemalloc (optional)
 
@@ -402,8 +410,8 @@ if(THRILL_USE_JEMALLOC)
     message(STATUS "but consider installing it for systems with limited memory.")
   else()
     list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_JEMALLOC=1")
-    list(APPEND THRILL_INCLUDE_DIRS ${JEMALLOC_INCLUDE_DIRS})
-    list(APPEND THRILL_LINK_LIBRARIES ${JEMALLOC_LIBRARIES})
+    set(THRILL_INCLUDE_DIRS ${JEMALLOC_INCLUDE_DIRS} ${THRILL_INCLUDE_DIRS})
+    set(THRILL_LINK_LIBRARIES ${JEMALLOC_LIBRARIES} ${THRILL_LINK_LIBRARIES})
   endif()
 endif()
 
@@ -424,8 +432,8 @@ if(THRILL_USE_ZLIB)
   find_package(ZLIB REQUIRED)
 
   list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_ZLIB=1")
-  list(APPEND THRILL_INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
-  list(APPEND THRILL_LINK_LIBRARIES ${ZLIB_LIBRARIES})
+  set(THRILL_INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS} ${THRILL_INCLUDE_DIRS})
+  set(THRILL_LINK_LIBRARIES ${ZLIB_LIBRARIES} ${THRILL_LINK_LIBRARIES})
 endif()
 
 # use BZLIB for transparent .bz2 compression/decompression
@@ -445,8 +453,8 @@ if(THRILL_USE_BZIP2)
   find_package(BZip2 REQUIRED)
 
   list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_BZIP2=1")
-  list(APPEND THRILL_INCLUDE_DIRS ${BZIP2_INCLUDE_DIRS})
-  list(APPEND THRILL_LINK_LIBRARIES ${BZIP2_LIBRARIES})
+  set(THRILL_INCLUDE_DIRS ${BZIP2_INCLUDE_DIRS} ${THRILL_INCLUDE_DIRS})
+  set(THRILL_LINK_LIBRARIES ${BZIP2_LIBRARIES} ${THRILL_LINK_LIBRARIES})
 endif()
 
 # try to find libS3 (optional)
@@ -476,9 +484,9 @@ if(THRILL_USE_S3)
 
   # add libS3 and dependencies to thrill's dependencies
   list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_LIBS3=1")
-  list(APPEND THRILL_INCLUDE_DIRS
-    "${CMAKE_CURRENT_SOURCE_DIR}/extlib/libs3/libs3/inc")
-  list(APPEND THRILL_LINK_LIBRARIES s3)
+  set(THRILL_INCLUDE_DIRS
+    "${CMAKE_CURRENT_SOURCE_DIR}/extlib/libs3/libs3/inc" ${THRILL_INCLUDE_DIRS})
+  set(THRILL_LINK_LIBRARIES s3 ${THRILL_LINK_LIBRARIES})
 
   # saved code to detect libs3 on the system. use this once multipart upload is
   # mainstream.
@@ -489,8 +497,8 @@ if(THRILL_USE_S3)
   #   list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_LIBS3=0")
   # else()
   #   list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_LIBS3=1")
-  #   list(APPEND THRILL_INCLUDE_DIRS ${LibS3_INCLUDE_DIRS})
-  #   list(APPEND THRILL_LINK_LIBRARIES ${LibS3_LIBRARIES})
+  #   set(THRILL_INCLUDE_DIRS ${LibS3_INCLUDE_DIRS} ${THRILL_INCLUDE_DIRS})
+  #   set(THRILL_LINK_LIBRARIES ${LibS3_LIBRARIES} ${THRILL_LINK_LIBRARIES})
   # endif()
 endif()
 
@@ -508,12 +516,12 @@ if(THRILL_USE_HDFS3)
   ExternalProject_Get_Property(libhdfs3 INSTALL_DIR)
 
   list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_LIBHDFS3=1")
-  list(APPEND THRILL_INCLUDE_DIRS "${INSTALL_DIR}/include")
+  set(THRILL_INCLUDE_DIRS "${INSTALL_DIR}/include" ${THRILL_INCLUDE_DIRS})
   add_library(hdfs3 UNKNOWN IMPORTED)
   set_target_properties(hdfs3 PROPERTIES
     IMPORTED_LOCATION "${INSTALL_DIR}/lib/libhdfs3.so")
   add_dependencies(hdfs3 libhdfs3)
-  list(APPEND THRILL_LINK_LIBRARIES hdfs3)
+  set(THRILL_LINK_LIBRARIES hdfs3 ${THRILL_LINK_LIBRARIES})
 
 endif()
 
@@ -532,9 +540,9 @@ elseif(TBB_INTERFACE_VERSION LESS 8000)
   list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_INTELTBB=0")
 else(NOT TBB_FOUND)
   list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_INTELTBB=1")
-  list(APPEND THRILL_INCLUDE_DIRS ${TBB_INCLUDE_DIRS})
+  set(THRILL_INCLUDE_DIRS ${TBB_INCLUDE_DIRS} ${THRILL_INCLUDE_DIRS})
   link_directories(${TBB_LIBRARY_DIRS})
-  list(APPEND THRILL_LINK_LIBRARIES ${TBB_LIBRARIES})
+  set(THRILL_LINK_LIBRARIES ${TBB_LIBRARIES} ${THRILL_LINK_LIBRARIES})
 endif()
 
 # use MPI library (optional)
@@ -553,9 +561,9 @@ endif()
 if(THRILL_USE_MPI)
   find_package(MPI REQUIRED)
 
-  list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_HAVE_NET_MPI=1")
-  list(APPEND THRILL_INCLUDE_DIRS ${MPI_INCLUDE_PATH})
-  list(APPEND THRILL_LINK_LIBRARIES ${MPI_LIBRARIES})
+  list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_NET_MPI=1")
+  set(THRILL_INCLUDE_DIRS ${MPI_INCLUDE_PATH} ${THRILL_INCLUDE_DIRS})
+  set(THRILL_LINK_LIBRARIES ${MPI_LIBRARIES} ${THRILL_LINK_LIBRARIES})
 endif()
 
 # build Infiniband/MPI net backend (optional)
@@ -569,8 +577,8 @@ endif()
 
 find_package(Boost 1.42.0 COMPONENTS)
 if(Boost_FOUND)
-  list(APPEND THRILL_INCLUDE_DIRS ${Boost_INCLUDE_DIRS})
-  list(APPEND THRILL_LINK_LIBRARIES ${Boost_LIBRARIES})
+  set(THRILL_INCLUDE_DIRS ${Boost_INCLUDE_DIRS} ${THRILL_INCLUDE_DIRS})
+  set(THRILL_LINK_LIBRARIES ${Boost_LIBRARIES} ${THRILL_LINK_LIBRARIES})
 endif()
 
 ################################################################################
@@ -659,29 +667,43 @@ add_subdirectory(misc)
 
 if(THRILL_TRY_COMPILE_HEADERS)
 
-  include(CheckCXXSourceCompiles)
-  set(CMAKE_REQUIRED_FLAGS ${CMAKE_CXX_FLAGS})
-  set(CMAKE_REQUIRED_INCLUDES ${CMAKE_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/extlib/cereal/include)
-  set(CMAKE_REQUIRED_LIBRARIES
-    ${CMAKE_BINARY_DIR}/thrill/libthrill.a ${THRILL_LINK_LIBRARIES})
+  file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/try_compile")
 
-  file(GLOB_RECURSE header_files FOLLOW_SYMLINKS "thrill/*.hpp")
-  list(SORT header_files)
+  file(GLOB_RECURSE header_files
+    RELATIVE "${PROJECT_SOURCE_DIR}" FOLLOW_SYMLINKS "thrill/*.hpp")
 
-  foreach(file ${header_files})
-    # replace / to _ to fix warnings
-    string(REPLACE "/" "_" compilename "${file}")
-    string(REPLACE "." "_" compilename "${compilename}")
+  # Define function to FILTER lists
+  function(GetFilteredList resultVar filter)
+    set(result)
+    foreach(ITR ${ARGN})
+      if(NOT (ITR MATCHES ${filter}))
+        list(APPEND result ${ITR})
+      endif()
+    endforeach()
+    set(${resultVar} ${result} PARENT_SCOPE)
+  endfunction()
 
-    check_cxx_source_compiles(
-      "#include \"${file}\"
-      int main() { return 0; }" IsSelfContained${compilename})
+  if(NOT MPI_FOUND)
+    GetFilteredList(header_files "^thrill/net/mpi/" ${header_files})
+  endif()
 
-    if(NOT IsSelfContained${compilename})
-      message(FATAL
-        "Compilation FAILED for ${file}\n\nCompiler output:\n${OUTPUT}")
-    endif()
+  foreach(header_file ${header_files})
+    # replace / and . with _ to get a valid target and file name
+    string(REPLACE "/" "_" compile_name "${header_file}")
+    string(REPLACE "." "_" compile_name "${compile_name}")
+
+    set(target_name "thrill_try_compile_${compile_name}")
+    set(source_name "${PROJECT_BINARY_DIR}/try_compile/${target_name}.cpp")
+
+    file(WRITE ${source_name}
+      "#include <${header_file}>
+       int main() { return 0; }")
+
+    add_executable(${target_name} ${source_name})
+    target_link_libraries(${target_name} thrill)
+    set_property(TARGET ${target_name}
+      PROPERTY RUNTIME_OUTPUT_DIRECTORY "try_compile/")
+
   endforeach()
 
 endif(THRILL_TRY_COMPILE_HEADERS)

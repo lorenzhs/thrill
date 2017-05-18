@@ -20,7 +20,6 @@
 #include <thrill/api/dop_node.hpp>
 #include <thrill/common/functional.hpp>
 #include <thrill/common/logger.hpp>
-#include <thrill/common/meta.hpp>
 #include <thrill/common/porting.hpp>
 #include <thrill/core/reduce_by_index_post_phase.hpp>
 #include <thrill/core/reduce_pre_phase.hpp>
@@ -69,7 +68,7 @@ class ReduceToIndexNode final : public DOpNode<ValueType>
     using Key = typename common::FunctionTraits<KeyExtractor>::result_type;
 
     using TableItem =
-              typename common::If<
+              typename std::conditional<
                   VolatileKey, std::pair<Key, ValueType>, ValueType>::type;
 
     static_assert(std::is_same<Key, size_t>::value,
@@ -309,8 +308,8 @@ template <typename ValueType, typename Stack>
 template <typename KeyExtractor, typename ReduceFunction,
           typename ReduceConfig, typename CheckingDriver>
 auto DIA<ValueType, Stack>::ReduceToIndex(
-    const KeyExtractor &key_extractor,
-    const ReduceFunction &reduce_function,
+    const KeyExtractor& key_extractor,
+    const ReduceFunction& reduce_function,
     size_t size,
     const ValueType &neutral_element,
     const ReduceConfig &reduce_config,
@@ -328,8 +327,8 @@ template <bool VolatileKeyValue,
           typename CheckingDriver>
 auto DIA<ValueType, Stack>::ReduceToIndex(
     const VolatileKeyFlag<VolatileKeyValue>&,
-    const KeyExtractor &key_extractor,
-    const ReduceFunction &reduce_function,
+    const KeyExtractor& key_extractor,
+    const ReduceFunction& reduce_function,
     size_t size,
     const ValueType &neutral_element,
     const ReduceConfig &reduce_config,
@@ -376,7 +375,7 @@ auto DIA<ValueType, Stack>::ReduceToIndex(
               DOpResult, KeyExtractor, ReduceFunction,
               ReduceConfig, CheckingDriver, VolatileKeyValue>;
 
-    auto node = common::MakeCounting<ReduceNode>(
+    auto node = tlx::make_counting<ReduceNode>(
         *this, "ReduceToIndex", key_extractor, reduce_function,
         size, neutral_element, reduce_config, driver);
 

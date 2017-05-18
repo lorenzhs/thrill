@@ -20,6 +20,7 @@
 #include <thrill/common/defines.hpp>
 #include <thrill/common/hash.hpp>
 #include <thrill/common/logger.hpp>
+#include <tlx/define.hpp>
 
 #include <vector>
 
@@ -79,7 +80,7 @@ public:
     }
 
     //! Process an input element (before sorting)
-    THRILL_ATTRIBUTE_ALWAYS_INLINE
+    TLX_ATTRIBUTE_ALWAYS_INLINE
     void add_pre(const ValueType& v) {
         sum_pre += hash(v);
         ++count_pre;
@@ -90,16 +91,16 @@ public:
      *
      * \param v Element to process
      */
-    THRILL_ATTRIBUTE_ALWAYS_INLINE
+    TLX_ATTRIBUTE_ALWAYS_INLINE
     void add_post(const ValueType& v) {
-        if (THRILL_LIKELY(count_post > 0) && cmp(v, last_post)) {
+        if (TLX_LIKELY(count_post > 0) && cmp(v, last_post)) {
             sLOG << "Non-sorted values in output";  // << last_post << v;
             sorted_ = false;
         }
         last_post = v;
 
         // Init "first" (= minimum)
-        if (THRILL_UNLIKELY(count_post == 0)) { first_post = v; }
+        if (TLX_UNLIKELY(count_post == 0)) { first_post = v; }
 
         sum_post += hash(v);
         ++count_post;

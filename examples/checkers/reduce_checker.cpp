@@ -15,9 +15,9 @@
 #include <thrill/api/size.hpp>
 #include <thrill/checkers/driver.hpp>
 #include <thrill/checkers/reduce.hpp>
-#include <thrill/common/cmdline_parser.hpp>
 #include <thrill/common/logger.hpp>
 #include <thrill/common/stats_timer.hpp>
+#include <tlx/cmdline_parser.hpp>
 
 #include <algorithm>
 #include <functional>
@@ -222,26 +222,26 @@ ostream& operator << (ostream& os, const pair<T, U>& p) {
 } // namespace std
 
 int main(int argc, char** argv) {
-    thrill::common::CmdlineParser clp;
+    tlx::CmdlineParser clp;
 
     size_t reps = default_reps;
-    clp.AddSizeT('n', "iterations", reps, "iterations");
+    clp.add_size_t('n', "iterations", reps, "iterations");
 
     bool run_unchecked = false, run_Dummy = false, run_RandFirstKey = false,
         run_SwitchValues = false, run_IncDec1 = false, run_IncDec2 = false,
         run_IncDec4 = false, run_IncDec8 = false, run_IncFirstKey = false;
-    clp.AddFlag('u', "unchecked", run_unchecked, "run unchecked");
-    clp.AddFlag('d', "Dummy", run_Dummy, "run Dummy manip");
-    clp.AddFlag('r', "RandFirstKey", run_RandFirstKey, "run RandFirstKey manip");
-    clp.AddFlag('s', "SwitchValues", run_SwitchValues, "run SwitchValues manip");
-    clp.AddFlag('1', "IncDec1", run_IncDec1, "run IncDec1 manip");
-    clp.AddFlag('2', "IncDec2", run_IncDec2, "run IncDec2 manip");
-    clp.AddFlag('4', "IncDec4", run_IncDec4, "run IncDec4 manip");
-    clp.AddFlag('8', "IncDec8", run_IncDec8, "run IncDec8 manip");
-    clp.AddFlag('i', "IncFirstKey", run_IncFirstKey, "run IncFirstKey manip");
+    clp.add_flag('u', "unchecked", run_unchecked, "run unchecked");
+    clp.add_flag('d', "Dummy", run_Dummy, "run Dummy manip");
+    clp.add_flag('r', "RandFirstKey", run_RandFirstKey, "run RandFirstKey manip");
+    clp.add_flag('s', "SwitchValues", run_SwitchValues, "run SwitchValues manip");
+    clp.add_flag('1', "IncDec1", run_IncDec1, "run IncDec1 manip");
+    clp.add_flag('2', "IncDec2", run_IncDec2, "run IncDec2 manip");
+    clp.add_flag('4', "IncDec4", run_IncDec4, "run IncDec4 manip");
+    clp.add_flag('8', "IncDec8", run_IncDec8, "run IncDec8 manip");
+    clp.add_flag('i', "IncFirstKey", run_IncFirstKey, "run IncFirstKey manip");
 
-    if (!clp.Process(argc, argv)) return -1;
-    clp.PrintResult();
+    if (!clp.process(argc, argv)) return -1;
+    clp.print_result();
 
 #ifdef CHECKERS_FULL
     if (run_unchecked) api::Run(reduce_by_key_unchecked(reps));

@@ -15,7 +15,7 @@
 #define THRILL_CHECKERS_MANIPULATOR_HEADER
 
 #include <thrill/checkers/functional.hpp>
-#include <thrill/common/meta.hpp>
+#include <tlx/meta/call_foreach_tuple.hpp>
 
 namespace thrill {
 namespace checkers {
@@ -77,7 +77,7 @@ template <typename Manipulator, typename ... Next>
 struct ManipulatorStackPass<Manipulator, Next ...>{
     template <typename ... Input>
     auto operator () (Input ... input) {
-        return ApplyTuple(next, manip(input ...));
+        return tlx::call_foreach_tuple(next, manip(input ...));
     }
 
     // Input was changes if any manipulator made a change.

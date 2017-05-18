@@ -57,26 +57,6 @@ namespace common {
     };
 
 /******************************************************************************/
-// Tuple Applier: takes a std::tuple<> and applies a variadic template function
-// to it. Hence, this expands the content of the tuple as the arguments.
-// C++17 has this as std::apply
-
-template <typename Functor, typename Tuple, std::size_t ... Is>
-auto ApplyTupleImpl(Functor && f, Tuple && t, common::index_sequence<Is ...>) {
-    return std::forward<Functor>(f)(
-        std::get<Is>(std::forward<Tuple>(t)) ...);
-}
-
-//! Call the functor f with the contents of t as arguments.
-template <typename Functor, typename Tuple>
-auto ApplyTuple(Functor && f, Tuple && t) {
-    using Indices = common::make_index_sequence<
-              std::tuple_size<std::decay_t<Tuple> >::value>;
-    return ApplyTupleImpl(std::forward<Functor>(f), std::forward<Tuple>(t),
-                          Indices());
-}
-
-/******************************************************************************/
 // Meta-template programming if statement.
 
 //! If Flag is true then If<>::type is of type TypeTrue otherwise of If<>::type
