@@ -77,7 +77,7 @@ auto reduce_by_key_test_factory = [](
                     VolatileKeyTag, NoDuplicateDetectionTag, key_extractor, ReduceFn(),
                     api::DefaultReduceConfig(), std::hash<Value>(),
                     std::equal_to<Value>(), driver)
-                .Execute();
+                .Size();
             run_timer.Stop();
 
             // Re-synchronize, then run final checking pass
