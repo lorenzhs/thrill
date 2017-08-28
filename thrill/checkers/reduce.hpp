@@ -24,17 +24,23 @@
 #include <thrill/common/logger.hpp>
 
 #include <array>
+#include <cassert>
 #include <random>
 #include <utility>
 
 namespace thrill {
 namespace checkers {
 
-template <typename hash_fn_, size_t bucket_bits_, size_t num_parallel_>
+template <typename hash_fn_, size_t bucket_bits_, size_t num_parallel_,
+          size_t mod_range = (1ULL << (bucket_bits_ - 1))>
 struct MinireductionConfig {
     using hash_fn = hash_fn_;
     static constexpr size_t bucket_bits = bucket_bits_;
     static constexpr size_t num_parallel = num_parallel_;
+    static constexpr size_t mod_min = mod_range + 1;
+    static constexpr size_t mod_max = 2*mod_range;
+    static_assert(mod_max <= (1ULL << bucket_bits),
+                  "mod_max must fit into bucket_bits bits but doesn't");
 };
 
 template <typename Key>
@@ -56,6 +62,8 @@ class ReduceCheckerMinireduction : public noncopynonmove
     using hash_fn = typename Config::hash_fn;
     static constexpr size_t bucket_bits = Config::bucket_bits;
     static constexpr size_t num_parallel = Config::num_parallel;
+    static constexpr size_t mod_min = Config::mod_min;
+    static constexpr size_t mod_max = Config::mod_max;
 
     //! hash value type
     using hash_t = decltype(std::declval<hash_fn>()(std::declval<Key>()));
@@ -71,18 +79,25 @@ class ReduceCheckerMinireduction : public noncopynonmove
 
     using reduction_t = std::array<Value, num_buckets>;
     using table_t = std::array<reduction_t, num_parallel>;
+    using modulus_t = std::array<Value, num_parallel>;
 
     static constexpr bool debug = false;
     //! Enable extra debug output by setting this to true
     static constexpr bool extra_verbose = false;
 
 public:
-    ReduceCheckerMinireduction() { reset(); }
+    ReduceCheckerMinireduction() { }
 
     //! Reset minireduction to initial state
-    void reset() {
+    void reset(size_t seed) {
+        sLOG0 << "minireduction initialized with" << (const size_t)mod_min
+              << "≤ modulus ≤" << (const size_t)mod_max << "with bucket_bits ="
+              << (const size_t)bucket_bits;
+        std::mt19937 rng(seed);
+        std::uniform_int_distribution<Value> dist(mod_min, mod_max);
         for (size_t i = 0; i < num_parallel; ++i) {
             std::fill(reductions_[i].begin(), reductions_[i].end(), Value { });
+            modulus_[i] = dist(rng);
         }
     }
 
@@ -93,8 +108,8 @@ public:
             const size_t bucket = (h >> (idx * bucket_bits)) & bucket_mask;
             sLOGC(extra_verbose) << key << idx << bucket << "="
                                  << std::hex << bucket << h << std::dec;
-            reductions_[idx][bucket] =
-                reducefn(reductions_[idx][bucket], value);
+            auto new_val = reducefn(reductions_[idx][bucket], value);
+            reductions_[idx][bucket] = new_val % modulus_[idx];
         }
     }
 
@@ -102,18 +117,19 @@ public:
     bool operator == (const ReduceCheckerMinireduction& other) const {
         // check dimensions
         if (num_buckets != other.num_buckets) {
-            sLOG << "bucket number mismatch:" << num_buckets
-                 << other.num_buckets;
+            sLOG << "bucket number mismatch:" << (size_t) num_buckets
+                 << (size_t) other.num_buckets;
             return false;
         }
         if (num_parallel != other.num_parallel) {
-            sLOG << "reduction number mismatch:" << num_parallel
-                 << other.num_parallel;
+            sLOG << "reduction number mismatch:" << (size_t) num_parallel
+                 << (size_t) other.num_parallel;
             return false;
         }
         // check all buckets for equality
         for (size_t i = 0; i < num_parallel; ++i) {
             for (size_t j = 0; j < num_buckets; ++j) {
+                assert(reductions_[i][j] < modulus_[i]);
                 if (reductions_[i][j] != other.reductions_[i][j]) {
                     sLOG << "table entry mismatch at column" << i << "row" << j
                          << "values" << reductions_[i][j] << other.reductions_[i][j]
@@ -126,12 +142,18 @@ public:
     }
 
     void reduce(api::Context& ctx, size_t root = 0) {
-        if (extra_verbose && ctx.net.my_rank() == root) {
+        if (extra_verbose) {
             dump_to_log("Before");
         }
 
         common::ComponentSum<table_t, ReduceFunction> table_reduce(reducefn);
         reductions_ = ctx.net.AllReduce(reductions_, table_reduce);
+        // Apply modulo
+        for (size_t i = 0; i < num_parallel; ++i) {
+            for (size_t j = 0; j < num_buckets; ++j) {
+                reductions_[i][j] %= modulus_[i];
+            }
+        }
 
         if (extra_verbose && ctx.net.my_rank() == root) {
             dump_to_log("Run");
@@ -142,7 +164,7 @@ protected:
     void dump_to_log(const std::string& name = "Run") {
         for (size_t i = 0; i < num_parallel; ++i) {
             std::stringstream s;
-            s << name << " " << i << ": ";
+            s << name << " " << i << ", mod " << modulus_[i] <<": ";
             for (size_t j = 0; j < num_buckets; ++j) {
                 s << reductions_[i][j] << " ";
             }
@@ -151,6 +173,7 @@ protected:
     }
 
     table_t reductions_;
+    modulus_t modulus_;
     hash_fn hash_;
     ReduceFunction reducefn;
 };
@@ -202,7 +225,8 @@ class ReduceChecker<Key, Value, ReduceFunction, Config,
     static constexpr bool debug = false;
 
 public:
-    ReduceChecker() : have_checked(false), cached_result(false) { }
+    ReduceChecker(size_t seed = 0) : rng(seed), have_checked(false),
+                                     cached_result(false) { }
 
     void add_pre(const Key& key, const Value& value) {
         mini_pre.push(key, value);
@@ -219,8 +243,10 @@ public:
     }
 
     void reset() {
-        mini_pre.reset();
-        mini_post.reset();
+        // It's important that we seed both minireductions with the same seed
+        auto seed = rng();
+        mini_pre.reset(seed);
+        mini_post.reset(seed);
         have_checked = false;
         cached_result = false;
     }
@@ -233,6 +259,7 @@ public:
         }
 
         mini_pre.reduce(ctx);
+        if (debug) ctx.net.Barrier(); // for logging
         mini_post.reduce(ctx);
 
         bool result = true; // return true on non-root PEs
@@ -248,6 +275,7 @@ public:
     }
 
 private:
+    std::mt19937 rng;
     Minireduction mini_pre, mini_post;
     bool have_checked, cached_result;
 };

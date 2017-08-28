@@ -138,11 +138,13 @@ using T = size_t;
 
 template <size_t bucket_bits, size_t num_parallel>
 using CRC32Config = checkers::MinireductionConfig<common::HashCrc32<T>,
-                                                  bucket_bits, num_parallel>;
+                                                  bucket_bits, num_parallel,
+                                                  (1 << (bucket_bits - 1))>;
 
 template <size_t bucket_bits, size_t num_parallel>
 using TabConfig = checkers::MinireductionConfig<common::HashTabulated<T>,
-                                                bucket_bits, num_parallel>;
+                                                bucket_bits, num_parallel,
+                                                (1 << (bucket_bits - 1))>;
 
 auto run = [](const auto &manipulator, const std::string& name, size_t reps) {
 
