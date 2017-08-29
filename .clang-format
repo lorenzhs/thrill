@@ -1,45 +1,36 @@
 AccessModifierOffset: -4
-AlignAfterOpenBracket: Align
+AlignAfterOpenBracket: AlwaysBreak
 AlignConsecutiveDeclarations: false
-AlignEscapedNewlinesLeft: false
-AlignTrailingComments: false
+AlignEscapedNewlinesLeft: true
+AlignTrailingComments: true
 AllowAllParametersOfDeclarationOnNextLine: true
-AllowShortBlocksOnASingleLine: true
-AllowShortFunctionsOnASingleLine: Inline
+AllowShortBlocksOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: true
-AllowShortLoopsOnASingleLine: true
+AllowShortLoopsOnASingleLine: false
 AlwaysBreakBeforeMultilineStrings: false
 AlwaysBreakTemplateDeclarations: true
 BinPackArguments: false
 BinPackParameters: false
-BraceWrapping:
-        AfterClass: true
-        AfterControlStatement: false
-        AfterFunction: false
-        AfterNamespace: false
-        AfterStruct: false
-        BeforeElse: false
-        IndentBraces: false
+BraceWrapping: {AfterClass: true, AfterControlStatement: false, AfterFunction: false,
+  AfterNamespace: false, AfterStruct: false, BeforeElse: true, IndentBraces: false}
 BreakBeforeBinaryOperators: false
 BreakBeforeBraces: Custom
-BreakBeforeTernaryOperators: false
-BreakConstructorInitializersBeforeComma: true
-BreakStringLiterals: true
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializersBeforeComma: false
+BreakStringLiterals: false
 ColumnLimit: 80
 CommentPragmas: ''
 ConstructorInitializerAllOnOneLineOrOnePerLine: true
 ConstructorInitializerIndentWidth: 4
-ContinuationIndentWidth: 0
-Cpp11BracedListStyle: true
-DerivePointerBinding: false
-ForEachMacros: ['LOG', 'LOGC', 'LOG1', 'LOG0', 'sLOG', 'sLOGC', 'sLOG1', 'sLOG0']
+ContinuationIndentWidth: 4
+Cpp11BracedListStyle: false
+DerivePointerBinding: true
+ForEachMacros: []
 IncludeCategories:
-  - Regex:           '^<(cereal|gtest|highwayhash)/)'
-    Priority:        1
-  - Regex:           '^<thrill/'
-    Priority:        2
-  - Regex:           '.\*'
-    Priority:        3
+- {Priority: 1, Regex: ^<(cereal|gtest|highwayhash)/)}
+- {Priority: 2, Regex: ^<thrill/}
+- {Priority: 3, Regex: .\*}
 IndentCaseLabels: false
 IndentFunctionDeclarationAfterType: false
 IndentWidth: 4
@@ -51,15 +42,15 @@ ObjCSpaceBeforeProtocolList: true
 PenaltyBreakBeforeFirstCallParameter: 0
 PenaltyBreakFirstLessLess: 0
 PointerAlignment: Left
-PointerBindsToType: true
-ReflowComments: true
+PointerBindsToType: false
+ReflowComments: false
 SortIncludes: true
-SpaceAfterCStyleCast: true
+SpaceAfterCStyleCast: false
 SpaceAfterTemplateKeyword: true
 SpaceBeforeAssignmentOperators: true
 SpaceBeforeParens: ControlStatements
 SpaceInEmptyParentheses: false
-SpacesBeforeTrailingComments: 2
+SpacesBeforeTrailingComments: 1
 SpacesInAngles: false
 SpacesInCStyleCastParentheses: false
 SpacesInContainerLiterals: false
