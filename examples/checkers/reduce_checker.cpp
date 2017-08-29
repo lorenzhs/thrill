@@ -44,7 +44,8 @@ auto reduce_by_key_test_factory = [](
     size_t reps)
 {
     using Value = uint64_t;
-    using ReduceFn = std::plus<Value>;
+    using ReduceFn = checkers::checked_plus<Value>;
+    //using ReduceFn = std::plus<Value>;
 
     using Config = std::decay_t<decltype(config)>;
     using Checker = checkers::ReduceChecker<Value, Value, ReduceFn, Config>;

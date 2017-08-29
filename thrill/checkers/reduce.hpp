@@ -79,7 +79,6 @@ class ReduceCheckerMinireduction : public noncopynonmove
 
     using reduction_t = std::array<Value, num_buckets>;
     using table_t = std::array<reduction_t, num_parallel>;
-    using modulus_t = std::array<Value, num_parallel>;
 
     static constexpr bool debug = false;
     //! Enable extra debug output by setting this to true
@@ -90,26 +89,54 @@ public:
 
     //! Reset minireduction to initial state
     void reset(size_t seed) {
-        sLOG0 << "minireduction initialized with" << (const size_t)mod_min
-              << "≤ modulus ≤" << (const size_t)mod_max << "with bucket_bits ="
-              << (const size_t)bucket_bits;
+        // randomize the modulus
         std::mt19937 rng(seed);
         std::uniform_int_distribution<Value> dist(mod_min, mod_max);
+        modulus_ = dist(rng);
+        init_reducefn();  // communicate modulus to reduce function if supported
+        sLOG0 << "minireduction initialized with" << (const size_t)mod_min
+              << "≤ modulus (" << modulus_ << ") ≤" << (const size_t)mod_max
+              << "with bucket_bits =" << (const size_t)bucket_bits;
+        // reset table to zero
         for (size_t i = 0; i < num_parallel; ++i) {
             std::fill(reductions_[i].begin(), reductions_[i].end(), Value { });
-            modulus_[i] = dist(rng);
+        }
+    }
+
+    template <typename ReduceFn = ReduceFunction>
+    typename std::enable_if_t<reduce_modulo_builtin_v<ReduceFn>>
+    init_reducefn() {
+        reducefn.modulus = modulus_;
+    }
+
+    template <typename ReduceFn = ReduceFunction>
+    typename std::enable_if_t<!reduce_modulo_builtin_v<ReduceFn>>
+    init_reducefn() { }
+
+    //! Add a single item with Key key and Value value
+    template <typename ReduceFn = ReduceFunction> inline
+    typename std::enable_if_t<reduce_modulo_builtin_v<ReduceFn>>
+    push(const Key& key, const Value& value) {
+        hash_t h = hash_(key);
+        for (size_t idx = 0; idx < num_parallel; ++idx) {
+            const size_t bucket = (h >> (idx * bucket_bits)) & bucket_mask;
+            sLOGC(extra_verbose) << key << idx << bucket << "="
+                                 << std::hex << bucket << h << std::dec;
+            reductions_[idx][bucket] = reducefn(reductions_[idx][bucket], value);
         }
     }
 
     //! Add a single item with Key key and Value value
-    void push(const Key& key, const Value& value) {
+    template <typename ReduceFn = ReduceFunction>
+    typename std::enable_if_t<!reduce_modulo_builtin_v<ReduceFn>>
+    push(const Key& key, const Value& value) {
         hash_t h = hash_(key);
         for (size_t idx = 0; idx < num_parallel; ++idx) {
             const size_t bucket = (h >> (idx * bucket_bits)) & bucket_mask;
             sLOGC(extra_verbose) << key << idx << bucket << "="
                                  << std::hex << bucket << h << std::dec;
             auto new_val = reducefn(reductions_[idx][bucket], value);
-            reductions_[idx][bucket] = new_val % modulus_[idx];
+            reductions_[idx][bucket] = new_val % modulus_;
         }
     }
 
@@ -129,7 +156,7 @@ public:
         // check all buckets for equality
         for (size_t i = 0; i < num_parallel; ++i) {
             for (size_t j = 0; j < num_buckets; ++j) {
-                assert(reductions_[i][j] < modulus_[i]);
+                assert(reductions_[i][j] < modulus_);
                 if (reductions_[i][j] != other.reductions_[i][j]) {
                     sLOG << "table entry mismatch at column" << i << "row" << j
                          << "values" << reductions_[i][j] << other.reductions_[i][j]
@@ -148,10 +175,11 @@ public:
 
         common::ComponentSum<table_t, ReduceFunction> table_reduce(reducefn);
         reductions_ = ctx.net.AllReduce(reductions_, table_reduce);
-        // Apply modulo
+        // Apply modulo (technically, this isn't needed if
+        // reduce_modulo_builtin_v<ReduceFunction> is true)
         for (size_t i = 0; i < num_parallel; ++i) {
             for (size_t j = 0; j < num_buckets; ++j) {
-                reductions_[i][j] %= modulus_[i];
+                reductions_[i][j] %= modulus_;
             }
         }
 
@@ -164,7 +192,7 @@ protected:
     void dump_to_log(const std::string& name = "Run") {
         for (size_t i = 0; i < num_parallel; ++i) {
             std::stringstream s;
-            s << name << " " << i << ", mod " << modulus_[i] <<": ";
+            s << name << " " << i << ", mod " << modulus_ <<": ";
             for (size_t j = 0; j < num_buckets; ++j) {
                 s << reductions_[i][j] << " ";
             }
@@ -173,7 +201,7 @@ protected:
     }
 
     table_t reductions_;
-    modulus_t modulus_;
+    Value modulus_;
     hash_fn hash_;
     ReduceFunction reducefn;
 };

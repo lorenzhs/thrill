@@ -14,6 +14,7 @@
 
 #include <thrill/common/functional.hpp>
 
+#include <limits>
 #include <ostream>
 #include <sstream>
 #include <type_traits>
@@ -23,13 +24,17 @@ namespace checkers {
 
 template <typename Integral>
 struct checked_plus {
-    Integral operator () (const Integral& i1, const Integral& i2) const {
+    static constexpr bool debug = false;
+
+    Integral inline operator () (const Integral& i1, const Integral& i2) const {
         Integral result;
         if (__builtin_add_overflow(i1, i2, &result)) {
-            sLOG1 << "Add overflow:" << i1 << "+" << i2 << "!=" << result;
+            sLOG << "Add overflow:" << i1 << "+" << i2 << "!=" << result;
+            result = (i1 % modulus) + (i2 % modulus);
         }
         return result;
     }
+    Integral modulus = std::numeric_limits<Integral>::max();
 };
 
 /*!
@@ -53,6 +58,28 @@ struct reduce_checkable<common::TupleReduceIndex<Index, Tuple, Op> >
 //! Convenience helper template for reduce_checkable
 template <typename ReduceFunction>
 constexpr bool reduce_checkable_v = reduce_checkable<ReduceFunction>::value;
+
+/*!
+ * Struct that signals whether the ReduceFunction supports builtin modulo
+ */
+template <typename ReduceFunction>
+struct reduce_modulo_builtin : public std::false_type { };
+
+//! Checked addition includes the modulo
+template <typename T>
+struct reduce_modulo_builtin<checked_plus<T> >: public std::true_type { };
+
+//! Operations on a tuple member do iff the operation does
+template <size_t Index, typename Tuple, typename Op>
+struct reduce_modulo_builtin<common::TupleReduceIndex<Index, Tuple, Op> >
+    : public reduce_modulo_builtin<Op>{ };
+
+//! Convenience helper template for reduce_modulo_builtin
+template <typename ReduceFunction>
+constexpr bool reduce_modulo_builtin_v =
+    reduce_modulo_builtin<ReduceFunction>::value;
+
+
 
 struct noncopynonmove {
     //! default-constructible
