@@ -291,7 +291,7 @@ public:
         }
 
         mini_pre.reduce(ctx);
-        if (debug) ctx.net.Barrier();  // for logging
+        if constexpr (debug) ctx.net.Barrier();  // for logging
         mini_post.reduce(ctx);
 
         bool result = true;            // return true on non-root PEs
