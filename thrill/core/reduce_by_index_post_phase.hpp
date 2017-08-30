@@ -130,7 +130,7 @@ public:
 
                 table.FlushPartitionEmit(
                     id, consume, /* grow */ false,
-                    [this, &table, &file_range, &index, writer](
+                    [this, &index, writer](
                         const size_t& /* partition_id */, const TableItem& p) {
                         for ( ; index < key(p); ++index) {
                             TableItem kv = MakeTableItem::Make(

@@ -457,9 +457,7 @@ DIA<Index> PrefixQuadruplingDiscarding(const InputDIA& input_dia, size_t input_s
                                  });
                     }
                     if (index == names_size - 4) {
-                        Index rank1;
-                        Index rank2;
-                        Index rank3;
+                        Index rank1{}, rank2{}, rank3{};
 
                         if (rb[0].status == Status::UNDECIDED) {
                             rank1 = (rb[0].index + Index(next_index) == rb[1].index) ? rb[1].rank : Index(0);

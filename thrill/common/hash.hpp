@@ -137,25 +137,25 @@ struct HashCrc32Sse42 {
         switch (length) {
         case 7:
             crc = _mm_crc32_u8(crc, *p_buf++);
-            __attribute__ ((fallthrough));
+            [[fallthrough]];
         case 6:
             crc = _mm_crc32_u16(crc, *(const uint16_t*)p_buf);
             p_buf += 2;
-            __attribute__ ((fallthrough));
+            [[fallthrough]];
         // case 5 is below: 4 + 1
         case 4:
             crc = _mm_crc32_u32(crc, *(const uint32_t*)p_buf);
             break;
         case 3:
             crc = _mm_crc32_u8(crc, *p_buf++);
-            __attribute__ ((fallthrough));
+            [[fallthrough]];
         case 2:
             crc = _mm_crc32_u16(crc, *(const uint16_t*)p_buf);
             break;
         case 5:
             crc = _mm_crc32_u32(crc, *(const uint32_t*)p_buf);
             p_buf += 4;
-            __attribute__ ((fallthrough));
+            [[fallthrough]];
         case 1:
             crc = _mm_crc32_u8(crc, *p_buf);
             break;

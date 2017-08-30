@@ -65,7 +65,7 @@ auto ConstructRLBWT(const InputDIA& input_dia) {
                              });
     }
 
-    auto rl_bwt = input_dia.template FlatWindow<PairIC>(DisjointTag, 256, [input_size](size_t, const std::vector<ValueType>& v, auto emit) {
+    auto rl_bwt = input_dia.template FlatWindow<PairIC>(DisjointTag, 256, [](size_t, const std::vector<ValueType>& v, auto emit) {
                                                             size_t i = 0;
                                                             size_t run_start = 0;
                                                             while (++i < v.size()) {
