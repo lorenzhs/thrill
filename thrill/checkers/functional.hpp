@@ -26,9 +26,10 @@ template <typename Integral>
 struct checked_plus {
     static constexpr bool debug = false;
 
-    Integral inline operator () (const Integral& i1, const Integral& i2) const {
+    Integral inline __attribute__((always_inline))
+    operator () (const Integral& i1, const Integral& i2) const {
         Integral result;
-        if (__builtin_add_overflow(i1, i2, &result)) {
+        if (TLX_UNLIKELY(__builtin_add_overflow(i1, i2, &result))) {
             sLOG << "Add overflow:" << i1 << "+" << i2 << "!=" << result;
             result = (i1 % modulus) + (i2 % modulus);
         }
