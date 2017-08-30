@@ -311,8 +311,8 @@ auto DIA<ValueType, Stack>::ReduceToIndex(
     const KeyExtractor& key_extractor,
     const ReduceFunction& reduce_function,
     size_t size,
-    const ValueType &neutral_element,
-    const ReduceConfig &reduce_config,
+    const ValueType& neutral_element,
+    const ReduceConfig& reduce_config,
     std::shared_ptr<CheckingDriver> driver) const {
     // forward to main function
     return ReduceToIndex(
@@ -330,8 +330,8 @@ auto DIA<ValueType, Stack>::ReduceToIndex(
     const KeyExtractor& key_extractor,
     const ReduceFunction& reduce_function,
     size_t size,
-    const ValueType &neutral_element,
-    const ReduceConfig &reduce_config,
+    const ValueType& neutral_element,
+    const ReduceConfig& reduce_config,
     std::shared_ptr<CheckingDriver> driver) const {
     assert(IsValid());
 

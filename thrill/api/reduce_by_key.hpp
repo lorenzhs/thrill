@@ -294,9 +294,9 @@ template <typename ValueType, typename Stack>
 template <typename KeyExtractor, typename ReduceFunction,
           typename ReduceConfig, typename CheckingDriver>
 auto DIA<ValueType, Stack>::ReduceByKey(
-    const KeyExtractor &key_extractor,
-    const ReduceFunction &reduce_function,
-    const ReduceConfig &reduce_config,
+    const KeyExtractor& key_extractor,
+    const ReduceFunction& reduce_function,
+    const ReduceConfig& reduce_config,
     std::shared_ptr<CheckingDriver> driver) const {
     // forward to main function
     using Key = typename common::FunctionTraits<KeyExtractor>::result_type;
@@ -311,10 +311,10 @@ template <typename KeyExtractor, typename ReduceFunction,
           typename ReduceConfig, typename KeyHashFunction,
           typename CheckingDriver>
 auto DIA<ValueType, Stack>::ReduceByKey(
-    const KeyExtractor &key_extractor,
-    const ReduceFunction &reduce_function,
-    const ReduceConfig &reduce_config,
-    const KeyHashFunction &key_hash_function,
+    const KeyExtractor& key_extractor,
+    const ReduceFunction& reduce_function,
+    const ReduceConfig& reduce_config,
+    const KeyHashFunction& key_hash_function,
     std::shared_ptr<CheckingDriver> driver) const {
     // forward to main function
     using Key = typename common::FunctionTraits<KeyExtractor>::result_type;
@@ -330,12 +330,12 @@ template <bool VolatileKeyValue,
           typename KeyHashFunction, typename KeyEqualFunction,
           typename CheckingDriver>
 auto DIA<ValueType, Stack>::ReduceByKey(
-    const VolatileKeyFlag<VolatileKeyValue>&volatile_key_flag,
-    const KeyExtractor &key_extractor,
-    const ReduceFunction &reduce_function,
-    const ReduceConfig &reduce_config,
-    const KeyHashFunction &key_hash_function,
-    const KeyEqualFunction &key_equal_funtion,
+    const VolatileKeyFlag<VolatileKeyValue>& volatile_key_flag,
+    const KeyExtractor& key_extractor,
+    const ReduceFunction& reduce_function,
+    const ReduceConfig& reduce_config,
+    const KeyHashFunction& key_hash_function,
+    const KeyEqualFunction& key_equal_funtion,
     std::shared_ptr<CheckingDriver> driver) const {
     // forward to main function
     return ReduceByKey(
@@ -350,12 +350,12 @@ template <bool DuplicateDetectionValue,
           typename KeyHashFunction, typename KeyEqualFunction,
           typename CheckingDriver>
 auto DIA<ValueType, Stack>::ReduceByKey(
-    const DuplicateDetectionFlag<DuplicateDetectionValue>&duplicate_detection_flag,
-    const KeyExtractor &key_extractor,
-    const ReduceFunction &reduce_function,
-    const ReduceConfig &reduce_config,
-    const KeyHashFunction &key_hash_function,
-    const KeyEqualFunction &key_equal_funtion,
+    const DuplicateDetectionFlag<DuplicateDetectionValue>& duplicate_detection_flag,
+    const KeyExtractor& key_extractor,
+    const ReduceFunction& reduce_function,
+    const ReduceConfig& reduce_config,
+    const KeyHashFunction& key_hash_function,
+    const KeyEqualFunction& key_equal_funtion,
     std::shared_ptr<CheckingDriver> driver) const {
     // forward to main function
     return ReduceByKey(
@@ -373,11 +373,11 @@ template <bool VolatileKeyValue,
 auto DIA<ValueType, Stack>::ReduceByKey(
     const VolatileKeyFlag<VolatileKeyValue>&,
     const DuplicateDetectionFlag<DuplicateDetectionValue>&,
-    const KeyExtractor &key_extractor,
-    const ReduceFunction &reduce_function,
-    const ReduceConfig &reduce_config,
-    const KeyHashFunction &key_hash_function,
-    const KeyEqualFunction &key_equal_funtion,
+    const KeyExtractor& key_extractor,
+    const ReduceFunction& reduce_function,
+    const ReduceConfig& reduce_config,
+    const KeyHashFunction& key_hash_function,
+    const KeyEqualFunction& key_equal_funtion,
     std::shared_ptr<CheckingDriver> driver) const {
     assert(IsValid());
 
@@ -431,8 +431,8 @@ template <typename ValueType, typename Stack>
 template <typename ReduceFunction, typename ReduceConfig,
           typename CheckingDriver>
 auto DIA<ValueType, Stack>::ReducePair(
-    const ReduceFunction &reduce_function,
-    const ReduceConfig &reduce_config,
+    const ReduceFunction& reduce_function,
+    const ReduceConfig& reduce_config,
     std::shared_ptr<CheckingDriver> driver) const {
     // forward to main function
     using Key = typename ValueType::first_type;
@@ -444,9 +444,9 @@ template <typename ValueType, typename Stack>
 template <typename ReduceFunction, typename ReduceConfig,
           typename KeyHashFunction, typename CheckingDriver>
 auto DIA<ValueType, Stack>::ReducePair(
-    const ReduceFunction &reduce_function,
-    const ReduceConfig &reduce_config,
-    const KeyHashFunction &key_hash_function,
+    const ReduceFunction& reduce_function,
+    const ReduceConfig& reduce_config,
+    const KeyHashFunction& key_hash_function,
     std::shared_ptr<CheckingDriver> driver) const {
     // forward to main function
     using Key = typename ValueType::first_type;
@@ -459,10 +459,10 @@ template <typename ReduceFunction, typename ReduceConfig,
           typename KeyHashFunction, typename KeyEqualFunction,
           typename CheckingDriver>
 auto DIA<ValueType, Stack>::ReducePair(
-    const ReduceFunction &reduce_function,
-    const ReduceConfig &reduce_config,
-    const KeyHashFunction &key_hash_function,
-    const KeyEqualFunction &key_equal_funtion,
+    const ReduceFunction& reduce_function,
+    const ReduceConfig& reduce_config,
+    const KeyHashFunction& key_hash_function,
+    const KeyEqualFunction& key_equal_funtion,
     std::shared_ptr<CheckingDriver> driver) const {
     // forward to main function
     return ReducePair(NoDuplicateDetectionTag,
@@ -477,10 +477,10 @@ template <bool DuplicateDetectionValue,
           typename CheckingDriver>
 auto DIA<ValueType, Stack>::ReducePair(
     const DuplicateDetectionFlag<DuplicateDetectionValue>&,
-    const ReduceFunction &reduce_function,
-    const ReduceConfig &reduce_config,
-    const KeyHashFunction &key_hash_function,
-    const KeyEqualFunction &key_equal_funtion,
+    const ReduceFunction& reduce_function,
+    const ReduceConfig& reduce_config,
+    const KeyHashFunction& key_hash_function,
+    const KeyEqualFunction& key_equal_funtion,
     std::shared_ptr<CheckingDriver> driver) const {
     assert(IsValid());
 

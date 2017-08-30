@@ -809,7 +809,7 @@ public:
 
 template <typename ValueType, typename Stack>
 template <typename CompareFunction, typename CheckingDriver>
-auto DIA<ValueType, Stack>::Sort(const CompareFunction &compare_function,
+auto DIA<ValueType, Stack>::Sort(const CompareFunction& compare_function,
                                  std::shared_ptr<CheckingDriver> driver) const {
     assert(IsValid());
 
@@ -842,8 +842,8 @@ auto DIA<ValueType, Stack>::Sort(const CompareFunction &compare_function,
 template <typename ValueType, typename Stack>
 template <typename CompareFunction, typename SortAlgorithm,
           typename CheckingDriver>
-auto DIA<ValueType, Stack>::Sort(const CompareFunction &compare_function,
-                                 const SortAlgorithm &sort_algorithm,
+auto DIA<ValueType, Stack>::Sort(const CompareFunction& compare_function,
+                                 const SortAlgorithm& sort_algorithm,
                                  std::shared_ptr<CheckingDriver> driver) const {
     assert(IsValid());
 

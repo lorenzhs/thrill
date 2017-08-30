@@ -38,7 +38,7 @@ struct MinireductionConfig {
     static constexpr size_t bucket_bits = bucket_bits_;
     static constexpr size_t num_parallel = num_parallel_;
     static constexpr size_t mod_min = mod_range + 1;
-    static constexpr size_t mod_max = 2*mod_range;
+    static constexpr size_t mod_max = 2 * mod_range;
     static_assert(mod_max <= (1ULL << bucket_bits),
                   "mod_max must fit into bucket_bits bits but doesn't");
 };
@@ -104,18 +104,19 @@ public:
     }
 
     template <typename ReduceFn = ReduceFunction>
-    typename std::enable_if_t<reduce_modulo_builtin_v<ReduceFn>>
+    typename std::enable_if_t<reduce_modulo_builtin_v<ReduceFn> >
     init_reducefn() {
         reducefn.modulus = modulus_;
     }
 
     template <typename ReduceFn = ReduceFunction>
-    typename std::enable_if_t<!reduce_modulo_builtin_v<ReduceFn>>
+    typename std::enable_if_t<!reduce_modulo_builtin_v<ReduceFn> >
     init_reducefn() { }
 
     //! Add a single item with Key key and Value value
-    template <typename ReduceFn = ReduceFunction> inline
-    typename std::enable_if_t<reduce_modulo_builtin_v<ReduceFn>>
+    template <typename ReduceFn = ReduceFunction>
+    inline
+    typename std::enable_if_t<reduce_modulo_builtin_v<ReduceFn> >
     push(const Key& key, const Value& value) {
         hash_t h = hash_(key);
         for (size_t idx = 0; idx < num_parallel; ++idx) {
@@ -128,7 +129,7 @@ public:
 
     //! Add a single item with Key key and Value value
     template <typename ReduceFn = ReduceFunction>
-    typename std::enable_if_t<!reduce_modulo_builtin_v<ReduceFn>>
+    typename std::enable_if_t<!reduce_modulo_builtin_v<ReduceFn> >
     push(const Key& key, const Value& value) {
         hash_t h = hash_(key);
         for (size_t idx = 0; idx < num_parallel; ++idx) {
@@ -144,13 +145,13 @@ public:
     bool operator == (const ReduceCheckerMinireduction& other) const {
         // check dimensions
         if (num_buckets != other.num_buckets) {
-            sLOG << "bucket number mismatch:" << (size_t) num_buckets
-                 << (size_t) other.num_buckets;
+            sLOG << "bucket number mismatch:" << (size_t)num_buckets
+                 << (size_t)other.num_buckets;
             return false;
         }
         if (num_parallel != other.num_parallel) {
-            sLOG << "reduction number mismatch:" << (size_t) num_parallel
-                 << (size_t) other.num_parallel;
+            sLOG << "reduction number mismatch:" << (size_t)num_parallel
+                 << (size_t)other.num_parallel;
             return false;
         }
         // check all buckets for equality
@@ -192,7 +193,7 @@ protected:
     void dump_to_log(const std::string& name = "Run") {
         for (size_t i = 0; i < num_parallel; ++i) {
             std::stringstream s;
-            s << name << " " << i << ", mod " << modulus_ <<": ";
+            s << name << " " << i << ", mod " << modulus_ << ": ";
             for (size_t j = 0; j < num_buckets; ++j) {
                 s << reductions_[i][j] << " ";
             }
@@ -287,10 +288,10 @@ public:
         }
 
         mini_pre.reduce(ctx);
-        if (debug) ctx.net.Barrier(); // for logging
+        if (debug) ctx.net.Barrier();  // for logging
         mini_post.reduce(ctx);
 
-        bool result = true; // return true on non-root PEs
+        bool result = true;            // return true on non-root PEs
         if (ctx.my_rank() == 0) {
             result = (mini_pre == mini_post);
         }
@@ -324,7 +325,7 @@ struct ReduceManipulatorConfig {
     ReduceManipulatorConfig(const KeyEx& key_ex_, const KeyEq& key_eq_)
         : key_ex(key_ex_), key_eq(key_eq_) { }
 
-    auto GetKey(const TableItem &t) const {
+    auto GetKey(const TableItem& t) const {
         return RMTI::GetKey(t, key_ex);
     }
 

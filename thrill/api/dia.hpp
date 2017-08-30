@@ -793,8 +793,8 @@ public:
               typename ReduceConfig = class DefaultReduceConfig,
               typename CheckingDriver = checkers::DummyReduceDriver>
     auto ReduceByKey(
-        const KeyExtractor &key_extractor,
-        const ReduceFunction &reduce_function,
+        const KeyExtractor& key_extractor,
+        const ReduceFunction& reduce_function,
         const ReduceConfig& reduce_config = ReduceConfig(),
         std::shared_ptr<CheckingDriver> driver =
             std::make_shared<CheckingDriver>()) const;
@@ -832,10 +832,10 @@ public:
               typename ReduceConfig, typename KeyHashFunction,
               typename CheckingDriver = checkers::DummyReduceDriver>
     auto ReduceByKey(
-        const KeyExtractor &key_extractor,
-        const ReduceFunction &reduce_function,
-        const ReduceConfig &reduce_config,
-        const KeyHashFunction &key_hash_function,
+        const KeyExtractor& key_extractor,
+        const ReduceFunction& reduce_function,
+        const ReduceConfig& reduce_config,
+        const KeyHashFunction& key_hash_function,
         std::shared_ptr<CheckingDriver> driver =
             std::make_shared<CheckingDriver>()) const;
 
@@ -875,11 +875,11 @@ public:
               typename KeyHashFunction, typename KeyEqualFunction,
               typename CheckingDriver = checkers::DummyReduceDriver>
     auto ReduceByKey(
-        const KeyExtractor &key_extractor,
-        const ReduceFunction &reduce_function,
-        const ReduceConfig &reduce_config,
-        const KeyHashFunction &key_hash_function,
-        const KeyEqualFunction &key_equal_function,
+        const KeyExtractor& key_extractor,
+        const ReduceFunction& reduce_function,
+        const ReduceConfig& reduce_config,
+        const KeyHashFunction& key_hash_function,
+        const KeyEqualFunction& key_equal_function,
         std::shared_ptr<CheckingDriver> driver =
             std::make_shared<CheckingDriver>()) const;
 
@@ -1072,7 +1072,7 @@ public:
               typename ReduceConfig = class DefaultReduceConfig,
               typename CheckingDriver = checkers::DummyReduceDriver>
     auto ReducePair(
-        const ReduceFunction &reduce_function,
+        const ReduceFunction& reduce_function,
         const ReduceConfig& reduce_config = ReduceConfig(),
         std::shared_ptr<CheckingDriver> driver =
             std::make_shared<CheckingDriver>()) const;
@@ -1105,9 +1105,9 @@ public:
               typename KeyHashFunction,
               typename CheckingDriver = checkers::DummyReduceDriver>
     auto ReducePair(
-        const ReduceFunction &reduce_function,
-        const ReduceConfig &reduce_config,
-        const KeyHashFunction &key_hash_function,
+        const ReduceFunction& reduce_function,
+        const ReduceConfig& reduce_config,
+        const KeyHashFunction& key_hash_function,
         std::shared_ptr<CheckingDriver> driver =
             std::make_shared<CheckingDriver>()) const;
 
@@ -1141,10 +1141,10 @@ public:
               typename KeyHashFunction, typename KeyEqualFunction,
               typename CheckingDriver = checkers::DummyReduceDriver>
     auto ReducePair(
-        const ReduceFunction &reduce_function,
-        const ReduceConfig &reduce_config,
-        const KeyHashFunction &key_hash_function,
-        const KeyEqualFunction &key_equal_function,
+        const ReduceFunction& reduce_function,
+        const ReduceConfig& reduce_config,
+        const KeyHashFunction& key_hash_function,
+        const KeyEqualFunction& key_equal_function,
         std::shared_ptr<CheckingDriver> driver =
             std::make_shared<CheckingDriver>()) const;
 
@@ -1604,8 +1604,8 @@ public:
               typename CheckingDriver = checkers::Driver<
                   checkers::SortCheckerDummy,
                   checkers::SortManipulatorDummy> >
-    auto Sort(const CompareFunction &compare_function,
-              const SortFunction &sort_algorithm,
+    auto Sort(const CompareFunction& compare_function,
+              const SortFunction& sort_algorithm,
               std::shared_ptr<CheckingDriver> driver =
                   std::make_shared<CheckingDriver>()) const;
 

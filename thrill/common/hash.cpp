@@ -34,11 +34,11 @@
 namespace thrill {
 namespace common {
 
-uint64_t highway_hash_bytes(const uint64_t (&key)[4], const char* bytes,
-                             const size_t size) {
+uint64_t highway_hash_bytes(const uint64_t(&key)[4], const char* bytes,
+                            const size_t size) {
     highwayhash::HHResult64 result;
     highwayhash::InstructionSets::Run<highwayhash::HighwayHash>(
-        key, bytes, size, &result, /*unused=*/0);
+        key, bytes, size, &result, /*unused=*/ 0);
     return result;
 }
 

@@ -28,7 +28,7 @@ class Driver
     static const bool debug = false;
 
 public:
-    template <typename ... Args>
+    template <typename... Args>
     explicit Driver(Args&& ... args)
         : checker_(std::forward<Args>(args) ...) { }
 

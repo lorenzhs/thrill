@@ -224,17 +224,21 @@ public:
 //! is_valid, adapted from boost.hana <boost/hana/type.hpp>.
 //! Checks whether an expression is valid C++. Slightly magic.
 namespace _detail {
-template <typename F, typename ... Args, typename = decltype(
+template <typename F, typename... Args, typename = decltype(
               std::declval<F&&>()(std::declval<Args&&>() ...)
               )>
-constexpr auto is_valid_impl(int) { return std::true_type(); }
+constexpr auto is_valid_impl(int) {
+    return std::true_type();
+}
 
-template <typename F, typename ... Args>
-constexpr auto is_valid_impl(...) { return std::false_type(); }
+template <typename F, typename... Args>
+constexpr auto is_valid_impl(...) {
+    return std::false_type();
+}
 
 template <typename F>
 struct is_valid_fun {
-    template <typename ... Args>
+    template <typename... Args>
     constexpr auto operator () (Args&& ...) const
     { return is_valid_impl < F, Args && ... > (int { }); }
 };
@@ -244,9 +248,9 @@ struct is_valid_fun {
 struct is_valid_t {
     template <typename F>
     constexpr auto operator () (F&&) const
-    { return _detail::is_valid_fun <F&&> {}; }
+    { return _detail::is_valid_fun < F && > { }; }
 
-    template <typename F, typename ... Args>
+    template <typename F, typename... Args>
     constexpr auto operator () (F&&, Args&& ...) const
     { return _detail::is_valid_impl < F &&, Args && ... > (int { }); }
 };

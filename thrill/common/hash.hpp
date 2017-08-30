@@ -206,7 +206,7 @@ using HashCrc32 = HashCrc32Fallback<T>;
 
 // highway hasher
 uint64_t highway_hash_bytes(const uint64_t(&)[4], const char*,
-                                   const size_t);
+                            const size_t);
 /**
  * HighwayHash, a fast strong hash function by Google
  *

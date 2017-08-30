@@ -79,8 +79,6 @@ template <typename ReduceFunction>
 constexpr bool reduce_modulo_builtin_v =
     reduce_modulo_builtin<ReduceFunction>::value;
 
-
-
 struct noncopynonmove {
     //! default-constructible
     noncopynonmove() = default;

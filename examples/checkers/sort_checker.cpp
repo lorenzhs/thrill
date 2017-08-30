@@ -141,18 +141,18 @@ using Hash = common::masked_hash<int, bits>;
 auto run = [](const auto& manipulator, const std::string& name, size_t reps) {
 
 #ifdef CHECKERS_FULL
-    //api::Run(sort_random(manipulator, Hash<32>{}, name, "CRC32-32", reps));
-    api::Run(sort_random(manipulator, Hash<16>{}, name, "CRC32-16", reps));
+    // api::Run(sort_random(manipulator, Hash<32>{}, name, "CRC32-32", reps));
+    api::Run(sort_random(manipulator, Hash<16>{ }, name, "CRC32-16", reps));
 #endif
-    api::Run(sort_random(manipulator, Hash<8>{}, name, "CRC32-8", reps));
-    api::Run(sort_random(manipulator, Hash<4>{}, name, "CRC32-4", reps));
-    api::Run(sort_random(manipulator, Hash<2>{}, name, "CRC32-2", reps));
+    api::Run(sort_random(manipulator, Hash<8>{ }, name, "CRC32-8", reps));
+    api::Run(sort_random(manipulator, Hash<4>{ }, name, "CRC32-4", reps));
+    api::Run(sort_random(manipulator, Hash<2>{ }, name, "CRC32-2", reps));
 };
 
 // yikes, preprocessor
-#define TEST_CHECK(MANIP) if(run_ ## MANIP) \
+#define TEST_CHECK(MANIP) if (run_ ## MANIP) \
         run(checkers::SortManipulator ## MANIP(), #MANIP, reps)
-#define TEST_CHECK_A(MANIP, ...) if(run_ ## MANIP) \
+#define TEST_CHECK_A(MANIP, ...) if (run_ ## MANIP) \
         run(checkers::SortManipulator ## MANIP(), #MANIP, __VA_ARGS__)
 
 // run with template parameter
@@ -166,7 +166,7 @@ int main(int argc, char** argv) {
     clp.add_size_t('n', "iterations", reps, "iterations");
 
     bool run_unchecked = false, run_Dummy = false, run_IncFirst = false,
-        run_RandFirst = false,  run_ResetToDefault = false,
+        run_RandFirst = false, run_ResetToDefault = false,
         run_SetEqual = false;
     clp.add_flag('u', "unchecked", run_unchecked, "run unchecked");
     clp.add_flag('d', "Dummy", run_Dummy, "run Dummy manip");
