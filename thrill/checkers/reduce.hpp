@@ -175,7 +175,10 @@ public:
         }
 
         common::ComponentSum<table_t, ReduceFunction> table_reduce(reducefn);
-        reductions_ = ctx.net.AllReduce(reductions_, table_reduce);
+        reductions_ = ctx.net.Reduce(reductions_, root, table_reduce);
+
+        if (ctx.net.my_rank() != root) return;
+
         // Apply modulo (technically, this isn't needed if
         // reduce_modulo_builtin_v<ReduceFunction> is true)
         for (size_t i = 0; i < num_parallel; ++i) {
@@ -184,7 +187,7 @@ public:
             }
         }
 
-        if (extra_verbose && ctx.net.my_rank() == root) {
+        if (extra_verbose) {
             dump_to_log("Run");
         }
     }
