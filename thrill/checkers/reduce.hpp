@@ -93,7 +93,10 @@ public:
         std::mt19937 rng(seed);
         std::uniform_int_distribution<Value> dist(mod_min, mod_max);
         modulus_ = dist(rng);
-        init_reducefn();  // communicate modulus to reduce function if supported
+        // communicate modulus to reduce function if supported
+        if constexpr (reduce_modulo_builtin_v<ReduceFunction>) {
+            reducefn.modulus = modulus_;
+        }
         sLOG0 << "minireduction initialized with" << (const size_t)mod_min
               << "≤ modulus (" << modulus_ << ") ≤" << (const size_t)mod_max
               << "with bucket_bits =" << (const size_t)bucket_bits;
@@ -103,41 +106,20 @@ public:
         }
     }
 
-    template <typename ReduceFn = ReduceFunction>
-    typename std::enable_if_t<reduce_modulo_builtin_v<ReduceFn> >
-    init_reducefn() {
-        reducefn.modulus = modulus_;
-    }
-
-    template <typename ReduceFn = ReduceFunction>
-    typename std::enable_if_t<!reduce_modulo_builtin_v<ReduceFn> >
-    init_reducefn() { }
-
     //! Add a single item with Key key and Value value
-    template <typename ReduceFn = ReduceFunction>
-    inline
-    typename std::enable_if_t<reduce_modulo_builtin_v<ReduceFn> >
-    push(const Key& key, const Value& value) {
+    inline void push(const Key& key, const Value& value) {
         hash_t h = hash_(key);
         for (size_t idx = 0; idx < num_parallel; ++idx) {
             const size_t bucket = (h >> (idx * bucket_bits)) & bucket_mask;
             sLOGC(extra_verbose) << key << idx << bucket << "="
                                  << std::hex << bucket << h << std::dec;
-            reductions_[idx][bucket] = reducefn(reductions_[idx][bucket], value);
-        }
-    }
-
-    //! Add a single item with Key key and Value value
-    template <typename ReduceFn = ReduceFunction>
-    typename std::enable_if_t<!reduce_modulo_builtin_v<ReduceFn> >
-    push(const Key& key, const Value& value) {
-        hash_t h = hash_(key);
-        for (size_t idx = 0; idx < num_parallel; ++idx) {
-            const size_t bucket = (h >> (idx * bucket_bits)) & bucket_mask;
-            sLOGC(extra_verbose) << key << idx << bucket << "="
-                                 << std::hex << bucket << h << std::dec;
-            auto new_val = reducefn(reductions_[idx][bucket], value);
-            reductions_[idx][bucket] = new_val % modulus_;
+            if constexpr(reduce_modulo_builtin_v<ReduceFunction>) {
+                reductions_[idx][bucket] =
+                    reducefn(reductions_[idx][bucket], value);
+            } else {
+                reductions_[idx][bucket] =
+                    reducefn(reductions_[idx][bucket], value) % modulus_;
+            }
         }
     }
 
@@ -174,20 +156,22 @@ public:
             dump_to_log("Before");
         }
 
-        common::ComponentSum<table_t, ReduceFunction> table_reduce(reducefn);
-        reductions_ = ctx.net.Reduce(reductions_, root, table_reduce);
+        /* TODO: use minimum possible integer type or some transfer encoding */
 
-        if (ctx.net.my_rank() != root) return;
-
-        // Apply modulo (technically, this isn't needed if
-        // reduce_modulo_builtin_v<ReduceFunction> is true)
-        for (size_t i = 0; i < num_parallel; ++i) {
-            for (size_t j = 0; j < num_buckets; ++j) {
-                reductions_[i][j] %= modulus_;
-            }
+        if constexpr(reduce_modulo_builtin_v<ReduceFunction>) {
+            common::ComponentSum<table_t, ReduceFunction>
+                table_reduce(reducefn);
+            reductions_ = ctx.net.Reduce(reductions_, root, table_reduce);
+        } else {
+            auto reducefn_mod = [&](const auto &a, const auto &b) {
+                return reducefn(a, b) % modulus_;
+            };
+            common::ComponentSum<table_t, decltype(reducefn_mod)>
+                table_reduce(reducefn_mod);
+            reductions_ = ctx.net.Reduce(reductions_, root, table_reduce);
         }
 
-        if (extra_verbose) {
+        if (extra_verbose && ctx.net.my_rank() == root) {
             dump_to_log("Run");
         }
     }

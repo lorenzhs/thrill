@@ -106,7 +106,7 @@ auto reduce_by_key_test_factory = [](
 
 auto reduce_by_key_unchecked = [](size_t reps) {
     using Value = size_t;
-    using ReduceFn = std::plus<Value>;
+    using ReduceFn = checkers::checked_plus<Value>;//std::plus<Value>;
 
     return [reps](Context& ctx) {
         std::mt19937 rng(std::random_device { } ());
