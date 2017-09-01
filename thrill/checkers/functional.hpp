@@ -138,6 +138,11 @@ struct select_uint : select_uint_<((tlx::Log2<max>::ceil + 7) >> 3)> {};
 template<unsigned long long max>
 using select_uint_t = typename select_uint<max>::type;
 
+template <typename Integer>
+constexpr bool is_power_of_two(Integer x) {
+    return x && ((x & (x - 1)) == 0);
+}
+
 } // namespace checkers
 } // namespace thrill
 

@@ -22,6 +22,7 @@
 #include <thrill/common/function_traits.hpp>
 #include <thrill/common/hash.hpp>
 #include <thrill/common/logger.hpp>
+#include <tlx/meta/log2.hpp>
 
 #include <array>
 #include <cassert>
@@ -31,13 +32,17 @@
 namespace thrill {
 namespace checkers {
 
-template <typename hash_fn_, size_t log2_buckets_, size_t num_parallel_,
+template <typename hash_fn_, size_t num_buckets_, size_t num_parallel_,
           size_t mod_range = 128 /* XXX TODO */>
 struct MinireductionConfig {
     //! type of hash function to use (e.g. CRC-32C or tabulation hashing)
     using hash_fn = hash_fn_;
-    //! log2(number of buckets). TODO: make this more general
-    static constexpr size_t log2_buckets = log2_buckets_;
+    //! number of buckets
+    static constexpr size_t num_buckets = num_buckets_;
+    //! is the number of buckets a power of two?
+    static constexpr bool pow2_buckets = is_power_of_two(num_buckets_);
+    //! ceil(log2(num_buckets))
+    static constexpr size_t log2_buckets = tlx::Log2<num_buckets_>::ceil;
     //! number of minireduction instances to execute in parallel
     static constexpr size_t num_parallel = num_parallel_;
     //! minimum value for the minireduction's modulus
@@ -64,28 +69,26 @@ class ReduceCheckerMinireduction : public noncopynonmove
 
     // Get stuff from the config
     using hash_fn = typename Config::hash_fn;
-    static constexpr size_t log2_buckets = Config::log2_buckets;
+    //! Number of buckets
+    static constexpr size_t num_buckets = Config::num_buckets;
+    //! Number of parallel instances
     static constexpr size_t num_parallel = Config::num_parallel;
-    static constexpr size_t mod_min = Config::mod_min;
-    static constexpr size_t mod_max = Config::mod_max;
+    //! Mask to cut down hash values to required number of bits
+    static constexpr size_t bucket_mask = (1 << Config::log2_buckets) - 1;
 
     //! hash value type
     using hash_t = decltype(std::declval<hash_fn>()(std::declval<Key>()));
     //! Check that hash function produces enough data
-    static_assert(log2_buckets <= 8 * sizeof(hash_t),
+    static_assert(Config::log2_buckets <= 8 * sizeof(hash_t),
                   "hash_fn produces fewer bits than needed to discern buckets");
-    static_assert(num_parallel * log2_buckets <= 8 * sizeof(hash_t),
+    static_assert(num_parallel * Config::log2_buckets <= 8 * sizeof(hash_t),
                   "hash_fn bits insufficient for requested number of buckets");
-    //! Number of buckets
-    static constexpr size_t num_buckets = 1ULL << log2_buckets;
-    //! Mask to extract a bucket
-    static constexpr size_t bucket_mask = (1ULL << log2_buckets) - 1;
 
     using reduction_t = std::array<Value, num_buckets>;
     using table_t = std::array<reduction_t, num_parallel>;
 
     // select smallest integer type that fits for transmission
-    using transmit_t = select_uint_t<mod_max>;
+    using transmit_t = select_uint_t<Config::mod_max>;
     using transmit_reduction_t = std::array<transmit_t, num_buckets>;
     using transmit_table_t = std::array<transmit_reduction_t, num_parallel>;
 
@@ -100,15 +103,16 @@ public:
     void reset(size_t seed) {
         // randomize the modulus
         std::mt19937 rng(seed);
-        std::uniform_int_distribution<Value> dist(mod_min, mod_max);
+        std::uniform_int_distribution<Value>
+            dist(Config::mod_min, Config::mod_max);
         modulus_ = dist(rng);
         // communicate modulus to reduce function if supported
         if constexpr (reduce_modulo_builtin_v<ReduceFunction>) {
             reducefn.modulus = modulus_;
         }
-        sLOG0 << "minireduction initialized with" << (const size_t)mod_min
-              << "≤ modulus (" << modulus_ << ") ≤" << (const size_t)mod_max
-              << "with log2_buckets =" << (const size_t)log2_buckets;
+        sLOG0 << "minireduction initialized with" << (size_t)Config::mod_min
+              << "≤ modulus (" << modulus_ << ") ≤" << (size_t)Config::mod_max
+              << "with" << (const size_t)num_buckets << "buckets";
         // reset table to zero
         for (size_t i = 0; i < num_parallel; ++i) {
             std::fill(reductions_[i].begin(), reductions_[i].end(), Value { });
@@ -119,7 +123,17 @@ public:
     inline void push(const Key& key, const Value& value) {
         hash_t h = hash_(key);
         for (size_t idx = 0; idx < num_parallel; ++idx) {
-            const size_t bucket = (h >> (idx * log2_buckets)) & bucket_mask;
+            size_t bucket = (h >> (idx * Config::log2_buckets)) & bucket_mask;
+            if constexpr(!Config::pow2_buckets) {
+                // FIXME scale hash value in `bucket` to the correct range.
+                // This is somewhat problematic, as some buckets are more likely
+                // to be hit this way. Fixing it would require more hash bits :(
+                bucket = static_cast<size_t>(
+                    static_cast<double>(bucket * num_buckets) /
+                    static_cast<double>(bucket_mask + 1));
+                assert(0 <= bucket && bucket < num_buckets);
+
+            }
             sLOGC(extra_verbose) << key << idx << bucket << "="
                                  << std::hex << bucket << h << std::dec;
             if constexpr(reduce_modulo_builtin_v<ReduceFunction>) {

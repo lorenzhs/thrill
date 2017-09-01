@@ -36,11 +36,9 @@ int main(int argc, char** argv) {
     size_t reps = default_reps;
     clp.add_size_t('n', "iterations", reps, "iterations");
 
-    bool run_unchecked = false, run_Dummy = false, run_RandFirstKey = false,
-        run_SwitchValues = false, run_IncDec1 = false, run_IncDec2 = false,
-        run_IncDec4 = false, run_IncDec8 = false, run_IncFirstKey = false;
-    clp.add_flag('u', "unchecked", run_unchecked, "run unchecked");
-    clp.add_flag('d', "Dummy", run_Dummy, "run Dummy manip");
+    bool run_RandFirstKey = false, run_SwitchValues = false,
+        run_IncDec1 = false, run_IncDec2 = false, run_IncDec4 = false,
+        run_IncDec8 = false, run_IncFirstKey = false;
     clp.add_flag('r', "RandFirstKey", run_RandFirstKey, "run RandFirstKey manip");
     clp.add_flag('s', "SwitchValues", run_SwitchValues, "run SwitchValues manip");
     clp.add_flag('1', "IncDec1", run_IncDec1, "run IncDec1 manip");
