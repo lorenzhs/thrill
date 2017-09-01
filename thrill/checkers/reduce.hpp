@@ -80,6 +80,11 @@ class ReduceCheckerMinireduction : public noncopynonmove
     using reduction_t = std::array<Value, num_buckets>;
     using table_t = std::array<reduction_t, num_parallel>;
 
+    // select smallest integer type that fits for transmission
+    using transmit_t = select_uint_t<mod_max>;
+    using transmit_reduction_t = std::array<transmit_t, num_buckets>;
+    using transmit_table_t = std::array<transmit_reduction_t, num_parallel>;
+
     static constexpr bool debug = false;
     //! Enable extra debug output by setting this to true
     static constexpr bool extra_verbose = false;
@@ -152,26 +157,46 @@ public:
     }
 
     void reduce(api::Context& ctx, size_t root = 0) {
-        if (extra_verbose) {
+        if (debug) {
             dump_to_log("Before");
         }
 
-        /* TODO: use minimum possible integer type or some transfer encoding */
+        // TODO: pack integers, don't just use smallest type that fits
 
-        if constexpr(reduce_modulo_builtin_v<ReduceFunction>) {
-            common::ComponentSum<table_t, ReduceFunction>
-                table_reduce(reducefn);
-            reductions_ = ctx.net.Reduce(reductions_, root, table_reduce);
-        } else {
-            auto reducefn_mod = [&](const auto &a, const auto &b) {
-                return reducefn(a, b) % modulus_;
-            };
-            common::ComponentSum<table_t, decltype(reducefn_mod)>
-                table_reduce(reducefn_mod);
-            reductions_ = ctx.net.Reduce(reductions_, root, table_reduce);
+        transmit_table_t transmit_table;
+        for (size_t i = 0; i < num_parallel; ++i) {
+            for (size_t j = 0; j < num_buckets; ++j) {
+                // Need to modulo manually, builtin modulo only means that it
+                // does the modulo before the value would overflow!
+                if constexpr(reduce_modulo_builtin_v<ReduceFunction>) {
+                    transmit_table[i][j] =
+                        static_cast<transmit_t>(reductions_[i][j] % modulus_);
+                } else {
+                    transmit_table[i][j] =
+                        static_cast<transmit_t>(reductions_[i][j]);
+                }
+            }
         }
 
-        if (extra_verbose && ctx.net.my_rank() == root) {
+        // Add a modulo to the reduce function
+        auto reducefn_mod = [&](const transmit_t &a, const transmit_t &b) {
+            auto red = reducefn(static_cast<Value>(a), static_cast<Value>(b));
+            return static_cast<transmit_t>(red % modulus_);
+        };
+        common::ComponentSum<transmit_table_t, decltype(reducefn_mod)>
+            table_reduce(reducefn_mod);
+        transmit_table = ctx.net.Reduce(transmit_table, root, table_reduce);
+
+        if (ctx.net.my_rank() != root) return;
+
+        // copy back into reductions_
+        for (size_t i = 0; i < num_parallel; ++i) {
+            for (size_t j = 0; j < num_buckets; ++j) {
+                reductions_[i][j] = static_cast<Value>(transmit_table[i][j]);
+            }
+        }
+
+        if (debug && ctx.net.my_rank() == root) {
             dump_to_log("Run");
         }
     }

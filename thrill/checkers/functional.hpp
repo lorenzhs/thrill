@@ -13,6 +13,7 @@
 #define THRILL_CHECKERS_FUNCTIONAL_HEADER
 
 #include <thrill/common/functional.hpp>
+#include <tlx/meta/log2.hpp>
 
 #include <limits>
 #include <ostream>
@@ -124,6 +125,18 @@ typename std::enable_if_t<!is_printable<T>::value, std::string>
 maybe_print(T const&) {
     return "✖";
 }
+
+template<size_t bytes> struct select_uint_;
+template<> struct select_uint_<1> { using type = uint8_t; };
+template<> struct select_uint_<2> { using type = uint16_t; };
+template<> struct select_uint_<4> { using type = uint32_t; };
+template<> struct select_uint_<8> { using type = uint64_t; };
+
+template<unsigned long long max>
+struct select_uint : select_uint_<((tlx::Log2<max>::ceil + 7) >> 3)> {};
+
+template<unsigned long long max>
+using select_uint_t = typename select_uint<max>::type;
 
 } // namespace checkers
 } // namespace thrill
