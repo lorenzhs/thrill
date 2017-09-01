@@ -34,13 +34,19 @@ namespace checkers {
 template <typename hash_fn_, size_t log2_buckets_, size_t num_parallel_,
           size_t mod_range = 128 /* XXX TODO */>
 struct MinireductionConfig {
+    //! type of hash function to use (e.g. CRC-32C or tabulation hashing)
     using hash_fn = hash_fn_;
+    //! log2(number of buckets). TODO: make this more general
     static constexpr size_t log2_buckets = log2_buckets_;
+    //! number of minireduction instances to execute in parallel
     static constexpr size_t num_parallel = num_parallel_;
+    //! minimum value for the minireduction's modulus
     static constexpr size_t mod_min = mod_range + 1;
+    //! maximum value for the minireduction's modulus
     static constexpr size_t mod_max = 2 * mod_range;
 };
 
+//! A default configuration with 4 instances, 256 buckets and CRC-32C hashing
 template <typename Key>
 using DefaultMinireductionConfig =
           MinireductionConfig<common::HashCrc32<Key>, 8, 4>;
