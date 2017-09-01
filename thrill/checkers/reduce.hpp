@@ -31,16 +31,14 @@
 namespace thrill {
 namespace checkers {
 
-template <typename hash_fn_, size_t bucket_bits_, size_t num_parallel_,
-          size_t mod_range = (1ULL << (bucket_bits_ - 1))>
+template <typename hash_fn_, size_t log2_buckets_, size_t num_parallel_,
+          size_t mod_range = 128 /* XXX TODO */>
 struct MinireductionConfig {
     using hash_fn = hash_fn_;
-    static constexpr size_t bucket_bits = bucket_bits_;
+    static constexpr size_t log2_buckets = log2_buckets_;
     static constexpr size_t num_parallel = num_parallel_;
     static constexpr size_t mod_min = mod_range + 1;
     static constexpr size_t mod_max = 2 * mod_range;
-    static_assert(mod_max <= (1ULL << bucket_bits),
-                  "mod_max must fit into bucket_bits bits but doesn't");
 };
 
 template <typename Key>
@@ -60,7 +58,7 @@ class ReduceCheckerMinireduction : public noncopynonmove
 
     // Get stuff from the config
     using hash_fn = typename Config::hash_fn;
-    static constexpr size_t bucket_bits = Config::bucket_bits;
+    static constexpr size_t log2_buckets = Config::log2_buckets;
     static constexpr size_t num_parallel = Config::num_parallel;
     static constexpr size_t mod_min = Config::mod_min;
     static constexpr size_t mod_max = Config::mod_max;
@@ -68,14 +66,14 @@ class ReduceCheckerMinireduction : public noncopynonmove
     //! hash value type
     using hash_t = decltype(std::declval<hash_fn>()(std::declval<Key>()));
     //! Check that hash function produces enough data
-    static_assert(bucket_bits <= 8 * sizeof(hash_t),
+    static_assert(log2_buckets <= 8 * sizeof(hash_t),
                   "hash_fn produces fewer bits than needed to discern buckets");
-    static_assert(num_parallel * bucket_bits <= 8 * sizeof(hash_t),
+    static_assert(num_parallel * log2_buckets <= 8 * sizeof(hash_t),
                   "hash_fn bits insufficient for requested number of buckets");
     //! Number of buckets
-    static constexpr size_t num_buckets = 1ULL << bucket_bits;
+    static constexpr size_t num_buckets = 1ULL << log2_buckets;
     //! Mask to extract a bucket
-    static constexpr size_t bucket_mask = (1ULL << bucket_bits) - 1;
+    static constexpr size_t bucket_mask = (1ULL << log2_buckets) - 1;
 
     using reduction_t = std::array<Value, num_buckets>;
     using table_t = std::array<reduction_t, num_parallel>;
@@ -104,7 +102,7 @@ public:
         }
         sLOG0 << "minireduction initialized with" << (const size_t)mod_min
               << "≤ modulus (" << modulus_ << ") ≤" << (const size_t)mod_max
-              << "with bucket_bits =" << (const size_t)bucket_bits;
+              << "with log2_buckets =" << (const size_t)log2_buckets;
         // reset table to zero
         for (size_t i = 0; i < num_parallel; ++i) {
             std::fill(reductions_[i].begin(), reductions_[i].end(), Value { });
@@ -115,7 +113,7 @@ public:
     inline void push(const Key& key, const Value& value) {
         hash_t h = hash_(key);
         for (size_t idx = 0; idx < num_parallel; ++idx) {
-            const size_t bucket = (h >> (idx * bucket_bits)) & bucket_mask;
+            const size_t bucket = (h >> (idx * log2_buckets)) & bucket_mask;
             sLOGC(extra_verbose) << key << idx << bucket << "="
                                  << std::hex << bucket << h << std::dec;
             if constexpr(reduce_modulo_builtin_v<ReduceFunction>) {
