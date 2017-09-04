@@ -73,16 +73,26 @@ class ReduceCheckerMinireduction : public noncopynonmove
     static constexpr size_t num_buckets = Config::num_buckets;
     //! Number of parallel instances
     static constexpr size_t num_parallel = Config::num_parallel;
-    //! Mask to cut down hash values to required number of bits
-    static constexpr size_t bucket_mask = (1 << Config::log2_buckets) - 1;
 
     //! hash value type
     using hash_t = decltype(std::declval<hash_fn>()(std::declval<Key>()));
+    //! Number of bits in the hash function's output
+    static constexpr size_t hash_bits = 8 * sizeof(hash_t);
     //! Check that hash function produces enough data
-    static_assert(Config::log2_buckets <= 8 * sizeof(hash_t),
+    static_assert(Config::log2_buckets <= hash_bits,
                   "hash_fn produces fewer bits than needed to discern buckets");
-    static_assert(num_parallel * Config::log2_buckets <= 8 * sizeof(hash_t),
+    static_assert(num_parallel * Config::log2_buckets <= hash_bits,
                   "hash_fn bits insufficient for requested number of buckets");
+
+    //! Hash bits per instance.  If num_buckets is a power of two, simply crop
+    //! out the correct number of bits.  Otherwise, use as many bits as possible
+    //! to maximise uniformity of the scaling bucket assignment
+    static constexpr size_t hash_shift =
+        if_v<Config::pow2_buckets,
+             Config::log2_buckets,
+             (hash_bits / num_parallel)>;
+    //! Mask to cut down hash values to required number of bits
+    static constexpr size_t bucket_mask = (1ULL << hash_shift) - 1;
 
     using reduction_t = std::array<Value, num_buckets>;
     using table_t = std::array<reduction_t, num_parallel>;
@@ -123,16 +133,13 @@ public:
     inline void push(const Key& key, const Value& value) {
         hash_t h = hash_(key);
         for (size_t idx = 0; idx < num_parallel; ++idx) {
-            size_t bucket = (h >> (idx * Config::log2_buckets)) & bucket_mask;
+            size_t bucket = (h >> (idx * hash_shift)) & bucket_mask;
             if constexpr(!Config::pow2_buckets) {
-                // FIXME scale hash value in `bucket` to the correct range.
-                // This is somewhat problematic, as some buckets are more likely
-                // to be hit this way. Fixing it would require more hash bits :(
+                // scale hash value to 0..num_buckets - 1
                 bucket = static_cast<size_t>(
                     static_cast<double>(bucket * num_buckets) /
-                    static_cast<double>(bucket_mask + 1));
+                    static_cast<double>(1ULL << hash_shift));
                 assert(0 <= bucket && bucket < num_buckets);
-
             }
             sLOGC(extra_verbose) << key << idx << bucket << "="
                                  << std::hex << bucket << h << std::dec;

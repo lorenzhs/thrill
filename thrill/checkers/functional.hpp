@@ -143,6 +143,24 @@ constexpr bool is_power_of_two(Integer x) {
     return x && ((x & (x - 1)) == 0);
 }
 
+//! Template if, mainly for static constexpr foo = if_<cond, foo, bar>::value;
+template <bool cond, auto if_true, auto if_false>
+struct if_ {
+    static_assert(std::is_same_v<decltype(if_true), decltype(if_false)>,
+                  "if_true and if_false must be of the same type");
+    static constexpr auto value = if_false;
+};
+
+template <auto if_true, auto if_false>
+struct if_<true, if_true, if_false> {
+    static_assert(std::is_same_v<decltype(if_true), decltype(if_false)>,
+                  "if_true and if_false must be of the same type");
+    static constexpr auto value = if_true;
+};
+
+template <bool cond, auto if_true, auto if_false>
+constexpr auto if_v = if_<cond, if_true, if_false>::value;
+
 } // namespace checkers
 } // namespace thrill
 
