@@ -165,12 +165,13 @@ int main(int argc, char** argv) {
     size_t reps = default_reps;
     clp.add_size_t('n', "iterations", reps, "iterations");
 
-    bool run_unchecked = false, run_Dummy = false, run_IncFirst = false,
-        run_RandFirst = false, run_ResetToDefault = false,
+    bool run_unchecked = false, run_Dummy = false, run_Bitflip = false,
+        run_IncFirst = false, run_RandFirst = false, run_ResetToDefault = false,
         run_SetEqual = false;
     clp.add_flag('u', "unchecked", run_unchecked, "run unchecked");
     clp.add_flag('d', "Dummy", run_Dummy, "run Dummy manip");
     clp.add_flag('i', "IncFirst", run_IncFirst, "run IncFirst manip");
+    clp.add_flag('b', "Bitflip", run_Bitflip, "run Bitflip manip");
     clp.add_flag('f', "RandFirst", run_RandFirst, "run RandFirst manip (boring)");
     clp.add_flag('r', "ResetToDefault", run_ResetToDefault, "run ResetToDefault manip");
     clp.add_flag('s', "SetEqual", run_SetEqual, "run SetEqual manip");
@@ -181,6 +182,7 @@ int main(int argc, char** argv) {
     if (run_unchecked) api::Run(sort_unchecked(reps));
     TEST_CHECK_A(Dummy, std::min(reps, (size_t)100));
     TEST_CHECK(IncFirst);
+    TEST_CHECK(Bitflip);
     TEST_CHECK(RandFirst);  // random value is easily caught
     // TEST_CHECK(DropLast);  // disabled: always caught by size check
     TEST_CHECK(ResetToDefault);

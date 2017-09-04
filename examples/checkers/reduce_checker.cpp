@@ -37,10 +37,11 @@ int main(int argc, char** argv) {
     clp.add_size_t('n', "iterations", reps, "iterations");
 
     bool run_RandFirstKey = false, run_SwitchValues = false,
-        run_IncDec1 = false, run_IncDec2 = false, run_IncDec4 = false,
-        run_IncDec8 = false, run_IncFirstKey = false;
+        run_Bitflip = false, run_IncDec1 = false, run_IncDec2 = false,
+        run_IncDec4 = false, run_IncDec8 = false, run_IncFirstKey = false;
     clp.add_flag('r', "RandFirstKey", run_RandFirstKey, "run RandFirstKey manip");
     clp.add_flag('s', "SwitchValues", run_SwitchValues, "run SwitchValues manip");
+    clp.add_flag('b', "Bitflip", run_Bitflip, "run Bitflip manip");
     clp.add_flag('1', "IncDec1", run_IncDec1, "run IncDec1 manip");
     clp.add_flag('2', "IncDec2", run_IncDec2, "run IncDec2 manip");
     clp.add_flag('4', "IncDec4", run_IncDec4, "run IncDec4 manip");
@@ -52,6 +53,7 @@ int main(int argc, char** argv) {
 
     TEST_CHECK(RandFirstKey);
     TEST_CHECK(SwitchValues);
+    TEST_CHECK(Bitflip);
     TEST_CHECK_T(IncDec1, IncDec<1>);
     TEST_CHECK_T(IncDec2, IncDec<2>);
     TEST_CHECK_T(IncDec4, IncDec<4>);

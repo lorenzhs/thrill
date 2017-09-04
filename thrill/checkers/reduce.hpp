@@ -398,9 +398,26 @@ struct ReduceManipulatorBase : public ManipulatorBase {
 
     //! Skip all items whose key is the default
     template <typename It, typename Config>
-    It skip_empty_key(It begin, It end, Config config) const {
-        while (begin < end && config.IsDefaultKey(*begin)) ++begin;
+    It skip_empty_key(It begin, It end, Config config, int step = 1) const {
+        while (begin != end && config.IsDefaultKey(*begin)) { begin += step; };
         return begin;
+    }
+
+    //! Find an element whose key isn't the default, behind the element if
+    //! possible, otherwise before it.  Returns end if none found.
+    template <typename It, typename Config>
+    It find_nonempty_key(It begin, It elem, It end, Config config) const {
+        assert(begin <= elem && elem <= end);
+
+        It it = elem;
+        while (it != end && config.IsDefaultKey(*it)) { ++it; }
+        if (it != end) { return it; }
+
+        it = elem - 1;
+        while (it >= begin && config.IsDefaultKey(*it)) { --it; }
+        if (it >= begin) { return it; }
+
+        return end;
     }
 
     //! Skip all items whose key is the default or equal to begin's key
@@ -468,6 +485,45 @@ struct ReduceManipulatorBase : public ManipulatorBase {
 
 //! Dummy No-Op Reduce Manipulator
 struct ReduceManipulatorDummy : public ReduceManipulatorBase<ReduceManipulatorDummy>{ };
+
+//! Flip a random bit somewhere in a random element (key or value)
+struct ReduceManipulatorBitflip
+    : public ReduceManipulatorBase<ReduceManipulatorBitflip>{
+    template <typename It, typename Config>
+    std::pair<It, It> manipulate(It begin, It end, Config config) {
+        // First, randomize position and find a non-empty key
+        It elem = begin + (rng() % (end - begin));
+        elem = this->find_nonempty_key(begin, elem, end, config);
+        if (elem == end) {
+            // there isn't a nonempty key in the input! nothing we can do here.
+            return std::make_pair(begin, end);
+        }
+
+        auto old = *elem; // for debug logging
+        auto rand = rng();
+        // manipulate key or value?
+        if (rand & 0x1) {
+            constexpr size_t key_bits = 8 * sizeof(typename Config::Key);
+            size_t bit = (rand >> 1) & (key_bits - 1);
+            elem->first ^= (1ULL << bit);
+            sLOG << "Manipulating" << end - begin << "elements,"
+                 << "flipping bit" << bit << "in key of #" << elem - begin
+                 << maybe_print(old) << "→" << maybe_print(*elem);
+        } else {
+            constexpr size_t val_bits = 8 * sizeof(typename Config::Value);
+            size_t bit = (rand >> 1) & (val_bits - 1);
+            elem->second ^= (1ULL << bit);
+            sLOG << "Manipulating" << end - begin << "elements,"
+                 << "flipping bit" << bit << "in value of #" << elem - begin
+                 << maybe_print(old) << "→" << maybe_print(*elem);
+        }
+        assert(old != *elem);
+        made_changes_ = true;
+        return std::make_pair(begin, end);
+    }
+private:
+    std::mt19937 rng { std::random_device { } () };
+};
 
 //! Drops first element
 struct ReduceManipulatorDropFirst

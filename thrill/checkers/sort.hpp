@@ -254,6 +254,22 @@ struct SortManipulatorIncFirst : public ManipulatorBase {
     }
 };
 
+//! Flip a random bit
+struct SortManipulatorBitflip : public ManipulatorBase {
+    template <typename ValueType>
+    void operator () (std::vector<ValueType>& vec) {
+        if (vec.size() > 0) {
+            size_t pos = rng() % vec.size();
+            const size_t bit = rng() & (8 * sizeof(ValueType) - 1);
+            vec[pos] ^= (1ULL << bit);
+            made_changes_ = true;
+        }
+    }
+
+private:
+    std::mt19937 rng { std::random_device { } () };
+};
+
 //! Reset first element to default-constructed value
 struct SortManipulatorRandFirst : public ManipulatorBase {
     template <typename ValueType>
