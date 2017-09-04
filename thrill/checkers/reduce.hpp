@@ -33,7 +33,7 @@ namespace thrill {
 namespace checkers {
 
 template <typename hash_fn_, size_t num_buckets_, size_t num_parallel_,
-          size_t mod_range = 128 /* XXX TODO */>
+          size_t mod_range = 32768 /* XXX TODO */>
 struct MinireductionConfig {
     //! type of hash function to use (e.g. CRC-32C or tabulation hashing)
     using hash_fn = hash_fn_;
@@ -57,15 +57,13 @@ using DefaultMinireductionConfig =
           MinireductionConfig<common::HashCrc32<Key>, 8, 4>;
 
 namespace _detail {
-//! Reduce checker minireduction helper
+//! Reduce checker minireduction, this is where the magic happens
 template <typename Key, typename Value, typename ReduceFunction,
           typename Config = DefaultMinireductionConfig<Key> >
 class ReduceCheckerMinireduction : public noncopynonmove
 {
     static_assert(reduce_checkable_v<ReduceFunction>,
                   "Reduce function isn't (marked) checkable");
-
-    using KeyValuePair = std::pair<Key, Value>;
 
     // Get stuff from the config
     using hash_fn = typename Config::hash_fn;
@@ -74,13 +72,11 @@ class ReduceCheckerMinireduction : public noncopynonmove
     //! Number of parallel instances
     static constexpr size_t num_parallel = Config::num_parallel;
 
-    //! hash value type
+    //! Hash function value type
     using hash_t = decltype(std::declval<hash_fn>()(std::declval<Key>()));
     //! Number of bits in the hash function's output
     static constexpr size_t hash_bits = 8 * sizeof(hash_t);
     //! Check that hash function produces enough data
-    static_assert(Config::log2_buckets <= hash_bits,
-                  "hash_fn produces fewer bits than needed to discern buckets");
     static_assert(num_parallel * Config::log2_buckets <= hash_bits,
                   "hash_fn bits insufficient for requested number of buckets");
 
@@ -98,13 +94,20 @@ class ReduceCheckerMinireduction : public noncopynonmove
     static constexpr double scale_factor =
         static_cast<double>(num_buckets) /
         static_cast<double>(1ULL << hash_shift);
+    static_assert(Config::pow2_buckets || scale_factor < 1,
+                  "insufficient number of bits in hash function output");
 
+    //! data type for a single minireduction's state
     using reduction_t = std::array<Value, num_buckets>;
+    //! data type for a number of parallel minireductions
     using table_t = std::array<reduction_t, num_parallel>;
 
-    // select smallest integer type that fits for transmission
+    //! smallest integer type that fits a minireduction value for transmission
+    //! (modulo some value between Config::mod_min and Config::mod_max)
     using transmit_t = select_uint_t<Config::mod_max>;
+    //! data type for a single minireduction's state for transmission
     using transmit_reduction_t = std::array<transmit_t, num_buckets>;
+    //! data type for a number of parallel minireductions for transmission
     using transmit_table_t = std::array<transmit_reduction_t, num_parallel>;
 
     static constexpr bool debug = false;
@@ -185,6 +188,8 @@ public:
         return true;
     }
 
+    //! Simple reduction to reduce minireduction.  Output is in reductions_ at
+    //! worker with rank `root`.
     void reduce(api::Context& ctx, size_t root = 0) {
         if (debug) {
             dump_to_log("Before");
@@ -231,6 +236,7 @@ public:
     }
 
 protected:
+    //! dump internal state of the minireduction to the log
     void dump_to_log(const std::string& name = "Run") {
         for (size_t i = 0; i < num_parallel; ++i) {
             std::stringstream s;
