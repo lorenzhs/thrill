@@ -93,6 +93,11 @@ class ReduceCheckerMinireduction : public noncopynonmove
              (hash_bits / num_parallel)>;
     //! Mask to cut down hash values to required number of bits
     static constexpr size_t bucket_mask = (1ULL << hash_shift) - 1;
+    //! Scale factor for non-power-of-two num_buckets to avoid expensive modulo
+    //! computations (divisions) in bucket assignment
+    static constexpr double scale_factor =
+        static_cast<double>(num_buckets) /
+        static_cast<double>(1ULL << hash_shift);
 
     using reduction_t = std::array<Value, num_buckets>;
     using table_t = std::array<reduction_t, num_parallel>;
@@ -137,8 +142,7 @@ public:
             if constexpr(!Config::pow2_buckets) {
                 // scale hash value to 0..num_buckets - 1
                 bucket = static_cast<size_t>(
-                    static_cast<double>(bucket * num_buckets) /
-                    static_cast<double>(1ULL << hash_shift));
+                    static_cast<double>(bucket) * scale_factor);
                 assert(0 <= bucket && bucket < num_buckets);
             }
             sLOGC(extra_verbose) << key << idx << bucket << "="
