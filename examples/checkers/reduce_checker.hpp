@@ -120,7 +120,8 @@ auto reduce_by_key_test_factory = [](
                      << " check_time=" << current_check.Microseconds()
                      << " traffic_reduce=" << traffic_reduce.first + traffic_reduce.second
                      << " traffic_check=" << traffic_check.first + traffic_check.second
-                     << " machines=" << ctx.num_hosts();
+                     << " machines=" << ctx.num_hosts()
+                     << " workers_per_host=" << ctx.workers_per_host();
             }
         }
 
@@ -175,7 +176,8 @@ auto reduce_by_key_unchecked = [](size_t reps) {
                      << " benchmark=wordcount_unchecked"
                      << " run_time=" << current_run.Microseconds()
                      << " traffic_reduce=" << traffic_reduce.first + traffic_reduce.second
-                     << " machines=" << ctx.num_hosts();
+                     << " machines=" << ctx.num_hosts()
+                     << " workers_per_host=" << ctx.workers_per_host();
             }
         }
         sRLOG << "Reduce:" << run_timer.Microseconds()/(1000.0*reps)

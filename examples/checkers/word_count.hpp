@@ -132,7 +132,8 @@ auto word_count_factory = [](
                      << " traffic_reduce=" << traffic_reduce.first + traffic_reduce.second
                      << " traffic_check=" << traffic_check.first + traffic_check.second
                      << " num_words=" << num_words
-                     << " machines=" << ctx.num_hosts();
+                     << " machines=" << ctx.num_hosts()
+                     << " workers_per_host=" << ctx.workers_per_host();
             }
         }
 
@@ -198,7 +199,8 @@ auto word_count_unchecked = [](size_t num_words, size_t reps) {
                      << " run_time=" << current_run.Microseconds()
                      << " traffic_reduce=" << traffic_reduce.first + traffic_reduce.second
                      << " num_words=" << num_words
-                     << " machines=" << ctx.num_hosts();
+                     << " machines=" << ctx.num_hosts()
+                     << " workers_per_host=" << ctx.workers_per_host();
             }
         }
         sRLOG << "Reduce:" << run_timer.Microseconds()/(1000.0*reps)
