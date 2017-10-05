@@ -179,71 +179,74 @@ using TabConfig = checkers::MinireductionConfig<common::HashTabulated<T>,
 
 auto run = [](const auto &manipulator, const std::string& name, size_t reps) {
 
-    auto& f = reduce_by_key_test_factory;
+    auto test = [reps, &manipulator, name](auto config, const std::string& config_name) {
+        api::Run(reduce_by_key_test_factory(
+                     manipulator, config, name, config_name, reps));
+    };
 
 #ifndef CHECKERS_FULL
     // default
-    api::Run(f(manipulator, CRC32Config<16, 1, 31>{}, name, "1x15_m31_CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<16, 1, 15>{}, name, "1x16_m15_CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<16, 1, 7>{}, name, "1x16_m7_CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<16, 1, 3>{}, name, "1x16_m3_CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<16, 1>{}, name, "1x16_CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<4, 1>{}, name, "1x4_CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<2, 1>{}, name, "1x2_CRC32", reps));
+    test(CRC32Config<16, 1, 31>{}, "1x15_m31_CRC32");
+    test(CRC32Config<16, 1, 15>{}, "1x16_m15_CRC32");
+    test(CRC32Config<16, 1, 7>{}, "1x16_m7_CRC32");
+    test(CRC32Config<16, 1, 3>{}, "1x16_m3_CRC32");
+    test(CRC32Config<16, 1>{}, "1x16_CRC32");
+    test(CRC32Config<4, 1>{}, "1x4_CRC32");
+    test(CRC32Config<2, 1>{}, "1x2_CRC32");
 #else
-    api::Run(f(manipulator, CRC32Config<256, 2>{}, name, "2x256_CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<256, 1>{}, name, "1x256_CRC32", reps));
+    test(CRC32Config<256, 2>{}, "2x256_CRC32");
+    test(CRC32Config<256, 1>{}, "1x256_CRC32");
 
-    api::Run(f(manipulator, CRC32Config<16, 4>{}, name, "4x16_CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<16, 2>{}, name, "2x16_CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<16, 1>{}, name, "1x16_CRC32", reps));
+    test(CRC32Config<16, 4>{}, "4x16_CRC32");
+    test(CRC32Config<16, 2>{}, "2x16_CRC32");
+    test(CRC32Config<16, 1>{}, "1x16_CRC32");
 
-    api::Run(f(manipulator, CRC32Config<4, 8>{}, name, "8x4_CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<4, 6>{}, name, "6x4_CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<4, 4>{}, name, "4x4_CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<4, 3>{}, name, "3x4_CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<4, 2>{}, name, "2x4_CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<4, 1>{}, name, "1x4_CRC32", reps));
+    test(CRC32Config<4, 8>{}, "8x4_CRC32");
+    test(CRC32Config<4, 6>{}, "6x4_CRC32");
+    test(CRC32Config<4, 4>{}, "4x4_CRC32");
+    test(CRC32Config<4, 3>{}, "3x4_CRC32");
+    test(CRC32Config<4, 2>{}, "2x4_CRC32");
+    test(CRC32Config<4, 1>{}, "1x4_CRC32");
 
-    api::Run(f(manipulator, CRC32Config<2, 8>{}, name, "8x2_CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<2, 6>{}, name, "6x2_CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<2, 4>{}, name, "4x2_CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<2, 3>{}, name, "3x2_CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<2, 2>{}, name, "2x2_CRC32", reps));
-    api::Run(f(manipulator, CRC32Config<2, 1>{}, name, "1x2_CRC32", reps));
+    test(CRC32Config<2, 8>{}, "8x2_CRC32");
+    test(CRC32Config<2, 6>{}, "6x2_CRC32");
+    test(CRC32Config<2, 4>{}, "4x2_CRC32");
+    test(CRC32Config<2, 3>{}, "3x2_CRC32");
+    test(CRC32Config<2, 2>{}, "2x2_CRC32");
+    test(CRC32Config<2, 1>{}, "1x2_CRC32");
 #endif
 
 #ifndef CHECKERS_FULL
     /*
-    api::Run(f(manipulator, TabConfig<16, 1, 31>{}, name, "1x16_m31_Tab", reps));
-    api::Run(f(manipulator, TabConfig<16, 1, 15>{}, name, "1x16_m15_Tab", reps));
-    api::Run(f(manipulator, TabConfig<16, 1, 7>{}, name, "1x16_m7_Tab", reps));
-    api::Run(f(manipulator, TabConfig<16, 1, 3>{}, name, "1x16_m3_Tab", reps));
-    api::Run(f(manipulator, TabConfig<16, 1>{}, name, "1x16_Tab", reps));
-    api::Run(f(manipulator, TabConfig<4, 1>{}, name, "1x4_Tab", reps));
-    api::Run(f(manipulator, TabConfig<2, 1>{}, name, "1x2_Tab", reps));
+    test(TabConfig<16, 1, 31>{}, "1x16_m31_Tab");
+    test(TabConfig<16, 1, 15>{}, "1x16_m15_Tab");
+    test(TabConfig<16, 1, 7>{}, "1x16_m7_Tab");
+    test(TabConfig<16, 1, 3>{}, "1x16_m3_Tab");
+    test(TabConfig<16, 1>{}, "1x16_Tab");
+    test(TabConfig<4, 1>{}, "1x4_Tab");
+    test(TabConfig<2, 1>{}, "1x2_Tab");
     */
 #else
-    api::Run(f(manipulator, TabConfig<256, 2>{}, name, "2x256_Tab", reps));
-    api::Run(f(manipulator, TabConfig<256, 1>{}, name, "1x256_Tab", reps));
+    test(TabConfig<256, 2>{}, "2x256_Tab");
+    test(TabConfig<256, 1>{}, "1x256_Tab");
 
-    api::Run(f(manipulator, TabConfig<16, 4>{}, name, "4x16_Tab", reps));
-    api::Run(f(manipulator, TabConfig<16, 2>{}, name, "2x16_Tab", reps));
-    api::Run(f(manipulator, TabConfig<16, 1>{}, name, "1x16_Tab", reps));
+    test(TabConfig<16, 4>{}, "4x16_Tab");
+    test(TabConfig<16, 2>{}, "2x16_Tab");
+    test(TabConfig<16, 1>{}, "1x16_Tab");
 
-    api::Run(f(manipulator, TabConfig<4, 8>{}, name, "8x4_Tab", reps));
-    api::Run(f(manipulator, TabConfig<4, 6>{}, name, "6x4_Tab", reps));
-    api::Run(f(manipulator, TabConfig<4, 4>{}, name, "4x4_Tab", reps));
-    api::Run(f(manipulator, TabConfig<4, 3>{}, name, "3x4_Tab", reps));
-    api::Run(f(manipulator, TabConfig<4, 2>{}, name, "2x4_Tab", reps));
-    api::Run(f(manipulator, TabConfig<4, 1>{}, name, "1x4_Tab", reps));
+    test(TabConfig<4, 8>{}, "8x4_Tab");
+    test(TabConfig<4, 6>{}, "6x4_Tab");
+    test(TabConfig<4, 4>{}, "4x4_Tab");
+    test(TabConfig<4, 3>{}, "3x4_Tab");
+    test(TabConfig<4, 2>{}, "2x4_Tab");
+    test(TabConfig<4, 1>{}, "1x4_Tab");
 
-    api::Run(f(manipulator, TabConfig<2, 8>{}, name, "8x2_Tab", reps));
-    api::Run(f(manipulator, TabConfig<2, 6>{}, name, "6x2_Tab", reps));
-    api::Run(f(manipulator, TabConfig<2, 4>{}, name, "4x2_Tab", reps));
-    api::Run(f(manipulator, TabConfig<2, 3>{}, name, "3x2_Tab", reps));
-    api::Run(f(manipulator, TabConfig<2, 2>{}, name, "2x2_Tab", reps));
-    api::Run(f(manipulator, TabConfig<2, 1>{}, name, "1x2_Tab", reps));
+    test(TabConfig<2, 8>{}, "8x2_Tab");
+    test(TabConfig<2, 6>{}, "6x2_Tab");
+    test(TabConfig<2, 4>{}, "4x2_Tab");
+    test(TabConfig<2, 3>{}, "3x2_Tab");
+    test(TabConfig<2, 2>{}, "2x2_Tab");
+    test(TabConfig<2, 1>{}, "1x2_Tab");
 #endif
 };
 
