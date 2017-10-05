@@ -35,6 +35,12 @@ thread_local int my_rank = -1;
 #define RLOG LOGC(my_rank == 0)
 #define sRLOG sLOGC(my_rank == 0)
 
+// to subtract traffic RX/TX pairs
+template <typename T,typename U>
+std::pair<T,U> operator-(const std::pair<T,U> &a,const std::pair<T,U> &b) {
+    return {a.first - b.first, a.second - b.second};
+}
+
 auto reduce_by_key_test_factory = [](
     const auto& manipulator, const auto& config,
     const std::string& manip_name,
@@ -70,6 +76,8 @@ auto reduce_by_key_test_factory = [](
 
             // Synchronize with barrier
             ctx.net.Barrier();
+            auto traffic_before = ctx.net_manager().Traffic();
+
             run_timer.Start();
             Generate(ctx, 1000000, generator)
                 .ReduceByKey(
@@ -81,12 +89,34 @@ auto reduce_by_key_test_factory = [](
 
             // Re-synchronize, then run final checking pass
             ctx.net.Barrier();
+            auto traffic_precheck = ctx.net_manager().Traffic();
+
             check_timer.Start();
             auto success = driver->check(ctx);
             check_timer.Stop();
 
             if (!success.first) { failures++; }
             if (success.second) { manips++; }
+
+            ctx.net.Barrier();
+            if (ctx.my_rank() == 0) {
+                auto traffic_after = ctx.net_manager().Traffic();
+                auto traffic_reduce = traffic_precheck - traffic_before;
+                auto traffic_check = traffic_after - traffic_precheck;
+                LOG1 << "RESULT"
+                     << " benchmark=random_checked"
+                     << " config=" << config_name
+                     << " c_its=" << Config::num_parallel
+                     << " c_buckets=" << Config::num_buckets
+                     << " c_mod_min=" << Config::mod_min
+                     << " c_mod_max=" << Config::mod_max
+                     << " manip=" << manip_name
+                     << " run_time=" << run_timer.Milliseconds()
+                     << " check_time=" << check_timer.Milliseconds()
+                     << " traffic_reduce=" << traffic_reduce.first + traffic_reduce.second
+                     << " traffic_check=" << traffic_check.first + traffic_check.second
+                     << " machines=" << ctx.num_hosts();
+            }
         }
 
         RLOG << "ReduceByKey with " << manip_name << " manip and "
