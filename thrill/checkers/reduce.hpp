@@ -307,12 +307,18 @@ public:
     void add_pre(const Key& key, const Value& value) {
         mini_pre.push(key, value);
     }
+    void add_pre(const Key& key, const KeyValuePair& kv) {
+        mini_pre.push(key, kv.second);
+    }
     void add_pre(const KeyValuePair& kv) {
         mini_pre.push(kv.first, kv.second);
     }
 
     void add_post(const Key& key, const Value& value) {
         mini_post.push(key, value);
+    }
+    void add_post(const Key& key, const KeyValuePair& kv) {
+        mini_post.push(key, kv.second);
     }
     void add_post(const KeyValuePair& kv) {
         mini_post.push(kv.first, kv.second);
