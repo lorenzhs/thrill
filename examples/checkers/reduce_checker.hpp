@@ -78,27 +78,32 @@ auto reduce_by_key_test_factory = [](
             ctx.net.Barrier();
             auto traffic_before = ctx.net_manager().Traffic();
 
-            run_timer.Start();
+            common::StatsTimerStart current_run;
             Generate(ctx, 1000000, generator)
                 .ReduceByKey(
                     VolatileKeyTag, NoDuplicateDetectionTag, key_extractor, ReduceFn(),
                     api::DefaultReduceConfig(), std::hash<Value>(),
                     std::equal_to<Value>(), driver)
                 .Size();
-            run_timer.Stop();
+            current_run.Stop();
 
             // Re-synchronize, then run final checking pass
             ctx.net.Barrier();
             auto traffic_precheck = ctx.net_manager().Traffic();
 
-            check_timer.Start();
+            common::StatsTimerStart current_check;
             auto success = driver->check(ctx);
-            check_timer.Stop();
+            current_check.Stop();
 
             if (!success.first) { failures++; }
             if (success.second) { manips++; }
 
             ctx.net.Barrier();
+
+            // add current iteration timers to total
+            run_timer += current_run;
+            check_timer += current_check;
+
             if (ctx.my_rank() == 0) {
                 auto traffic_after = ctx.net_manager().Traffic();
                 auto traffic_reduce = traffic_precheck - traffic_before;
@@ -111,8 +116,8 @@ auto reduce_by_key_test_factory = [](
                      << " c_mod_min=" << Config::mod_min
                      << " c_mod_max=" << Config::mod_max
                      << " manip=" << manip_name
-                     << " run_time=" << run_timer.Milliseconds()
-                     << " check_time=" << check_timer.Milliseconds()
+                     << " run_time=" << current_run.Microseconds()
+                     << " check_time=" << current_check.Microseconds()
                      << " traffic_reduce=" << traffic_reduce.first + traffic_reduce.second
                      << " traffic_check=" << traffic_check.first + traffic_check.second
                      << " machines=" << ctx.num_hosts();
@@ -149,14 +154,30 @@ auto reduce_by_key_unchecked = [](size_t reps) {
 
         common::StatsTimerStopped run_timer;
         for (size_t i = 0; i < reps; ++i) {
+            // Synchronize with barrier
             ctx.net.Barrier();
-            run_timer.Start();
+            auto traffic_before = ctx.net_manager().Traffic();
+            common::StatsTimerStart current_run;
             Generate(ctx, 1000000, generator)
                 .ReduceByKey(VolatileKeyTag, key_extractor, ReduceFn())
-                .Execute();
-            run_timer.Stop();
-        }
+                .Size();
+            current_run.Stop();
 
+            // Re-synchronize
+            ctx.net.Barrier();
+            // add current iteration timer to total
+            run_timer += current_run;
+
+            if (ctx.my_rank() == 0) {
+                auto traffic_after = ctx.net_manager().Traffic();
+                auto traffic_reduce = traffic_after - traffic_before;
+                LOG1 << "RESULT"
+                     << " benchmark=wordcount_unchecked"
+                     << " run_time=" << current_run.Microseconds()
+                     << " traffic_reduce=" << traffic_reduce.first + traffic_reduce.second
+                     << " machines=" << ctx.num_hosts();
+            }
+        }
         sRLOG << "Reduce:" << run_timer.Microseconds()/(1000.0*reps)
               << "ms (no checking, no manipulation)";
         sRLOG << "";
