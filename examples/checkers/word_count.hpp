@@ -81,20 +81,13 @@ auto word_count_factory = [](
 
             common::StatsTimerStart current_run;
 
-            auto lines = Generate(
-                ctx, num_words / 10,
+            auto word_pairs = Generate(
+                ctx, num_words,
                 [&](size_t /* index */) {
-                    return examples::word_count::RandomTextWriterGenerate(10, rng);
-                });
-
-            auto word_pairs = lines.template FlatMap<WordCountPair>(
-                [](const std::string& line, auto emit) -> void {
-                    /* map lambda: emit each word */
-                    common::SplitView(
-                        line, ' ', [&](const common::StringView& sv) {
-                            if (sv.size() == 0) return;
-                            emit(WordCountPair(sv.ToString(), 1));
-                        });
+                    return WordCountPair(
+                        examples::word_count::s_random_text_writer_words[
+                            rng() % examples::word_count::s_num_random_text_writer_words],
+                        1);
                 });
 
             word_pairs.ReduceByKey(
@@ -176,20 +169,13 @@ auto word_count_unchecked = [](size_t num_words, size_t reps) {
             auto traffic_before = ctx.net_manager().Traffic();
             common::StatsTimerStart current_run;
 
-            auto lines = Generate(
-                ctx, num_words / 10,
+            auto word_pairs = Generate(
+                ctx, num_words,
                 [&](size_t /* index */) {
-                    return examples::word_count::RandomTextWriterGenerate(10, rng);
-                });
-
-            auto word_pairs = lines.template FlatMap<WordCountPair>(
-                [](const std::string& line, auto emit) -> void {
-                    /* map lambda: emit each word */
-                    common::SplitView(
-                        line, ' ', [&](const common::StringView& sv) {
-                            if (sv.size() == 0) return;
-                            emit(WordCountPair(sv.ToString(), 1));
-                        });
+                    return WordCountPair(
+                        examples::word_count::s_random_text_writer_words[
+                            rng() % examples::word_count::s_num_random_text_writer_words],
+                        1);
                 });
 
             word_pairs.ReduceByKey(
