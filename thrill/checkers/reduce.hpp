@@ -509,12 +509,25 @@ struct ReduceManipulatorBitflip
         auto rand = rng();
         // manipulate key or value?
         if (rand & 0x1) {
-            constexpr size_t key_bits = 8 * sizeof(typename Config::Key);
-            size_t bit = (rand >> 1) & (key_bits - 1);
-            elem->first ^= (1ULL << bit);
-            sLOG << "Manipulating" << end - begin << "elements,"
-                 << "flipping bit" << bit << "in key of #" << elem - begin
-                 << maybe_print(old) << "→" << maybe_print(*elem);
+            if constexpr(std::is_same_v<std::string, typename Config::Key>) {
+                // mess up a string
+                size_t size = elem->first.size();
+                assert(size > 0);
+                size_t bit = (rand >> 1) & 7;
+                size_t pos = (rand >> 4) % size;
+                elem->first[pos] ^= (1ULL << bit);
+                sLOG1 << "Manipulating" << end - begin << "elements,"
+                     << "flipping bit" << bit << "in char" << pos
+                     << "in (string) key of #" << elem - begin
+                     << maybe_print(old) << "→" << maybe_print(*elem);
+            } else {
+                constexpr size_t key_bits = 8 * sizeof(typename Config::Key);
+                size_t bit = (rand >> 1) & (key_bits - 1);
+                elem->first ^= (1ULL << bit);
+                sLOG << "Manipulating" << end - begin << "elements,"
+                     << "flipping bit" << bit << "in key of #" << elem - begin
+                     << maybe_print(old) << "→" << maybe_print(*elem);
+            }
         } else {
             constexpr size_t val_bits = 8 * sizeof(typename Config::Value);
             size_t bit = (rand >> 1) & (val_bits - 1);
@@ -616,7 +629,12 @@ struct ReduceManipulatorIncFirstKey
     std::pair<It, It> manipulate(It begin, It end, Config /* config */) {
         sLOG << "Manipulating" << end - begin
              << "elements, incrementing key of first:" << maybe_print(*begin);
-        begin->first++; // XXX
+
+        if constexpr(std::is_same_v<std::string, typename Config::Key>) {
+            begin->first += "1";
+        } else {
+            begin->first++; // XXX
+        }
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
@@ -631,7 +649,11 @@ struct ReduceManipulatorRandFirstKey
              << "elements, randomizing first key" << maybe_print(*begin);
         auto old_key = config.GetKey(*begin);
         do {
-            begin->first = static_cast<typename Config::Key>(rng()); // XXX
+            if constexpr(std::is_same_v<std::string, typename Config::Key>) {
+                begin->first = "a"; // chosen by fair dice roll, very random lol
+            } else {
+                begin->first = static_cast<typename Config::Key>(rng()); // XXX
+            }
         } while (config.key_eq(old_key, config.GetKey(*begin)));
         sLOG << "Update: old key" << maybe_print(old_key)
              << "new" << maybe_print(begin->first);
