@@ -1,5 +1,5 @@
 /*******************************************************************************
- * examples/checkers/reduce_checker_timings.cpp
+ * examples/checkers/word_count_checker_timings.cpp
  *
  * Part of Project Thrill - http://project-thrill.org
  *
@@ -21,7 +21,6 @@ const size_t default_reps = 10000;
 const size_t default_reps = 100;
 #endif
 const size_t default_num_words = 1000000;
-
 
 int main(int argc, char** argv) {
     tlx::CmdlineParser clp;

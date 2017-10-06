@@ -1,5 +1,5 @@
 /*******************************************************************************
- * examples/checkers/reduce_checker.cpp
+ * examples/checkers/word_count_checker.cpp
  *
  * Part of Project Thrill - http://project-thrill.org
  *

@@ -40,7 +40,7 @@ struct MinireductionConfig {
     //! number of buckets
     static constexpr size_t num_buckets = num_buckets_;
     //! is the number of buckets a power of two?
-    static constexpr bool pow2_buckets = is_power_of_two(num_buckets_);
+    static constexpr bool   pow2_buckets = is_power_of_two(num_buckets_);
     //! ceil(log2(num_buckets))
     static constexpr size_t log2_buckets = tlx::Log2<num_buckets_>::ceil;
     //! number of minireduction instances to execute in parallel
@@ -142,7 +142,7 @@ public:
         hash_t h = hash_(key);
         for (size_t idx = 0; idx < num_parallel; ++idx) {
             size_t bucket = (h >> (idx * hash_shift)) & bucket_mask;
-            if constexpr(!Config::pow2_buckets) {
+            if constexpr (!Config::pow2_buckets) {
                 // scale hash value to 0..num_buckets - 1
                 bucket = static_cast<size_t>(
                     static_cast<double>(bucket) * scale_factor);
@@ -150,7 +150,7 @@ public:
             }
             sLOGC(extra_verbose) << key << idx << bucket << "="
                                  << std::hex << bucket << h << std::dec;
-            if constexpr(reduce_modulo_builtin_v<ReduceFunction>) {
+            if constexpr (reduce_modulo_builtin_v<ReduceFunction>) {
                 reductions_[idx][bucket] =
                     reducefn(reductions_[idx][bucket], value);
             } else {
@@ -202,7 +202,7 @@ public:
             for (size_t j = 0; j < num_buckets; ++j) {
                 // Need to modulo manually, builtin modulo only means that it
                 // does the modulo before the value would overflow!
-                if constexpr(reduce_modulo_builtin_v<ReduceFunction>) {
+                if constexpr (reduce_modulo_builtin_v<ReduceFunction>) {
                     transmit_table[i][j] =
                         static_cast<transmit_t>(reductions_[i][j] % modulus_);
                 } else {
@@ -405,7 +405,7 @@ struct ReduceManipulatorBase : public ManipulatorBase {
     //! Skip all items whose key is the default
     template <typename It, typename Config>
     It skip_empty_key(It begin, It end, Config config, int step = 1) const {
-        while (begin != end && config.IsDefaultKey(*begin)) { begin += step; };
+        while (begin != end && config.IsDefaultKey(*begin)) { begin += step; }
         return begin;
     }
 
@@ -509,14 +509,14 @@ struct ReduceManipulatorBitflip
         auto rand = rng();
         // manipulate key or value?
         if (rand & 0x1) {
-            if constexpr(std::is_same_v<std::string, typename Config::Key>) {
+            if constexpr (std::is_same_v<std::string, typename Config::Key>) {
                 // mess up a string
                 size_t size = elem->first.size();
                 assert(size > 0);
                 size_t bit = (rand >> 1) & 7;
                 size_t pos = (rand >> 4) % size;
                 elem->first[pos] ^= (1ULL << bit);
-                sLOG1 << "Manipulating" << end - begin << "elements,"
+                sLOG << "Manipulating" << end - begin << "elements,"
                      << "flipping bit" << bit << "in char" << pos
                      << "in (string) key of #" << elem - begin
                      << maybe_print(old) << "→" << maybe_print(*elem);
@@ -540,6 +540,7 @@ struct ReduceManipulatorBitflip
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
+
 private:
     std::mt19937 rng { std::random_device { } () };
 };
@@ -630,7 +631,7 @@ struct ReduceManipulatorIncFirstKey
         sLOG << "Manipulating" << end - begin
              << "elements, incrementing key of first:" << maybe_print(*begin);
 
-        if constexpr(std::is_same_v<std::string, typename Config::Key>) {
+        if constexpr (std::is_same_v<std::string, typename Config::Key>) {
             begin->first += "1";
         } else {
             begin->first++; // XXX
@@ -649,7 +650,7 @@ struct ReduceManipulatorRandFirstKey
              << "elements, randomizing first key" << maybe_print(*begin);
         auto old_key = config.GetKey(*begin);
         do {
-            if constexpr(std::is_same_v<std::string, typename Config::Key>) {
+            if constexpr (std::is_same_v<std::string, typename Config::Key>) {
                 begin->first = "a"; // chosen by fair dice roll, very random lol
             } else {
                 begin->first = static_cast<typename Config::Key>(rng()); // XXX

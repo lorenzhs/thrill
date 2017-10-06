@@ -21,7 +21,6 @@ const size_t default_reps = 10000;
 const size_t default_reps = 100;
 #endif
 
-
 int main(int argc, char** argv) {
     tlx::CmdlineParser clp;
 

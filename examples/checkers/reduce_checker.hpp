@@ -1,5 +1,3 @@
-#pragma once
-
 /*******************************************************************************
  * examples/checkers/reduce_checker.hpp
  *
@@ -13,6 +11,10 @@
  *
  * All rights reserved. Published under the BSD-2 license in the LICENSE file.
  ******************************************************************************/
+
+#pragma once
+#ifndef THRILL_EXAMPLES_CHECKERS_REDUCE_CHECKER_HEADER
+#define THRILL_EXAMPLES_CHECKERS_REDUCE_CHECKER_HEADER
 
 #include <thrill/api/context.hpp>
 #include <thrill/api/generate.hpp>
@@ -36,9 +38,9 @@ thread_local int my_rank = -1;
 #define sRLOG sLOGC(my_rank == 0)
 
 // to subtract traffic RX/TX pairs
-template <typename T,typename U>
-std::pair<T,U> operator-(const std::pair<T,U> &a,const std::pair<T,U> &b) {
-    return {a.first - b.first, a.second - b.second};
+template <typename T, typename U>
+std::pair<T, U> operator - (const std::pair<T, U>& a, const std::pair<T, U>& b) {
+    return std::make_pair(a.first - b.first, a.second - b.second);
 }
 
 auto reduce_by_key_test_factory = [](
@@ -280,3 +282,7 @@ ostream& operator << (ostream& os, const pair<T, U>& p) {
 }
 
 } // namespace std
+
+#endif // !THRILL_EXAMPLES_CHECKERS_REDUCE_CHECKER_HEADER
+
+/******************************************************************************/

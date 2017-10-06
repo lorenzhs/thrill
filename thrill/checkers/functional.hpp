@@ -27,7 +27,7 @@ template <typename Integral>
 struct checked_plus {
     static constexpr bool debug = false;
 
-    Integral inline __attribute__((always_inline))
+    Integral inline __attribute__ ((always_inline))
     operator () (const Integral& i1, const Integral& i2) const {
         Integral result;
         if (TLX_UNLIKELY(__builtin_add_overflow(i1, i2, &result))) {
@@ -132,10 +132,10 @@ template<> struct select_uint_<2> { using type = uint16_t; };
 template<> struct select_uint_<4> { using type = uint32_t; };
 template<> struct select_uint_<8> { using type = uint64_t; };
 
-template<unsigned long long max>
-struct select_uint : select_uint_<((tlx::Log2<max>::ceil + 7) >> 3)> {};
+template <unsigned long long max>
+struct select_uint : select_uint_<((tlx::Log2<max>::ceil + 7) >> 3)>{ };
 
-template<unsigned long long max>
+template <unsigned long long max>
 using select_uint_t = typename select_uint<max>::type;
 
 template <typename Integer>
@@ -152,7 +152,7 @@ struct if_ {
 };
 
 template <auto if_true, auto if_false>
-struct if_<true, if_true, if_false> {
+struct if_<true, if_true, if_false>{
     static_assert(std::is_same_v<decltype(if_true), decltype(if_false)>,
                   "if_true and if_false must be of the same type");
     static constexpr auto value = if_true;
