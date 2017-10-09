@@ -211,7 +211,7 @@ auto run = [](const auto &manipulator, const std::string& name, size_t reps) {
 
 #ifndef CHECKERS_FULL
     // default
-    test(CRC32Config<16, 1, 31>{}, "1x15_m31_CRC32");
+    test(CRC32Config<16, 1, 31>{}, "1x16_m31_CRC32");
     test(CRC32Config<16, 1, 15>{}, "1x16_m15_CRC32");
     test(CRC32Config<16, 1, 7>{}, "1x16_m7_CRC32");
     test(CRC32Config<16, 1, 3>{}, "1x16_m3_CRC32");
