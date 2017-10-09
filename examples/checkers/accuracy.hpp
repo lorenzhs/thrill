@@ -5,8 +5,6 @@
  *
  * Part of Project Thrill - http://project-thrill.org
  *
- * Copyright (C) 2015 Alexander Noe <aleexnoe@gmail.com>
- * Copyright (C) 2015 Timo Bingmann <tb@panthema.net>
  * Copyright (C) 2016-2017 Lorenz Hübschle-Schneider <lorenz@4z2.de>
  *
  * All rights reserved. Published under the BSD-2 license in the LICENSE file.
@@ -15,6 +13,8 @@
 #pragma once
 #ifndef THRILL_EXAMPLES_CHECKERS_ACCURACY_HEADER
 #define THRILL_EXAMPLES_CHECKERS_ACCURACY_HEADER
+
+#include <tuple>
 
 template <typename Functor, typename Manipulator, typename ... Args>
 void run_accuracy(Functor &&f, const Manipulator &manipulator,
