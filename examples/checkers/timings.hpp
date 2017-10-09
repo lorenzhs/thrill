@@ -23,10 +23,6 @@ void run_timings(Functor &&test) {
     test(CRC32Config<16, 4>{}, "4x16_CRC32");
     test(CRC32Config<16, 2>{}, "2x16_CRC32");
     test(CRC32Config<16, 1>{}, "1x16_CRC32");
-    test(CRC32Config<16, 1, 31>{}, "1x16_m31_CRC32");
-    test(CRC32Config<16, 1, 15>{}, "1x16_m15_CRC32");
-    test(CRC32Config<16, 1, 7>{}, "1x16_m7_CRC32");
-    test(CRC32Config<16, 1, 3>{}, "1x16_m3_CRC32");
     test(CRC32Config<8, 1>{}, "1x8_CRC32");
     test(CRC32Config<4, 1>{}, "1x4_CRC32");
     test(CRC32Config<2, 1>{}, "1x2_CRC32");
