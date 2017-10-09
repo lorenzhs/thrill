@@ -14,6 +14,7 @@
 #include <tlx/cmdline_parser.hpp>
 
 #include "reduce_checker.hpp"
+#include "timings.hpp"
 
 #ifdef CHECKERS_FULL
 const size_t default_reps = 10000;
@@ -31,7 +32,13 @@ int main(int argc, char** argv) {
     clp.print_result();
 
     api::Run(reduce_by_key_unchecked(reps));
-    run(checkers::ReduceManipulatorDummy(), "Dummy", reps);
+
+    auto test = [reps](auto config, const std::string& config_name) {
+        api::Run(reduce_by_key_test_factory(checkers::ReduceManipulatorDummy(),
+                                            config, "Dummy", config_name, reps));
+    };
+
+    run_timings(test);
 }
 
 /******************************************************************************/

@@ -14,6 +14,7 @@
 #include <tlx/cmdline_parser.hpp>
 
 #include "word_count.hpp"
+#include "accuracy.hpp"
 
 #ifdef CHECKERS_FULL
 const size_t default_reps = 10000;
@@ -24,12 +25,15 @@ const size_t default_num_words = 1000000;
 
 // yikes, preprocessor
 #define TEST_CHECK(MANIP) if (run_ ## MANIP) \
-        run(checkers::ReduceManipulator ## MANIP(), #MANIP, num_words, reps)
+    run_accuracy(word_count_factory, checkers::ReduceManipulator ## MANIP(), \
+                 #MANIP, num_words, reps)
 #define TEST_CHECK_I(MANIP, ITS) if (run_ ## MANIP) \
-        run(checkers::ReduceManipulator ## MANIP(), #MANIP, num_words, ITS)
+    run_accuracy(word_count_factory, checkers::ReduceManipulator ## MANIP(), \
+                 #MANIP, num_words, ITS)
 // run with template parameter
 #define TEST_CHECK_T(NAME, FULL) if (run_ ## NAME) \
-        run(checkers::ReduceManipulator ## FULL(), #NAME, num_words, reps)
+    run_accuracy(word_count_factory, checkers::ReduceManipulator ## FULL(), \
+                 #NAME, num_words, reps)
 
 int main(int argc, char** argv) {
     tlx::CmdlineParser clp;

@@ -14,6 +14,7 @@
 #include <tlx/cmdline_parser.hpp>
 
 #include "word_count.hpp"
+#include "timings.hpp"
 
 #ifdef CHECKERS_FULL
 const size_t default_reps = 10000;
@@ -34,7 +35,13 @@ int main(int argc, char** argv) {
     clp.print_result();
 
     api::Run(word_count_unchecked(num_words, reps));
-    run(checkers::ReduceManipulatorDummy(), "Dummy", num_words, reps);
+
+    auto test = [num_words, reps](auto config, const std::string& config_name) {
+        api::Run(word_count_factory(checkers::ReduceManipulatorDummy(), config,
+                                    "Dummy", config_name, num_words, reps));
+    };
+
+    run_timings(test);
 }
 
 /******************************************************************************/
