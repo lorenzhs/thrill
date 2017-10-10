@@ -27,10 +27,12 @@ int main(int argc, char** argv) {
 
     int reps = default_reps;
     size_t words_per_worker = default_words_per_worker,
-        distinct_words = default_distinct_words;
+        distinct_words = default_distinct_words,
+        seed = 42;
     clp.add_int('n', "iterations", reps, "iterations");
     clp.add_size_t('w', "words", words_per_worker, "words per worker");
     clp.add_size_t('d', "distinct", distinct_words, "number of distinct words");
+    clp.add_size_t('s', "seed", seed, "seed for input generation (0: random)");
 
     if (!clp.process(argc, argv)) return -1;
     clp.print_result();
@@ -38,18 +40,18 @@ int main(int argc, char** argv) {
     api::Run([&](Context& ctx) {
         ctx.enable_consume();
         // warmup
-        word_count_unchecked(words_per_worker, distinct_words, 100, true)(ctx);
+        word_count_unchecked(words_per_worker, distinct_words, seed, 100, true)(ctx);
 
-        auto test = [words_per_worker, distinct_words, reps, &ctx](
+        auto test = [words_per_worker, distinct_words, seed, reps, &ctx](
             auto config, const std::string& config_name) {
             word_count_factory(checkers::ReduceManipulatorDummy(), config,
                                "Dummy", config_name, words_per_worker,
-                               distinct_words, reps)(ctx);
+                               distinct_words, seed, reps)(ctx);
         };
 
         run_timings(test);
 
-        word_count_unchecked(words_per_worker, distinct_words, reps)(ctx);
+        word_count_unchecked(words_per_worker, distinct_words, seed, reps)(ctx);
     });
 }
 

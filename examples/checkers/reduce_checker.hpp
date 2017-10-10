@@ -47,7 +47,7 @@ auto reduce_by_key_test_factory = [](
     const auto& manipulator, const auto& config,
     const std::string& manip_name,
     const std::string& config_name,
-    size_t elems_per_worker, int reps)
+    size_t elems_per_worker, size_t seed, int reps)
 {
     using Value = uint64_t;
     // checked_plus is important for making modulo efficient
@@ -58,9 +58,11 @@ auto reduce_by_key_test_factory = [](
     using Manipulator = std::decay_t<decltype(manipulator)>;
     using Driver = checkers::Driver<Checker, Manipulator>;
 
-    return [reps, elems_per_worker, manip_name, config_name](Context& ctx) {
+    return [reps, elems_per_worker, seed, manip_name, config_name](Context& ctx) {
         const size_t size = elems_per_worker * ctx.num_workers();
-        std::mt19937 rng(std::random_device { } ());
+        size_t true_seed = seed;
+        if (seed == 0) true_seed = std::random_device{}();
+        std::mt19937 rng(true_seed);
         std::uniform_int_distribution<Value> distribution(0, 0xFFFFFFFF);
         auto key_extractor = [](const Value& in) { return in & 0xFFFF; };
         auto generator = [&distribution, &rng](const size_t&) -> Value
@@ -143,14 +145,16 @@ auto reduce_by_key_test_factory = [](
 };
 
 
-auto reduce_by_key_unchecked = [](size_t elems_per_worker, int reps,
-                                  const bool warmup = false) {
+auto reduce_by_key_unchecked = [](size_t elems_per_worker, size_t seed,
+                                  int reps, const bool warmup = false) {
     using Value = size_t;
     using ReduceFn = checkers::checked_plus<Value>;//std::plus<Value>;
 
-    return [reps, elems_per_worker, warmup](Context& ctx) {
+    return [reps, elems_per_worker, seed, warmup](Context& ctx) {
         const size_t size = elems_per_worker * ctx.num_workers();
-        std::mt19937 rng(std::random_device { } ());
+        size_t true_seed = seed;
+        if (seed == 0) true_seed = std::random_device{}();
+        std::mt19937 rng(true_seed);
         std::uniform_int_distribution<Value> distribution(0, 0xFFFFFFFF);
         auto key_extractor = [](const Value& in) { return in & 0xFFFF; };
         auto generator = [&distribution, &rng](const size_t&) -> Value

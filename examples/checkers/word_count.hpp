@@ -102,7 +102,7 @@ auto word_count_factory = [](
     const auto& manipulator, const auto& config,
     const std::string& manip_name,
     const std::string& config_name,
-    size_t words_per_worker, size_t distinct_words, int reps)
+    size_t words_per_worker, size_t distinct_words, size_t seed, int reps)
 {
     using Key = uint64_t;
     using Value = uint64_t;
@@ -115,9 +115,12 @@ auto word_count_factory = [](
     using Manipulator = std::decay_t<decltype(manipulator)>;
     using Driver = checkers::Driver<Checker, Manipulator>;
 
-    return [words_per_worker, distinct_words, reps, manip_name, config_name](Context& ctx) {
+    return [words_per_worker, distinct_words, seed, reps, manip_name,
+            config_name](Context& ctx) {
         const size_t num_words = words_per_worker * ctx.num_workers();
-        std::mt19937 rng(std::random_device { } ());
+        size_t true_seed = seed;
+        if (seed == 0) true_seed = std::random_device{}();
+        std::mt19937 rng(true_seed);
         zipf_generator<double> zipf(rng(), distinct_words, 1.0);
 
         if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
@@ -207,15 +210,18 @@ auto word_count_factory = [](
 
 
 auto word_count_unchecked = [](size_t words_per_worker, size_t distinct_words,
-                               int reps, const bool warmup = false) {
+                               size_t seed, int reps, const bool warmup = false)
+{
     using Key = uint64_t;
     using Value = uint64_t;
     using WordCountPair = std::pair<Key, Value>;
     using ReduceFn = checkers::checked_plus<Value>;//std::plus<Value>;
 
-    return [words_per_worker, distinct_words, reps, warmup](Context& ctx) {
+    return [words_per_worker, distinct_words, seed, reps, warmup](Context& ctx) {
         const size_t num_words = words_per_worker * ctx.num_workers();
-        std::mt19937 rng(std::random_device { } ());
+        size_t true_seed = seed;
+        if (seed == 0) true_seed = std::random_device{}();
+        std::mt19937 rng(true_seed);
         zipf_generator<double> zipf(rng(), distinct_words, 1.0);
 
         if (my_rank < 0) { my_rank = ctx.net.my_rank(); }

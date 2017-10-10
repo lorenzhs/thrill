@@ -24,22 +24,26 @@ const size_t default_elems_per_worker = 125000;
 // yikes, preprocessor
 #define TEST_CHECK(MANIP) if (run_ ## MANIP) \
         run_accuracy(ctx, reduce_by_key_test_factory,                    \
-                     checkers::ReduceManipulator ## MANIP(), #MANIP, elems_per_worker, reps)
+                     checkers::ReduceManipulator ## MANIP(), #MANIP,     \
+                     elems_per_worker, seed, reps)
 #define TEST_CHECK_I(MANIP, ITS) if (run_ ## MANIP) \
         run_accuracy(ctx, reduce_by_key_test_factory,                    \
-                     checkers::ReduceManipulator ## MANIP(), #MANIP, elems_per_worker, ITS)
+                     checkers::ReduceManipulator ## MANIP(), #MANIP,     \
+                     elems_per_worker, seed, ITS)
 // run with template parameter
 #define TEST_CHECK_T(NAME, FULL) if (run_ ## NAME) \
         run_accuracy(ctx, reduce_by_key_test_factory,                    \
-                     checkers::ReduceManipulator ## FULL(), #NAME, elems_per_worker, reps)
+                     checkers::ReduceManipulator ## FULL(), #NAME,       \
+                     elems_per_worker, seed, reps)
 
 int main(int argc, char** argv) {
     tlx::CmdlineParser clp;
 
     int reps = default_reps;
-    size_t elems_per_worker = default_elems_per_worker;
+    size_t elems_per_worker = default_elems_per_worker, seed = 42;
     clp.add_int('n', "iterations", reps, "iterations");
     clp.add_size_t('e', "elems", elems_per_worker, "elements per worker");
+    clp.add_size_t('s', "seed", seed, "seed for input generation (0: random)");
 
     bool run_RandFirstKey = false, run_SwitchValues = false,
         run_Bitflip = false, run_IncDec1 = false, run_IncDec2 = false,
@@ -59,7 +63,7 @@ int main(int argc, char** argv) {
     api::Run([&](Context &ctx){
         ctx.enable_consume();
         // warmup
-        reduce_by_key_unchecked(10, true)(ctx);
+        reduce_by_key_unchecked(seed, 10, true)(ctx);
 
         TEST_CHECK(RandFirstKey);
         TEST_CHECK(SwitchValues);

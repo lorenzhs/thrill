@@ -25,9 +25,10 @@ int main(int argc, char** argv) {
     tlx::CmdlineParser clp;
 
     int reps = default_reps;
-    size_t elems_per_worker = default_elems_per_worker;
+    size_t elems_per_worker = default_elems_per_worker, seed = 42;
     clp.add_int('n', "iterations", reps, "iterations");
     clp.add_size_t('e', "elems", elems_per_worker, "elements per worker");
+    clp.add_size_t('s', "seed", seed, "seed for input generation (0: random)");
 
     if (!clp.process(argc, argv)) return -1;
     clp.print_result();
@@ -35,18 +36,18 @@ int main(int argc, char** argv) {
     api::Run([&](Context& ctx){
         ctx.enable_consume();
         // warmup
-        reduce_by_key_unchecked(elems_per_worker, 100, true)(ctx);
+        reduce_by_key_unchecked(elems_per_worker, seed, 100, true)(ctx);
 
-        auto test = [reps, elems_per_worker, &ctx](
+        auto test = [reps, elems_per_worker, seed, &ctx](
             auto config, const std::string& config_name) {
             reduce_by_key_test_factory(checkers::ReduceManipulatorDummy(),
                                        config, "Dummy", config_name,
-                                       elems_per_worker, reps)(ctx);
+                                       elems_per_worker, seed, reps)(ctx);
         };
 
         run_timings(test);
 
-        reduce_by_key_unchecked(elems_per_worker, reps)(ctx);
+        reduce_by_key_unchecked(elems_per_worker, seed, reps)(ctx);
     });
 }
 

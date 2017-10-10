@@ -26,26 +26,28 @@ const size_t default_distinct_words = 1000000;
 #define TEST_CHECK(MANIP) if (run_ ## MANIP)                            \
         run_accuracy(ctx, word_count_factory,                           \
                      checkers::ReduceManipulator ## MANIP(),            \
-                     #MANIP, words_per_worker, distinct_words, reps)
+                     #MANIP, words_per_worker, distinct_words, seed, reps)
 #define TEST_CHECK_I(MANIP, ITS) if (run_ ## MANIP)                     \
         run_accuracy(ctx, word_count_factory,                           \
                      checkers::ReduceManipulator ## MANIP(),            \
-                     #MANIP, words_per_worker, distinct_words, ITS)
+                     #MANIP, words_per_worker, distinct_words, seed, ITS)
 // run with template parameter
 #define TEST_CHECK_T(NAME, FULL) if (run_ ## NAME)                      \
         run_accuracy(ctx, word_count_factory,                           \
                      checkers::ReduceManipulator ## FULL(),             \
-                     #NAME, words_per_worker, distinct_words, reps)
+                     #NAME, words_per_worker, distinct_words, seed, reps)
 
 int main(int argc, char** argv) {
     tlx::CmdlineParser clp;
 
     int reps = default_reps;
     size_t words_per_worker = default_words_per_worker,
-        distinct_words = default_distinct_words;
+        distinct_words = default_distinct_words,
+        seed = 42;
     clp.add_int('n', "iterations", reps, "iterations");
     clp.add_size_t('w', "words", words_per_worker, "words per worker");
     clp.add_size_t('d', "distinct", distinct_words, "number of distinct words");
+    clp.add_size_t('s', "seed", seed, "seed for input generation (0: random)");
 
     bool run_RandFirstKey = false, run_SwitchValues = false,
         run_Bitflip = false, run_IncDec1 = false, run_IncDec2 = false,
@@ -65,7 +67,7 @@ int main(int argc, char** argv) {
     api::Run([&](Context &ctx){
         ctx.enable_consume();
         // warmup
-        word_count_unchecked(words_per_worker, distinct_words, 10, true)(ctx);
+        word_count_unchecked(words_per_worker, distinct_words, seed, 10, true)(ctx);
 
         TEST_CHECK(RandFirstKey);
         TEST_CHECK(SwitchValues);
