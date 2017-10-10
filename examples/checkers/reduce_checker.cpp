@@ -19,24 +19,27 @@ const int default_reps = 10000;
 #else
 const int default_reps = 100;
 #endif
+const size_t default_elems_per_worker = 125000;
 
 // yikes, preprocessor
 #define TEST_CHECK(MANIP) if (run_ ## MANIP) \
         run_accuracy(ctx, reduce_by_key_test_factory,                    \
-                     checkers::ReduceManipulator ## MANIP(), #MANIP, reps)
+                     checkers::ReduceManipulator ## MANIP(), #MANIP, elems_per_worker, reps)
 #define TEST_CHECK_I(MANIP, ITS) if (run_ ## MANIP) \
         run_accuracy(ctx, reduce_by_key_test_factory,                    \
-                     checkers::ReduceManipulator ## MANIP(), #MANIP, ITS)
+                     checkers::ReduceManipulator ## MANIP(), #MANIP, elems_per_worker, ITS)
 // run with template parameter
 #define TEST_CHECK_T(NAME, FULL) if (run_ ## NAME) \
         run_accuracy(ctx, reduce_by_key_test_factory,                    \
-                     checkers::ReduceManipulator ## FULL(), #NAME, reps)
+                     checkers::ReduceManipulator ## FULL(), #NAME, elems_per_worker, reps)
 
 int main(int argc, char** argv) {
     tlx::CmdlineParser clp;
 
     int reps = default_reps;
+    size_t elems_per_worker = default_elems_per_worker;
     clp.add_int('n', "iterations", reps, "iterations");
+    clp.add_size_t('e', "elems", elems_per_worker, "elements per worker");
 
     bool run_RandFirstKey = false, run_SwitchValues = false,
         run_Bitflip = false, run_IncDec1 = false, run_IncDec2 = false,

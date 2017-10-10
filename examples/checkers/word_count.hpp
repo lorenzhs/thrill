@@ -46,13 +46,65 @@ std::pair<T, U> operator - (const std::pair<T, U>& a, const std::pair<T, U>& b) 
     return std::make_pair(a.first - b.first, a.second - b.second);
 }
 
+template <typename fptype = float>
+class zipf_generator {
+    std::vector<fptype> dist;
+    std::uniform_real_distribution<fptype> rng;
+    std::mt19937 gen;
+    size_t num;
+    double s;
+
+public:
+    zipf_generator(const size_t seed, const size_t num_, const double s_)
+        : dist(num_ + 1), rng(0.0, 1.0), gen(seed), num(num_ + 1), s(s_)
+    {
+        // precompute distribution
+        dist[0] = 0.0;
+
+        double curr = 0.0;
+        for (size_t i = 1; i < num; ++i) {
+            curr += pow(static_cast<double>(i), -s);
+            dist[i] = static_cast<fptype>(curr);
+        }
+
+        // normalize entries
+        for (size_t i = 1; i < num; ++i) {
+            dist[i] /= static_cast<fptype>(curr);
+        }
+    }
+
+    zipf_generator(const zipf_generator &other) = delete;
+    zipf_generator(zipf_generator &&other) = delete;
+    zipf_generator &operator=(const zipf_generator &other) = delete;
+    zipf_generator &&operator=(zipf_generator &&other) = delete;
+
+    size_t next() {
+        fptype random = rng(gen); // uniform
+        // magic parameter tuning result, see below for reasoning
+        if (num >= 250000) {
+            return std::upper_bound(dist.begin(), dist.end(), random) - dist.begin() - 1;
+        } else {
+             // This version is faster for small values of num, especially when using g++
+             // As the distribution is strongly skewed towards the low end, branch prediction
+             // becomes cheaper than a conditional move for more than around 250k elements.
+             size_t low(0), high(num), mid, half;
+             while ((half = (high / 2)) > 0) {
+                 mid = low + half;
+                 low = (dist[mid] > random) ? low : mid;
+                 high -= half;
+             }
+             return low;
+         }
+    }
+};
+
 auto word_count_factory = [](
     const auto& manipulator, const auto& config,
     const std::string& manip_name,
     const std::string& config_name,
-    size_t num_words, int reps)
+    size_t words_per_worker, size_t distinct_words, int reps)
 {
-    using Key = std::string;
+    using Key = uint64_t;
     using Value = uint64_t;
     using WordCountPair = std::pair<Key, Value>;
     // checked_plus is important for making modulo efficient
@@ -63,8 +115,10 @@ auto word_count_factory = [](
     using Manipulator = std::decay_t<decltype(manipulator)>;
     using Driver = checkers::Driver<Checker, Manipulator>;
 
-    return [num_words, reps, manip_name, config_name](Context& ctx) {
+    return [words_per_worker, distinct_words, reps, manip_name, config_name](Context& ctx) {
+        const size_t num_words = words_per_worker * ctx.num_workers();
         std::mt19937 rng(std::random_device { } ());
+        zipf_generator<double> zipf(rng(), distinct_words, 1.0);
 
         if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
         sRLOG << "Running ReduceByKey tests with" << manip_name
@@ -85,10 +139,7 @@ auto word_count_factory = [](
             auto word_pairs = Generate(
                 ctx, num_words,
                 [&](size_t /* index */) {
-                    return WordCountPair(
-                        examples::word_count::s_random_text_writer_words[
-                            rng() % examples::word_count::s_num_random_text_writer_words],
-                        1);
+                    return WordCountPair(zipf.next(), 1);
                 });
 
             word_pairs.ReduceByKey(
@@ -134,7 +185,8 @@ auto word_count_factory = [](
                      << " check_time=" << current_check.Microseconds()
                      << " traffic_reduce=" << traffic_reduce.first + traffic_reduce.second
                      << " traffic_check=" << traffic_check.first + traffic_check.second
-                     << " num_words=" << num_words
+                     << " words_per_worker=" << words_per_worker
+                     << " distinct_words=" << distinct_words
                      << " machines=" << ctx.num_hosts()
                      << " workers_per_host=" << ctx.workers_per_host();
             }
@@ -154,16 +206,20 @@ auto word_count_factory = [](
 
 
 
-auto word_count_unchecked = [](size_t num_words, int reps,
-                               const bool warmup = false) {
-    using Key = std::string;
+auto word_count_unchecked = [](size_t words_per_worker, size_t distinct_words,
+                               int reps, const bool warmup = false) {
+    using Key = uint64_t;
     using Value = uint64_t;
     using WordCountPair = std::pair<Key, Value>;
     using ReduceFn = checkers::checked_plus<Value>;//std::plus<Value>;
 
-    return [num_words, reps, warmup](Context& ctx) {
+    return [words_per_worker, distinct_words, reps, warmup](Context& ctx) {
+        const size_t num_words = words_per_worker * ctx.num_workers();
         std::mt19937 rng(std::random_device { } ());
+        zipf_generator<double> zipf(rng(), distinct_words, 1.0);
+
         if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
+
         sRLOG << "Running ReduceByKey tests without checker," << reps << "reps";
 
         common::StatsTimerStopped run_timer;
@@ -176,10 +232,7 @@ auto word_count_unchecked = [](size_t num_words, int reps,
             auto word_pairs = Generate(
                 ctx, num_words,
                 [&](size_t /* index */) {
-                    return WordCountPair(
-                        examples::word_count::s_random_text_writer_words[
-                            rng() % examples::word_count::s_num_random_text_writer_words],
-                        1);
+                    return WordCountPair(zipf.next(), 1);
                 });
 
             word_pairs.ReduceByKey(
@@ -202,7 +255,8 @@ auto word_count_unchecked = [](size_t num_words, int reps,
                      << " benchmark=wordcount_unchecked"
                      << " run_time=" << current_run.Microseconds()
                      << " traffic_reduce=" << traffic_reduce.first + traffic_reduce.second
-                     << " num_words=" << num_words
+                     << " words_per_worker=" << words_per_worker
+                     << " distinct_words=" << distinct_words
                      << " machines=" << ctx.num_hosts()
                      << " workers_per_host=" << ctx.workers_per_host();
             }
@@ -213,7 +267,7 @@ auto word_count_unchecked = [](size_t num_words, int reps,
     };
 };
 
-using T = std::string;
+using T = uint64_t;
 
 template <size_t num_buckets, size_t num_parallel,
           size_t log_mod_range = (8 * sizeof(size_t) - 2)>

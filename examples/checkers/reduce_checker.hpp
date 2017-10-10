@@ -47,7 +47,7 @@ auto reduce_by_key_test_factory = [](
     const auto& manipulator, const auto& config,
     const std::string& manip_name,
     const std::string& config_name,
-    int reps)
+    size_t elems_per_worker, int reps)
 {
     using Value = uint64_t;
     // checked_plus is important for making modulo efficient
@@ -58,7 +58,8 @@ auto reduce_by_key_test_factory = [](
     using Manipulator = std::decay_t<decltype(manipulator)>;
     using Driver = checkers::Driver<Checker, Manipulator>;
 
-    return [reps, manip_name, config_name](Context& ctx) {
+    return [reps, elems_per_worker, manip_name, config_name](Context& ctx) {
+        const size_t size = elems_per_worker * ctx.num_workers();
         std::mt19937 rng(std::random_device { } ());
         std::uniform_int_distribution<Value> distribution(0, 0xFFFFFFFF);
         auto key_extractor = [](const Value& in) { return in & 0xFFFF; };
@@ -80,7 +81,7 @@ auto reduce_by_key_test_factory = [](
             auto traffic_before = ctx.net_manager().Traffic();
 
             common::StatsTimerStart current_run;
-            Generate(ctx, 1000000, generator)
+            Generate(ctx, size, generator)
                 .ReduceByKey(
                     VolatileKeyTag, NoDuplicateDetectionTag, key_extractor, ReduceFn(),
                     api::DefaultReduceConfig(), std::hash<Value>(),
@@ -123,6 +124,7 @@ auto reduce_by_key_test_factory = [](
                      << " check_time=" << current_check.Microseconds()
                      << " traffic_reduce=" << traffic_reduce.first + traffic_reduce.second
                      << " traffic_check=" << traffic_check.first + traffic_check.second
+                     << " elems_per_worker=" << elems_per_worker
                      << " machines=" << ctx.num_hosts()
                      << " workers_per_host=" << ctx.workers_per_host();
             }
@@ -141,11 +143,13 @@ auto reduce_by_key_test_factory = [](
 };
 
 
-auto reduce_by_key_unchecked = [](int reps, const bool warmup = false) {
+auto reduce_by_key_unchecked = [](size_t elems_per_worker, int reps,
+                                  const bool warmup = false) {
     using Value = size_t;
     using ReduceFn = checkers::checked_plus<Value>;//std::plus<Value>;
 
-    return [reps, warmup](Context& ctx) {
+    return [reps, elems_per_worker, warmup](Context& ctx) {
+        const size_t size = elems_per_worker * ctx.num_workers();
         std::mt19937 rng(std::random_device { } ());
         std::uniform_int_distribution<Value> distribution(0, 0xFFFFFFFF);
         auto key_extractor = [](const Value& in) { return in & 0xFFFF; };
@@ -161,7 +165,7 @@ auto reduce_by_key_unchecked = [](int reps, const bool warmup = false) {
             ctx.net.Barrier();
             auto traffic_before = ctx.net_manager().Traffic();
             common::StatsTimerStart current_run;
-            Generate(ctx, 1000000, generator)
+            Generate(ctx, size, generator)
                 .ReduceByKey(VolatileKeyTag, key_extractor, ReduceFn())
                 .Size();
 
@@ -179,6 +183,7 @@ auto reduce_by_key_unchecked = [](int reps, const bool warmup = false) {
                      << " benchmark=random_unchecked"
                      << " run_time=" << current_run.Microseconds()
                      << " traffic_reduce=" << traffic_reduce.first + traffic_reduce.second
+                     << " elems_per_worker=" << elems_per_worker
                      << " machines=" << ctx.num_hosts()
                      << " workers_per_host=" << ctx.workers_per_host();
             }
