@@ -420,7 +420,7 @@ JsonLogger::JsonLogger(JsonLogger* super, const Args& ... args)
     {
         // use JsonLine writer without a Logger to generate a valid string.
         JsonLine json(nullptr, oss);
-        tlx::vexpand((json << (args), 0) ...);
+        (json << ... << args);
     }
     common_ = JsonVerbatim(oss.str());
 }
