@@ -175,7 +175,7 @@ auto reduce_by_key_unchecked = [](size_t reps) {
                 auto traffic_after = ctx.net_manager().Traffic();
                 auto traffic_reduce = traffic_after - traffic_before;
                 LOG1 << "RESULT"
-                     << " benchmark=wordcount_unchecked"
+                     << " benchmark=random_unchecked"
                      << " run_time=" << current_run.Microseconds()
                      << " traffic_reduce=" << traffic_reduce.first + traffic_reduce.second
                      << " machines=" << ctx.num_hosts()
