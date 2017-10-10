@@ -122,6 +122,8 @@ auto word_count_factory = [](
         if (seed == 0) true_seed = std::random_device{}();
         std::mt19937 rng(true_seed);
         zipf_generator<double> zipf(rng(), distinct_words, 1.0);
+        auto generator = [&zipf](size_t /* index */)
+            { return WordCountPair(zipf.next(), 1); };
 
         if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
         sRLOG << "Running ReduceByKey tests with" << manip_name
@@ -139,16 +141,11 @@ auto word_count_factory = [](
 
             common::StatsTimerStart current_run;
 
-            auto word_pairs = Generate(
-                ctx, num_words,
-                [&](size_t /* index */) {
-                    return WordCountPair(zipf.next(), 1);
-                });
-
-            word_pairs.ReduceByKey(
-                common::TupleGet<0, WordCountPair>(),
-                common::TupleReduceIndex<1, WordCountPair, ReduceFn>(),
-                api::DefaultReduceConfig(), driver)
+            Generate(ctx, num_words, generator)
+                .ReduceByKey(
+                    common::TupleGet<0, WordCountPair>(),
+                    common::TupleReduceIndex<1, WordCountPair, ReduceFn>(),
+                    api::DefaultReduceConfig(), driver)
                 .Size();
 
 
@@ -223,6 +220,8 @@ auto word_count_unchecked = [](size_t words_per_worker, size_t distinct_words,
         if (seed == 0) true_seed = std::random_device{}();
         std::mt19937 rng(true_seed);
         zipf_generator<double> zipf(rng(), distinct_words, 1.0);
+        auto generator = [&zipf](size_t /* index */)
+            { return WordCountPair(zipf.next(), 1); };
 
         if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
 
@@ -235,15 +234,10 @@ auto word_count_unchecked = [](size_t words_per_worker, size_t distinct_words,
             auto traffic_before = ctx.net_manager().Traffic();
             common::StatsTimerStart current_run;
 
-            auto word_pairs = Generate(
-                ctx, num_words,
-                [&](size_t /* index */) {
-                    return WordCountPair(zipf.next(), 1);
-                });
-
-            word_pairs.ReduceByKey(
-                common::TupleGet<0, WordCountPair>(),
-                common::TupleReduceIndex<1, WordCountPair, ReduceFn>())
+            Generate(ctx, num_words, generator)
+                .ReduceByKey(
+                    common::TupleGet<0, WordCountPair>(),
+                    common::TupleReduceIndex<1, WordCountPair, ReduceFn>())
                 .Size();
 
 
