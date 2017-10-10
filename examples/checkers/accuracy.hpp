@@ -17,16 +17,16 @@
 #include <tuple>
 
 template <typename Functor, typename Manipulator, typename ... Args>
-void run_accuracy(Functor &&f, const Manipulator &manipulator,
+void run_accuracy(Context &ctx, Functor &&f, const Manipulator &manipulator,
                   const std::string& name, Args ... args) {
 
     auto arg_tuple = std::make_tuple(std::forward<Args>(args)...);
 
-    auto test = [&f, &manipulator, &name, &arg_tuple](auto config, const std::string& config_name) {
+    auto test = [&f, &manipulator, &name, &arg_tuple, &ctx](auto config, const std::string& config_name) {
         auto arg = std::tuple_cat(
             std::tie(manipulator, config, name, config_name),
             arg_tuple);
-        api::Run(std::apply(f, arg));
+        std::apply(f, arg)(ctx);
     };
 
 #ifndef CHECKERS_FULL

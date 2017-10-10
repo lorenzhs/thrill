@@ -15,31 +15,38 @@
 #include "timings.hpp"
 
 #ifdef CHECKERS_FULL
-const size_t default_reps = 10000;
+const int default_reps = 10000;
 #else
-const size_t default_reps = 100;
+const int default_reps = 100;
 #endif
 const size_t default_num_words = 1000000;
 
 int main(int argc, char** argv) {
     tlx::CmdlineParser clp;
 
-    size_t reps = default_reps;
+    int reps = default_reps;
     size_t num_words = default_num_words;
-    clp.add_size_t('n', "iterations", reps, "iterations");
+    clp.add_int('n', "iterations", reps, "iterations");
     clp.add_size_t('w', "words", num_words, "num_words");
 
     if (!clp.process(argc, argv)) return -1;
     clp.print_result();
 
-    api::Run(word_count_unchecked(num_words, reps));
+    api::Run([&](Context& ctx) {
+        ctx.enable_consume();
+        // warmup
+        word_count_unchecked(num_words, 10, true)(ctx);
 
-    auto test = [num_words, reps](auto config, const std::string& config_name) {
-        api::Run(word_count_factory(checkers::ReduceManipulatorDummy(), config,
-                                    "Dummy", config_name, num_words, reps));
-    };
+        word_count_unchecked(num_words, reps)(ctx);
 
-    run_timings(test);
+        auto test = [num_words, reps, &ctx](auto config,
+                                            const std::string& config_name) {
+            word_count_factory(checkers::ReduceManipulatorDummy(), config,
+                               "Dummy", config_name, num_words, reps)(ctx);
+        };
+
+        run_timings(test);
+    });
 }
 
 /******************************************************************************/

@@ -50,7 +50,7 @@ auto word_count_factory = [](
     const auto& manipulator, const auto& config,
     const std::string& manip_name,
     const std::string& config_name,
-    size_t num_words, size_t reps)
+    size_t num_words, int reps)
 {
     using Key = std::string;
     using Value = uint64_t;
@@ -66,14 +66,13 @@ auto word_count_factory = [](
     return [num_words, reps, manip_name, config_name](Context& ctx) {
         std::mt19937 rng(std::random_device { } ());
 
-        ctx.enable_consume();
         if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
         sRLOG << "Running ReduceByKey tests with" << manip_name
               << "manipulator," << config_name << "config," << reps << "reps";
 
         common::StatsTimerStopped run_timer, check_timer;
         size_t failures = 0, manips = 0;
-        for (size_t i = 0; i < reps; ++i) {
+        for (int i = -3; i < reps; ++i) {
             auto driver = std::make_shared<Driver>();
             driver->silence();
 
@@ -98,26 +97,28 @@ auto word_count_factory = [](
                 api::DefaultReduceConfig(), driver)
                 .Size();
 
-            current_run.Stop();
 
             // Re-synchronize, then run final checking pass
             ctx.net.Barrier();
+            current_run.Stop();
             auto traffic_precheck = ctx.net_manager().Traffic();
 
             common::StatsTimerStart current_check;
             auto success = driver->check(ctx);
+            // No need for a barrier, it returns as soon as the global result is
+            // determined
             current_check.Stop();
 
-            if (!success.first) { failures++; }
-            if (success.second) { manips++; }
+            if (i >= 0) { // ignore warmup
+                if (!success.first) { failures++; }
+                if (success.second) { manips++; }
 
-            ctx.net.Barrier();
+                // add current iteration timers to total
+                run_timer += current_run;
+                check_timer += current_check;
+            }
 
-            // add current iteration timers to total
-            run_timer += current_run;
-            check_timer += current_check;
-
-            if (ctx.my_rank() == 0) {
+            if (ctx.my_rank() == 0 && i >= 0) { // ignore warmup
                 auto traffic_after = ctx.net_manager().Traffic();
                 auto traffic_reduce = traffic_precheck - traffic_before;
                 auto traffic_check = traffic_after - traffic_precheck;
@@ -153,20 +154,20 @@ auto word_count_factory = [](
 
 
 
-auto word_count_unchecked = [](size_t num_words, size_t reps) {
+auto word_count_unchecked = [](size_t num_words, int reps,
+                               const bool warmup = false) {
     using Key = std::string;
     using Value = uint64_t;
     using WordCountPair = std::pair<Key, Value>;
     using ReduceFn = checkers::checked_plus<Value>;//std::plus<Value>;
 
-    return [num_words, reps](Context& ctx) {
+    return [num_words, reps, warmup](Context& ctx) {
         std::mt19937 rng(std::random_device { } ());
-        ctx.enable_consume();
         if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
         sRLOG << "Running ReduceByKey tests without checker," << reps << "reps";
 
         common::StatsTimerStopped run_timer;
-        for (size_t i = 0; i < reps; ++i) {
+        for (int i = -3; i < reps; ++i) {
             // Synchronize with barrier
             ctx.net.Barrier();
             auto traffic_before = ctx.net_manager().Traffic();
@@ -186,14 +187,15 @@ auto word_count_unchecked = [](size_t num_words, size_t reps) {
                 common::TupleReduceIndex<1, WordCountPair, ReduceFn>())
                 .Size();
 
-            current_run.Stop();
 
             // Re-synchronize
             ctx.net.Barrier();
+            current_run.Stop();
             // add current iteration timer to total
-            run_timer += current_run;
+            if (i >= 0) // ignore warmup
+                run_timer += current_run;
 
-            if (ctx.my_rank() == 0) {
+            if (ctx.my_rank() == 0 && !warmup && i >= 0) { // ignore warmup
                 auto traffic_after = ctx.net_manager().Traffic();
                 auto traffic_reduce = traffic_after - traffic_before;
                 LOG1 << "RESULT"

@@ -15,28 +15,28 @@
 #include "accuracy.hpp"
 
 #ifdef CHECKERS_FULL
-const size_t default_reps = 10000;
+const int default_reps = 10000;
 #else
-const size_t default_reps = 100;
+const int default_reps = 100;
 #endif
 
 // yikes, preprocessor
 #define TEST_CHECK(MANIP) if (run_ ## MANIP) \
-        run_accuracy(reduce_by_key_test_factory, \
+        run_accuracy(ctx, reduce_by_key_test_factory,                    \
                      checkers::ReduceManipulator ## MANIP(), #MANIP, reps)
 #define TEST_CHECK_I(MANIP, ITS) if (run_ ## MANIP) \
-        run_accuracy(reduce_by_key_test_factory, \
+        run_accuracy(ctx, reduce_by_key_test_factory,                    \
                      checkers::ReduceManipulator ## MANIP(), #MANIP, ITS)
 // run with template parameter
 #define TEST_CHECK_T(NAME, FULL) if (run_ ## NAME) \
-        run_accuracy(reduce_by_key_test_factory, \
+        run_accuracy(ctx, reduce_by_key_test_factory,                    \
                      checkers::ReduceManipulator ## FULL(), #NAME, reps)
 
 int main(int argc, char** argv) {
     tlx::CmdlineParser clp;
 
-    size_t reps = default_reps;
-    clp.add_size_t('n', "iterations", reps, "iterations");
+    int reps = default_reps;
+    clp.add_int('n', "iterations", reps, "iterations");
 
     bool run_RandFirstKey = false, run_SwitchValues = false,
         run_Bitflip = false, run_IncDec1 = false, run_IncDec2 = false,
@@ -53,17 +53,23 @@ int main(int argc, char** argv) {
     if (!clp.process(argc, argv)) return -1;
     clp.print_result();
 
-    TEST_CHECK(RandFirstKey);
-    TEST_CHECK(SwitchValues);
-    TEST_CHECK(Bitflip);
-    TEST_CHECK_T(IncDec1, IncDec<1>);
-    TEST_CHECK_T(IncDec2, IncDec<2>);
-    TEST_CHECK_T(IncDec4, IncDec<4>);
-    TEST_CHECK_T(IncDec8, IncDec<8>);
-    // TEST_CHECK(DropFirst); // disabled because always detected
-    // TEST_CHECK(IncFirst); // disabled because always detected
-    // TEST_CHECK(RandFirst); // disabled because always detected
-    TEST_CHECK(IncFirstKey);
+    api::Run([&](Context &ctx){
+        ctx.enable_consume();
+        // warmup
+        reduce_by_key_unchecked(10, true)(ctx);
+
+        TEST_CHECK(RandFirstKey);
+        TEST_CHECK(SwitchValues);
+        TEST_CHECK(Bitflip);
+        TEST_CHECK_T(IncDec1, IncDec<1>);
+        TEST_CHECK_T(IncDec2, IncDec<2>);
+        TEST_CHECK_T(IncDec4, IncDec<4>);
+        TEST_CHECK_T(IncDec8, IncDec<8>);
+        // TEST_CHECK(DropFirst); // disabled because always detected
+        // TEST_CHECK(IncFirst); // disabled because always detected
+        // TEST_CHECK(RandFirst); // disabled because always detected
+        TEST_CHECK(IncFirstKey);
+    });
 }
 
 /******************************************************************************/

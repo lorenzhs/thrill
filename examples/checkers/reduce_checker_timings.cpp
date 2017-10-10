@@ -15,28 +15,36 @@
 #include "timings.hpp"
 
 #ifdef CHECKERS_FULL
-const size_t default_reps = 10000;
+const int default_reps = 10000;
 #else
-const size_t default_reps = 100;
+const int default_reps = 100;
 #endif
 
 int main(int argc, char** argv) {
     tlx::CmdlineParser clp;
 
-    size_t reps = default_reps;
-    clp.add_size_t('n', "iterations", reps, "iterations");
+    int reps = default_reps;
+    clp.add_int('n', "iterations", reps, "iterations");
 
     if (!clp.process(argc, argv)) return -1;
     clp.print_result();
 
-    api::Run(reduce_by_key_unchecked(reps));
+    api::Run([&](Context& ctx){
+        ctx.enable_consume();
+        // warmup
+        reduce_by_key_unchecked(100, true)(ctx);
 
-    auto test = [reps](auto config, const std::string& config_name) {
-        api::Run(reduce_by_key_test_factory(checkers::ReduceManipulatorDummy(),
-                                            config, "Dummy", config_name, reps));
-    };
+        reduce_by_key_unchecked(reps)(ctx);
 
-    run_timings(test);
+        auto test = [reps,&ctx](auto config, const std::string& config_name) {
+            reduce_by_key_test_factory(checkers::ReduceManipulatorDummy(),
+                                       config, "Dummy", config_name, reps)(ctx);
+        };
+
+        run_timings(test);
+
+        reduce_by_key_unchecked(reps)(ctx);
+    });
 }
 
 /******************************************************************************/

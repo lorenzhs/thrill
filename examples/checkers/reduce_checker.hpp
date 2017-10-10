@@ -47,7 +47,7 @@ auto reduce_by_key_test_factory = [](
     const auto& manipulator, const auto& config,
     const std::string& manip_name,
     const std::string& config_name,
-    size_t reps)
+    int reps)
 {
     using Value = uint64_t;
     // checked_plus is important for making modulo efficient
@@ -65,14 +65,13 @@ auto reduce_by_key_test_factory = [](
         auto generator = [&distribution, &rng](const size_t&) -> Value
             { return distribution(rng); };
 
-        ctx.enable_consume();
         if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
         sRLOG << "Running ReduceByKey tests with" << manip_name
               << "manipulator," << config_name << "config," << reps << "reps";
 
         common::StatsTimerStopped run_timer, check_timer;
         size_t failures = 0, manips = 0;
-        for (size_t i = 0; i < reps; ++i) {
+        for (int i = -3; i < reps; ++i) {
             auto driver = std::make_shared<Driver>();
             driver->silence();
 
@@ -87,26 +86,28 @@ auto reduce_by_key_test_factory = [](
                     api::DefaultReduceConfig(), std::hash<Value>(),
                     std::equal_to<Value>(), driver)
                 .Size();
-            current_run.Stop();
 
             // Re-synchronize, then run final checking pass
             ctx.net.Barrier();
+            current_run.Stop();
             auto traffic_precheck = ctx.net_manager().Traffic();
 
             common::StatsTimerStart current_check;
             auto success = driver->check(ctx);
+            // No need for a barrier, it returns as soon as the global result is
+            // determined
             current_check.Stop();
 
-            if (!success.first) { failures++; }
-            if (success.second) { manips++; }
+            if (i >= 0) {  // ignore warmup
+                // add current iteration timers to total
+                run_timer += current_run;
+                check_timer += current_check;
 
-            ctx.net.Barrier();
+                if (!success.first) { failures++; }
+                if (success.second) { manips++; }
+            }
 
-            // add current iteration timers to total
-            run_timer += current_run;
-            check_timer += current_check;
-
-            if (ctx.my_rank() == 0) {
+            if (ctx.my_rank() == 0 && i >= 0) { // ignore warmup
                 auto traffic_after = ctx.net_manager().Traffic();
                 auto traffic_reduce = traffic_precheck - traffic_before;
                 auto traffic_check = traffic_after - traffic_precheck;
@@ -140,23 +141,22 @@ auto reduce_by_key_test_factory = [](
 };
 
 
-auto reduce_by_key_unchecked = [](size_t reps) {
+auto reduce_by_key_unchecked = [](int reps, const bool warmup = false) {
     using Value = size_t;
     using ReduceFn = checkers::checked_plus<Value>;//std::plus<Value>;
 
-    return [reps](Context& ctx) {
+    return [reps, warmup](Context& ctx) {
         std::mt19937 rng(std::random_device { } ());
         std::uniform_int_distribution<Value> distribution(0, 0xFFFFFFFF);
         auto key_extractor = [](const Value& in) { return in & 0xFFFF; };
         auto generator = [&distribution, &rng](const size_t&) -> Value
             { return distribution(rng); };
 
-        ctx.enable_consume();
         if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
         sRLOG << "Running ReduceByKey tests without checker," << reps << "reps";
 
         common::StatsTimerStopped run_timer;
-        for (size_t i = 0; i < reps; ++i) {
+        for (int i = -3; i < reps; ++i) {
             // Synchronize with barrier
             ctx.net.Barrier();
             auto traffic_before = ctx.net_manager().Traffic();
@@ -164,14 +164,15 @@ auto reduce_by_key_unchecked = [](size_t reps) {
             Generate(ctx, 1000000, generator)
                 .ReduceByKey(VolatileKeyTag, key_extractor, ReduceFn())
                 .Size();
-            current_run.Stop();
 
             // Re-synchronize
             ctx.net.Barrier();
+            current_run.Stop();
             // add current iteration timer to total
-            run_timer += current_run;
+            if (i >= 0)
+                run_timer += current_run;
 
-            if (ctx.my_rank() == 0) {
+            if (ctx.my_rank() == 0 && !warmup && i >= 0) { // ignore warmup
                 auto traffic_after = ctx.net_manager().Traffic();
                 auto traffic_reduce = traffic_after - traffic_before;
                 LOG1 << "RESULT"
