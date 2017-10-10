@@ -35,9 +35,7 @@ int main(int argc, char** argv) {
     api::Run([&](Context& ctx) {
         ctx.enable_consume();
         // warmup
-        word_count_unchecked(num_words, 10, true)(ctx);
-
-        word_count_unchecked(num_words, reps)(ctx);
+        word_count_unchecked(num_words, 100, true)(ctx);
 
         auto test = [num_words, reps, &ctx](auto config,
                                             const std::string& config_name) {
@@ -46,6 +44,8 @@ int main(int argc, char** argv) {
         };
 
         run_timings(test);
+
+        word_count_unchecked(num_words, reps)(ctx);
     });
 }
 

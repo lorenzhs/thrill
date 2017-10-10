@@ -34,8 +34,6 @@ int main(int argc, char** argv) {
         // warmup
         reduce_by_key_unchecked(100, true)(ctx);
 
-        reduce_by_key_unchecked(reps)(ctx);
-
         auto test = [reps,&ctx](auto config, const std::string& config_name) {
             reduce_by_key_test_factory(checkers::ReduceManipulatorDummy(),
                                        config, "Dummy", config_name, reps)(ctx);
