@@ -18,12 +18,13 @@ template <typename Functor>
 void run_timings(Functor &&test) {
 #ifndef CHECKERS_FULL
     // default
-    test(CRC32Config<16, 4>{}, "4x16_CRC32");
-    test(CRC32Config<16, 2>{}, "2x16_CRC32");
-    test(CRC32Config<16, 1>{}, "1x16_CRC32");
-    test(CRC32Config<8, 1>{}, "1x8_CRC32");
-    test(CRC32Config<4, 1>{}, "1x4_CRC32");
-    test(CRC32Config<2, 1>{}, "1x2_CRC32");
+    test(Tab64Config<16, 16, 15>{}, "16x16_Tab64_m15");
+    test(Tab64Config<256, 8, 15>{}, "8x256_Tab64_m15");
+    test(Tab64Config<128, 5, 11>{}, "5x128_Tab64_m11");
+    test(CRC32Config<256, 4, 15>{}, "4x256_CRC32_m15");
+    test(CRC32Config<16, 8, 15>{}, "8x16_CRC32_m15");
+    test(CRC32Config<32, 6, 9>{}, "6x32_CRC32_m9");
+    test(CRC32Config<16, 5, 5>{}, "5x16_CRC32_m5");
 #else
     test(CRC32Config<256, 2>{}, "2x256_CRC32");
     test(CRC32Config<256, 1>{}, "1x256_CRC32");

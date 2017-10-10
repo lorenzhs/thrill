@@ -286,6 +286,12 @@ template <size_t num_buckets, size_t num_parallel,
 using TabConfig = checkers::MinireductionConfig<common::HashTabulated<T>,
                                                 num_buckets, num_parallel,
                                                 (1ULL << log_mod_range)>;
+template <size_t num_buckets, size_t num_parallel,
+          size_t log_mod_range = (8 * sizeof(size_t) - 2)>
+using Tab64Config = checkers::MinireductionConfig<
+    common::TabulationHashing<sizeof(T), uint64_t>,
+    num_buckets, num_parallel, (1ULL << log_mod_range)>;
+
 
 namespace std {
 template <typename T, typename U>
