@@ -47,7 +47,7 @@ int main(int argc, char** argv) {
     clp.add_int('n', "iterations", reps, "iterations");
     clp.add_size_t('w', "words", words_per_worker, "words per worker");
     clp.add_size_t('d', "distinct", distinct_words, "number of distinct words");
-    clp.add_size_t('s', "seed", seed, "seed for input generation (0: random)");
+    clp.add_size_t('e', "seed", seed, "seed for input generation (0: random)");
 
     bool run_RandFirstKey = false, run_SwitchValues = false,
         run_Bitflip = false, run_IncDec1 = false, run_IncDec2 = false,
