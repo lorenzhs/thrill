@@ -31,14 +31,13 @@ void run_accuracy(Context &ctx, Functor &&f, const Manipulator &manipulator,
 
 #ifndef CHECKERS_FULL
     // default
-    test(CRC32Config<16, 4>{}, "4x16_CRC32");
-    test(CRC32Config<16, 2>{}, "2x16_CRC32");
-    test(CRC32Config<16, 1>{}, "1x16_CRC32");
-    test(CRC32Config<16, 1, 31>{}, "1x16_m31_CRC32");
-    test(CRC32Config<16, 1, 15>{}, "1x16_m15_CRC32");
-    test(CRC32Config<16, 1, 7>{}, "1x16_m7_CRC32");
-    test(CRC32Config<16, 1, 3>{}, "1x16_m3_CRC32");
-    test(CRC32Config<8, 1>{}, "1x8_CRC32");
+    test(CRC32Config<16, 4, 7>{}, "4x16_CRC32_m7");
+    test(CRC32Config<8, 4, 7>{}, "4x8_CRC32_m7");
+    test(CRC32Config<8, 4, 5>{}, "4x8_CRC32_m5");
+    test(CRC32Config<8, 4, 3>{}, "4x8_CRC32_m3");
+    test(CRC32Config<4, 4, 5>{}, "4x4_CRC32_m5");
+    test(CRC32Config<4, 4, 3>{}, "4x4_CRC32_m3");
+    test(CRC32Config<2, 4, 4>{}, "4x2_CRC32_m4");
     test(CRC32Config<4, 1>{}, "1x4_CRC32");
     test(CRC32Config<2, 1>{}, "1x2_CRC32");
 #else
@@ -65,15 +64,15 @@ void run_accuracy(Context &ctx, Functor &&f, const Manipulator &manipulator,
 #endif
 
 #ifndef CHECKERS_FULL
-    /*
-    test(TabConfig<16, 1, 31>{}, "1x16_m31_Tab");
-    test(TabConfig<16, 1, 15>{}, "1x16_m15_Tab");
-    test(TabConfig<16, 1, 7>{}, "1x16_m7_Tab");
-    test(TabConfig<16, 1, 3>{}, "1x16_m3_Tab");
-    test(TabConfig<16, 1>{}, "1x16_Tab");
+    test(TabConfig<16, 4, 7>{}, "4x16_Tab_m7");
+    test(TabConfig<8, 4, 7>{}, "4x8_Tab_m7");
+    test(TabConfig<8, 4, 5>{}, "4x8_Tab_m5");
+    test(TabConfig<8, 4, 3>{}, "4x8_Tab_m3");
+    test(TabConfig<4, 4, 5>{}, "4x4_Tab_m5");
+    test(TabConfig<4, 4, 3>{}, "4x4_Tab_m3");
+    test(TabConfig<2, 4, 4>{}, "4x2_Tab_m4");
     test(TabConfig<4, 1>{}, "1x4_Tab");
     test(TabConfig<2, 1>{}, "1x2_Tab");
-    */
 #else
     test(TabConfig<256, 2>{}, "2x256_Tab");
     test(TabConfig<256, 1>{}, "1x256_Tab");
