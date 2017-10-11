@@ -292,8 +292,8 @@ protected:
 };
 
 //! Tabulation hashing
-template <typename T>
-using HashTabulated = TabulationHashing<sizeof(T)>;
+template <typename T, typename hash_t = uint32_t>
+using HashTabulated = TabulationHashing<sizeof(T), hash_t>;
 
 template <typename ValueType, size_t bits = 32,
           typename Hash = HashCrc32<ValueType> >
