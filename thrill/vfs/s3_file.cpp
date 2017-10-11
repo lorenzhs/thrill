@@ -123,12 +123,13 @@ static void FillS3BucketContext(S3BucketContext& bkt, const std::string& key) {
     bkt.uriStyle = S3UriStyleVirtualHost;
     bkt.accessKeyId = getenv("THRILL_S3_KEY");
     bkt.secretAccessKey = getenv("THRILL_S3_SECRET");
+    bkt.authRegion = getenv("THRILL_S3_REGION");
 
-    if (bkt.accessKeyId != nullptr) {
-        die("S3-ERROR - set environment variable THRILL_S3_KEY");
+    if (bkt.accessKeyId == nullptr) {
+        LOG1 << "S3-WARNING - no key given - set environment variable THRILL_S3_KEY";
     }
-    if (bkt.secretAccessKey != nullptr) {
-        die("S3-ERROR - set environment variable THRILL_S3_SECRET");
+    if (bkt.secretAccessKey == nullptr) {
+        LOG1<< "S3-WARNING - no secret given - set environment variable THRILL_S3_SECRET";
     }
 }
 
@@ -164,7 +165,8 @@ public:
         do {
             S3_list_bucket(
                 bucket_context, prefix, last_marker_, delimiter, maxkeys,
-                /* request_context */ nullptr, &handlers, this);
+                /* request_context */ nullptr, /* timeoutMs */ 0,
+                &handlers, this);
         } while (status_ == S3StatusOK && is_truncated_);      // NOLINT
 
         // S3 keys are usually returned sorted, but we sort anyway
@@ -296,7 +298,7 @@ public:
 
         // construct bucket
         S3BucketContext bucket_context;
-        FillS3BucketContext(bucket_context, bucket_.c_str());
+        FillS3BucketContext(bucket_context, bucket_);
 
         // construct handlers
         S3GetObjectHandler handler;
@@ -316,8 +318,8 @@ public:
         // issue request but do not wait for data
         S3_get_object(
             &bucket_context, key_.c_str(), get_conditions,
-            start_byte, byte_count,
-            /* request_context */ req_ctx_, &handler, this);
+            start_byte, byte_count, /* request_context */ req_ctx_,
+            /* timeoutMs */ 0, &handler, this);
     }
 
     //! simpler constructor
@@ -503,7 +505,7 @@ public:
         // create new multi part upload
         S3_initiate_multipart(
             &bucket_context, key_.c_str(), put_properties, &handler,
-            /* request_context */ nullptr, this);
+            /* request_context */ nullptr, /* timeoutMs */ 0, this);
     }
 
     ~S3WriteStream() override {
@@ -576,7 +578,7 @@ public:
         S3_complete_multipart_upload(
             &bucket_context, key_.c_str(), &handler, upload_id_.c_str(),
             /* content_length */ xml_str.size(),
-            /* request_context */ nullptr, this);
+            /* request_context */ nullptr, /* timeoutMs */ 0, this);
 
         upload_id_.clear();
     }
@@ -674,7 +676,8 @@ private:
         S3_upload_part(&bucket_context, key_.c_str(), put_properties_,
                        &handler, upload_seq_++, upload_id_.c_str(),
                        /* partContentLength */ buffer_.size(),
-                       /* request_context */ nullptr, this);
+                       /* request_context */ nullptr,
+                       /* timeoutMs */ 0, this);
 
         buffer_.clear();
     }

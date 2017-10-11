@@ -14,7 +14,7 @@
 #ifndef THRILL_COMMON_JSON_LOGGER_HEADER
 #define THRILL_COMMON_JSON_LOGGER_HEADER
 
-#include <tlx/meta/vexpand.hpp>
+#include <tlx/meta/call_foreach.hpp>
 
 #include <array>
 #include <cassert>

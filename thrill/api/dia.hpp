@@ -1223,21 +1223,16 @@ public:
      *
      * \param reduce_config Reduce configuration.
      *
-     * \param driver Checking driver.
-     *
      * \ingroup dia_dops
      */
     template <typename KeyExtractor, typename ReduceFunction,
-              typename ReduceConfig = class DefaultReduceToIndexConfig,
-              typename CheckingDriver = checkers::DummyReduceDriver>
+              typename ReduceConfig = class DefaultReduceToIndexConfig>
     auto ReduceToIndex(
         const KeyExtractor& key_extractor,
         const ReduceFunction& reduce_function,
         size_t size,
         const ValueType& neutral_element = ValueType(),
-        const ReduceConfig& reduce_config = ReduceConfig(),
-        std::shared_ptr<CheckingDriver> driver =
-            std::make_shared<CheckingDriver>()) const;
+        const ReduceConfig& reduce_config = ReduceConfig()) const;
 
     /*!
      * ReduceToIndexByKey is a DOp, which groups elements of the DIA with the
@@ -1274,23 +1269,18 @@ public:
      *
      * \param reduce_config Reduce configuration.
      *
-     * \param driver Checking driver.
-     *
      * \ingroup dia_dops
      */
     template <bool VolatileKeyValue,
               typename KeyExtractor, typename ReduceFunction,
-              typename ReduceConfig = class DefaultReduceToIndexConfig,
-              typename CheckingDriver = checkers::DummyReduceDriver>
+              typename ReduceConfig = class DefaultReduceToIndexConfig>
     auto ReduceToIndex(
         const VolatileKeyFlag<VolatileKeyValue>&,
         const KeyExtractor& key_extractor,
         const ReduceFunction& reduce_function,
         size_t size,
         const ValueType& neutral_element = ValueType(),
-        const ReduceConfig& reduce_config = ReduceConfig(),
-        std::shared_ptr<CheckingDriver> driver =
-            std::make_shared<CheckingDriver>()) const;
+        const ReduceConfig& reduce_config = ReduceConfig()) const;
 
     /*!
      * GroupByKey is a DOp, which groups elements of the DIA by its key.

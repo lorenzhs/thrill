@@ -25,7 +25,6 @@
 #include <thrill/core/reduce_pre_phase.hpp>
 
 #include <functional>
-#include <memory>
 #include <thread>
 #include <type_traits>
 #include <utility>
@@ -56,8 +55,7 @@ class DefaultReduceToIndexConfig : public core::DefaultReduceConfig
  */
 template <typename ValueType,
           typename KeyExtractor, typename ReduceFunction,
-          typename ReduceConfig, typename CheckingDriver,
-          bool VolatileKey>
+          typename ReduceConfig, bool VolatileKey>
 class ReduceToIndexNode final : public DOpNode<ValueType>
 {
     static constexpr bool debug = false;
@@ -74,9 +72,6 @@ class ReduceToIndexNode final : public DOpNode<ValueType>
     static_assert(std::is_same<Key, size_t>::value,
                   "Key must be an unsigned integer");
 
-    using Checker = typename CheckingDriver::checker_t;
-    using Manipulator = typename CheckingDriver::manipulator_t;
-
     static constexpr bool use_mix_stream_ = ReduceConfig::use_mix_stream_;
     static constexpr bool use_post_thread_ = ReduceConfig::use_post_thread_;
 
@@ -85,60 +80,12 @@ private:
     class Emitter
     {
     public:
-        explicit Emitter(ReduceToIndexNode* node, Checker& checker)
-            : node_(node), checker_(checker) { }
-
-        void operator () (const ValueType& item) const {
-            checker_.add_post(item);
-            return node_->PushItem(item);
-        }
-
-        void operator () (const ValueType& item, const TableItem& pair) const {
-            checker_.add_post(pair);
-            return node_->PushItem(item);
-        }
+        explicit Emitter(ReduceToIndexNode* node) : node_(node) { }
+        void operator () (const ValueType& item) const
+        { return node_->PushItem(item); }
 
     private:
         ReduceToIndexNode* node_;
-        Checker& checker_;
-    };
-
-    //! PreOp to insert elements into PrePhase
-    template <typename V, typename PrePhase, typename Checker,
-              typename KeyIsValue = void>
-    struct ReducePreOp {
-        ReducePreOp(PrePhase& pre_phase, const KeyExtractor&, Checker& checker)
-            : pre_phase_(pre_phase), checker_(checker) { }
-        auto operator () (const ValueType& input) {
-            checker_.add_pre(input);
-            return pre_phase_.Insert(input);
-        }
-
-    private:
-        PrePhase& pre_phase_;
-        Checker&  checker_;
-    };
-
-    //! PreOp to insert elements into PrePhase, handling the case where either
-    //! Key or Value is equal to ValueType
-    template <typename V, typename PrePhase, typename Checker>
-    struct ReducePreOp<V, PrePhase, Checker,
-                       typename std::enable_if_t<(std::is_same<std::decay_t<V>, Key>::value ||
-                                                  std::is_same<std::decay_t<V>, ValueType>::value)> >{
-        ReducePreOp(PrePhase& pre_phase, const KeyExtractor& key_extractor,
-                    Checker& checker)
-            : pre_phase_(pre_phase),
-              key_extractor_(key_extractor),
-              checker_(checker) { }
-        auto operator () (const ValueType& input) {
-            checker_.add_pre(key_extractor_(input), input);
-            return pre_phase_.Insert(input);
-        }
-
-    private:
-        PrePhase&           pre_phase_;
-        const KeyExtractor& key_extractor_;
-        Checker&            checker_;
     };
 
 public:
@@ -153,8 +100,7 @@ public:
                       const ReduceFunction& reduce_function,
                       size_t result_size,
                       const ValueType& neutral_element,
-                      const ReduceConfig& config,
-                      std::shared_ptr<CheckingDriver> driver)
+                      const ReduceConfig& config)
         : Super(parent.ctx(), label, { parent.id() }, { parent.node() }),
           mix_stream_(use_mix_stream_ ?
                       parent.ctx().GetNewMixStream(this) : nullptr),
@@ -165,26 +111,19 @@ public:
           result_size_(result_size),
           pre_phase_(
               context_, Super::id(), context_.num_workers(),
-              key_extractor, reduce_function, emitters_, driver->manipulator(),
+              key_extractor, reduce_function, emitters_, manipulator_,
               config, core::ReduceByIndex<Key>(0, result_size)),
           post_phase_(
               context_, Super::id(),
-              key_extractor, reduce_function, Emitter(this, driver->checker()),
-              driver->manipulator(), config, core::ReduceByIndex<Key>(),
-              neutral_element),
-          checking_driver_(driver)
+              key_extractor, reduce_function, Emitter(this),
+              config, neutral_element)
     {
-        // Reset checker
-        checking_driver_->reset();
         // Hook PreOp: Locally hash elements of the current DIA onto buckets and
         // reduce each bucket to a single value, afterwards send data to another
         // worker given by the shuffle algorithm.
-        auto pre_op_fn = ReducePreOp<ValueType, decltype(pre_phase_), Checker>
-                             (pre_phase_, key_extractor, driver->checker());
-/*[this](const ValueType& input) {
-                             checker_.add_pre(input);
+        auto pre_op_fn = [this](const ValueType& input) {
                              return pre_phase_.Insert(input);
-                             };*/
+                         };
 
         // close the function stack with our pre op and register it at parent
         // node for output
@@ -205,18 +144,14 @@ public:
 
             // re-parameterize with resulting key range on this worker - this is
             // only know after Initialize() of the pre_phase_.
-            post_phase_.table().index_function() =
-                core::ReduceByIndex<Key>(
-                    pre_phase_.key_range(context_.my_rank()));
+            post_phase_.SetRange(pre_phase_.key_range(context_.my_rank()));
         }
         else {
             pre_phase_.Initialize(DIABase::mem_limit_ / 2);
 
             // re-parameterize with resulting key range on this worker - this is
             // only know after Initialize() of the pre_phase_.
-            post_phase_.table().index_function() =
-                core::ReduceByIndex<Key>(
-                    pre_phase_.key_range(context_.my_rank()));
+            post_phase_.SetRange(pre_phase_.key_range(context_.my_rank()));
             post_phase_.Initialize(DIABase::mem_limit_ / 2);
 
             // start additional thread to receive from the channel
@@ -291,48 +226,46 @@ private:
     //! handle to additional thread for post phase
     std::thread thread_;
 
+    // Dummy
+    using Manipulator = checkers::ReduceManipulatorDummy;
+    Manipulator manipulator_;
+
     core::ReducePrePhase<
-        TableItem, Key, ValueType, KeyExtractor, ReduceFunction, Manipulator,
-        VolatileKey, ReduceConfig, core::ReduceByIndex<Key> > pre_phase_;
+        TableItem, Key, ValueType, KeyExtractor, ReduceFunction,
+        Manipulator, VolatileKey,
+        ReduceConfig, core::ReduceByIndex<Key> > pre_phase_;
 
     core::ReduceByIndexPostPhase<
         TableItem, Key, ValueType, KeyExtractor, ReduceFunction, Emitter,
-        Manipulator, VolatileKey, ReduceConfig> post_phase_;
-
-    std::shared_ptr<CheckingDriver> checking_driver_;
+        VolatileKey, ReduceConfig> post_phase_;
 
     bool reduced_ = false;
 };
 
 template <typename ValueType, typename Stack>
-template <typename KeyExtractor, typename ReduceFunction,
-          typename ReduceConfig, typename CheckingDriver>
+template <typename KeyExtractor, typename ReduceFunction, typename ReduceConfig>
 auto DIA<ValueType, Stack>::ReduceToIndex(
     const KeyExtractor& key_extractor,
     const ReduceFunction& reduce_function,
     size_t size,
     const ValueType& neutral_element,
-    const ReduceConfig& reduce_config,
-    std::shared_ptr<CheckingDriver> driver) const {
+    const ReduceConfig& reduce_config) const {
     // forward to main function
     return ReduceToIndex(
         NoVolatileKeyTag,
-        key_extractor, reduce_function, size, neutral_element, reduce_config,
-        driver);
+        key_extractor, reduce_function, size, neutral_element, reduce_config);
 }
 
 template <typename ValueType, typename Stack>
 template <bool VolatileKeyValue,
-          typename KeyExtractor, typename ReduceFunction, typename ReduceConfig,
-          typename CheckingDriver>
+          typename KeyExtractor, typename ReduceFunction, typename ReduceConfig>
 auto DIA<ValueType, Stack>::ReduceToIndex(
     const VolatileKeyFlag<VolatileKeyValue>&,
     const KeyExtractor& key_extractor,
     const ReduceFunction& reduce_function,
     size_t size,
     const ValueType& neutral_element,
-    const ReduceConfig& reduce_config,
-    std::shared_ptr<CheckingDriver> driver) const {
+    const ReduceConfig& reduce_config) const {
     assert(IsValid());
 
     using DOpResult
@@ -373,11 +306,11 @@ auto DIA<ValueType, Stack>::ReduceToIndex(
 
     using ReduceNode = ReduceToIndexNode<
               DOpResult, KeyExtractor, ReduceFunction,
-              ReduceConfig, CheckingDriver, VolatileKeyValue>;
+              ReduceConfig, VolatileKeyValue>;
 
     auto node = tlx::make_counting<ReduceNode>(
         *this, "ReduceToIndex", key_extractor, reduce_function,
-        size, neutral_element, reduce_config, driver);
+        size, neutral_element, reduce_config);
 
     return DIA<DOpResult>(node);
 }
