@@ -81,8 +81,8 @@ auto reduce_by_key_test_factory = [](
             // Synchronize with barrier
             ctx.net.Barrier();
             auto traffic_before = ctx.net_manager().Traffic();
-
             common::StatsTimerStart current_run;
+
             Generate(ctx, size, generator)
                 .ReduceByKey(
                     VolatileKeyTag, NoDuplicateDetectionTag, key_extractor, ReduceFn(),
@@ -110,7 +110,7 @@ auto reduce_by_key_test_factory = [](
                 if (success.second) { manips++; }
             }
 
-            if (ctx.my_rank() == 0 && i >= 0) { // ignore warmup
+            if (my_rank == 0 && i >= 0) { // ignore warmup
                 auto traffic_after = ctx.net_manager().Traffic();
                 auto traffic_reduce = traffic_precheck - traffic_before;
                 auto traffic_check = traffic_after - traffic_precheck;
@@ -171,6 +171,7 @@ auto reduce_by_key_unchecked = [](size_t elems_per_worker, size_t seed,
             ctx.net.Barrier();
             auto traffic_before = ctx.net_manager().Traffic();
             common::StatsTimerStart current_run;
+
             Generate(ctx, size, generator)
                 .ReduceByKey(VolatileKeyTag, key_extractor, ReduceFn())
                 .Size();
@@ -182,7 +183,7 @@ auto reduce_by_key_unchecked = [](size_t elems_per_worker, size_t seed,
             if (i >= 0)
                 run_timer += current_run;
 
-            if (ctx.my_rank() == 0 && !warmup && i >= 0) { // ignore warmup
+            if (my_rank == 0 && !warmup && i >= 0) { // ignore warmup
                 auto traffic_after = ctx.net_manager().Traffic();
                 auto traffic_reduce = traffic_after - traffic_before;
                 LOG1 << "RESULT"

@@ -138,7 +138,6 @@ auto word_count_factory = [](
             // Synchronize with barrier
             ctx.net.Barrier();
             auto traffic_before = ctx.net_manager().Traffic();
-
             common::StatsTimerStart current_run;
 
             Generate(ctx, num_words, generator)
@@ -169,7 +168,7 @@ auto word_count_factory = [](
                 check_timer += current_check;
             }
 
-            if (ctx.my_rank() == 0 && i >= 0) { // ignore warmup
+            if (my_rank == 0 && i >= 0) { // ignore warmup
                 auto traffic_after = ctx.net_manager().Traffic();
                 auto traffic_reduce = traffic_precheck - traffic_before;
                 auto traffic_check = traffic_after - traffic_precheck;
@@ -250,7 +249,7 @@ auto word_count_unchecked = [](size_t words_per_worker, size_t distinct_words,
             if (i >= 0) // ignore warmup
                 run_timer += current_run;
 
-            if (ctx.my_rank() == 0 && !warmup && i >= 0) { // ignore warmup
+            if (my_rank == 0 && !warmup && i >= 0) { // ignore warmup
                 auto traffic_after = ctx.net_manager().Traffic();
                 auto traffic_reduce = traffic_after - traffic_before;
                 LOG1 << "RESULT"
