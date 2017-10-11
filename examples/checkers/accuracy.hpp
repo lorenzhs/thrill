@@ -22,15 +22,14 @@ void run_accuracy(Context &ctx, Functor &&f, const Manipulator &manipulator,
 
     auto arg_tuple = std::make_tuple(std::forward<Args>(args)...);
 
-    auto test = [&f, &manipulator, &name, &arg_tuple, &ctx](auto config, const std::string& config_name) {
+    auto test = [&f, &manipulator, &name, &arg_tuple, &ctx](
+        auto config, const std::string& config_name) {
         auto arg = std::tuple_cat(
             std::tie(manipulator, config, name, config_name),
             arg_tuple);
         std::apply(f, arg)(ctx);
     };
 
-#ifndef CHECKERS_FULL
-    // default
     test(CRC32Config<16, 4, 7>{}, "4x16_CRC32_m7");
     test(CRC32Config<8, 4, 7>{}, "4x8_CRC32_m7");
     test(CRC32Config<8, 4, 5>{}, "4x8_CRC32_m5");
@@ -40,30 +39,7 @@ void run_accuracy(Context &ctx, Functor &&f, const Manipulator &manipulator,
     test(CRC32Config<2, 4, 4>{}, "4x2_CRC32_m4");
     test(CRC32Config<4, 1>{}, "1x4_CRC32");
     test(CRC32Config<2, 1>{}, "1x2_CRC32");
-#else
-    test(CRC32Config<256, 2>{}, "2x256_CRC32");
-    test(CRC32Config<256, 1>{}, "1x256_CRC32");
 
-    test(CRC32Config<16, 4>{}, "4x16_CRC32");
-    test(CRC32Config<16, 2>{}, "2x16_CRC32");
-    test(CRC32Config<16, 1>{}, "1x16_CRC32");
-
-    test(CRC32Config<4, 8>{}, "8x4_CRC32");
-    test(CRC32Config<4, 6>{}, "6x4_CRC32");
-    test(CRC32Config<4, 4>{}, "4x4_CRC32");
-    test(CRC32Config<4, 3>{}, "3x4_CRC32");
-    test(CRC32Config<4, 2>{}, "2x4_CRC32");
-    test(CRC32Config<4, 1>{}, "1x4_CRC32");
-
-    test(CRC32Config<2, 8>{}, "8x2_CRC32");
-    test(CRC32Config<2, 6>{}, "6x2_CRC32");
-    test(CRC32Config<2, 4>{}, "4x2_CRC32");
-    test(CRC32Config<2, 3>{}, "3x2_CRC32");
-    test(CRC32Config<2, 2>{}, "2x2_CRC32");
-    test(CRC32Config<2, 1>{}, "1x2_CRC32");
-#endif
-
-#ifndef CHECKERS_FULL
     test(TabConfig<16, 4, 7>{}, "4x16_Tab_m7");
     test(TabConfig<8, 4, 7>{}, "4x8_Tab_m7");
     test(TabConfig<8, 4, 5>{}, "4x8_Tab_m5");
@@ -73,30 +49,6 @@ void run_accuracy(Context &ctx, Functor &&f, const Manipulator &manipulator,
     test(TabConfig<2, 4, 4>{}, "4x2_Tab_m4");
     test(TabConfig<4, 1>{}, "1x4_Tab");
     test(TabConfig<2, 1>{}, "1x2_Tab");
-#else
-    test(TabConfig<256, 2>{}, "2x256_Tab");
-    test(TabConfig<256, 1>{}, "1x256_Tab");
-
-    test(TabConfig<16, 4>{}, "4x16_Tab");
-    test(TabConfig<16, 2>{}, "2x16_Tab");
-    test(TabConfig<16, 1>{}, "1x16_Tab");
-
-    test(TabConfig<4, 8>{}, "8x4_Tab");
-    test(TabConfig<4, 6>{}, "6x4_Tab");
-    test(TabConfig<4, 4>{}, "4x4_Tab");
-    test(TabConfig<4, 3>{}, "3x4_Tab");
-    test(TabConfig<4, 2>{}, "2x4_Tab");
-    test(TabConfig<4, 1>{}, "1x4_Tab");
-
-    test(TabConfig<2, 8>{}, "8x2_Tab");
-    test(TabConfig<2, 6>{}, "6x2_Tab");
-    test(TabConfig<2, 4>{}, "4x2_Tab");
-    test(TabConfig<2, 3>{}, "3x2_Tab");
-    test(TabConfig<2, 2>{}, "2x2_Tab");
-    test(TabConfig<2, 1>{}, "1x2_Tab");
-#endif
-
-    #undef test
 }
 
 #endif
