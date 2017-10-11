@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
     api::Run([&](Context& ctx) {
         ctx.enable_consume();
         // warmup
-        word_count_unchecked(words_per_worker, distinct_words, seed, 100, true)(ctx);
+        word_count_unchecked(words_per_worker, distinct_words, seed, std::min(100, reps), true)(ctx);
 
         auto test = [words_per_worker, distinct_words, seed, reps, &ctx](
             auto config, const std::string& config_name) {

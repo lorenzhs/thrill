@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
     api::Run([&](Context& ctx){
         ctx.enable_consume();
         // warmup
-        reduce_by_key_unchecked(elems_per_worker, seed, 100, true)(ctx);
+        reduce_by_key_unchecked(elems_per_worker, seed, std::min(100, reps), true)(ctx);
 
         auto test = [reps, elems_per_worker, seed, &ctx](
             auto config, const std::string& config_name) {
