@@ -134,11 +134,13 @@ auto reduce_by_key = [](
         }
     }
 
+    double expected_failures = config.exp_delta * manips;
     RLOG << "ReduceByKey with " << manip_name << " manip and "
          << config_name << " config: "
          << (failures > 0 ? common::log::fg_red() : "")
-         << failures << " / " << reps << " tests failed"
-         << "; " << manips << " manipulations" << common::log::reset();
+         << failures << " / " << reps << " tests failed, expected approx. "
+         << expected_failures << " given " << manips << " manipulations"
+         << common::log::reset();
     sRLOG << "Reduce:" << run_timer.Microseconds()/(1000.0*reps) << "ms;"
           << "Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms;"
           << "Config:" << config_name;
