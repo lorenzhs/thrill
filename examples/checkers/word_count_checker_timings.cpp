@@ -29,21 +29,35 @@ int main(int argc, char** argv) {
     size_t words_per_worker = default_words_per_worker,
         distinct_words = default_distinct_words,
         seed = 42;
+    std::string config_param = "8x16_CRC32_m15";
     clp.add_int('n', "iterations", reps, "iterations");
     clp.add_size_t('w', "words", words_per_worker, "words per worker");
     clp.add_size_t('d', "distinct", distinct_words, "number of distinct words");
     clp.add_size_t('s', "seed", seed, "seed for input generation (0: random)");
+    clp.add_string('c', "config", config_param, "which configuration to run");
 
     if (!clp.process(argc, argv)) return -1;
     clp.print_result();
 
+    if (std::find(known_configs.begin(), known_configs.end(), config_param) ==
+        known_configs.end()) {
+        LOG1 << "unknown config: " << config_param;
+        return 1;
+    }
+
     api::Run([&](Context& ctx) {
         ctx.enable_consume();
+        my_rank = ctx.net.my_rank();
         // warmup
+        RLOG << "Warmup...";
         word_count_unchecked(words_per_worker, distinct_words, seed, std::min(100, reps), true)(ctx);
 
-        auto test = [words_per_worker, distinct_words, seed, reps, &ctx](
+        auto test = [words_per_worker, distinct_words, seed, reps, config_param, &ctx](
             auto config, const std::string& config_name) {
+            if (config_name != config_param) {
+                return;
+            }
+            RLOG << "Executing chosen configuration " << config_name;
             word_count_factory(checkers::ReduceManipulatorDummy(), config,
                                "Dummy", config_name, words_per_worker,
                                distinct_words, seed, reps)(ctx);
@@ -51,7 +65,9 @@ int main(int argc, char** argv) {
 
         run_timings(test);
 
-        word_count_unchecked(words_per_worker, distinct_words, seed, reps)(ctx);
+        if (config_param == "unchecked") {
+            word_count_unchecked(words_per_worker, distinct_words, seed, reps)(ctx);
+        }
     });
 }
 

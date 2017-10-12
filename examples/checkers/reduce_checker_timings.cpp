@@ -26,20 +26,28 @@ int main(int argc, char** argv) {
 
     int reps = default_reps;
     size_t elems_per_worker = default_elems_per_worker, seed = 42;
+    std::string config_param = "8x16_CRC32_m15";
     clp.add_int('n', "iterations", reps, "iterations");
     clp.add_size_t('e', "elems", elems_per_worker, "elements per worker");
     clp.add_size_t('s', "seed", seed, "seed for input generation (0: random)");
+    clp.add_string('c', "config", config_param, "which configuration to run");
 
     if (!clp.process(argc, argv)) return -1;
     clp.print_result();
 
     api::Run([&](Context& ctx){
         ctx.enable_consume();
+        my_rank = ctx.net.my_rank();
         // warmup
+        RLOG << "Warmup...";
         reduce_by_key_unchecked(elems_per_worker, seed, std::min(100, reps), true)(ctx);
 
-        auto test = [reps, elems_per_worker, seed, &ctx](
+        auto test = [reps, elems_per_worker, seed, config_param, &ctx](
             auto config, const std::string& config_name) {
+            if (config_name != config_param) {
+                return;
+            }
+            RLOG << "Executing chosen configuration " << config_name;
             reduce_by_key_test_factory(checkers::ReduceManipulatorDummy(),
                                        config, "Dummy", config_name,
                                        elems_per_worker, seed, reps)(ctx);
@@ -47,7 +55,9 @@ int main(int argc, char** argv) {
 
         run_timings(test);
 
-        reduce_by_key_unchecked(elems_per_worker, seed, reps)(ctx);
+        if (config_param == "unchecked") {
+            reduce_by_key_unchecked(elems_per_worker, seed, reps)(ctx);
+        }
     });
 }
 

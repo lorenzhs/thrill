@@ -14,10 +14,22 @@
 #ifndef THRILL_EXAMPLES_CHECKERS_TIMINGS_HEADER
 #define THRILL_EXAMPLES_CHECKERS_TIMINGS_HEADER
 
+#include <string>
+#include <vector>
+
+static const std::vector<std::string> known_configs = {
+    "16x16_Tab64_m15",
+    "8x256_Tab64_m15",
+    "5x128_Tab64_m11",
+    "4x256_CRC32_m15",
+    "8x16_CRC32_m15",
+    "6x32_CRC32_m9",
+    "5x16_CRC32_m5",
+    "unchecked"
+};
+
 template <typename Functor>
 void run_timings(Functor &&test) {
-#ifndef CHECKERS_FULL
-    // default
     test(Tab64Config<16, 16, 15>{}, "16x16_Tab64_m15");
     test(Tab64Config<256, 8, 15>{}, "8x256_Tab64_m15");
     test(Tab64Config<128, 5, 11>{}, "5x128_Tab64_m11");
@@ -25,7 +37,7 @@ void run_timings(Functor &&test) {
     test(CRC32Config<16, 8, 15>{}, "8x16_CRC32_m15");
     test(CRC32Config<32, 6, 9>{}, "6x32_CRC32_m9");
     test(CRC32Config<16, 5, 5>{}, "5x16_CRC32_m5");
-#else
+#if 0
     test(CRC32Config<256, 2>{}, "2x256_CRC32");
     test(CRC32Config<256, 1>{}, "1x256_CRC32");
 
@@ -48,7 +60,6 @@ void run_timings(Functor &&test) {
     test(CRC32Config<2, 1>{}, "1x2_CRC32");
 #endif
 
-#ifndef CHECKERS_FULL
     /*
     test(TabConfig<16, 1, 31>{}, "1x16_m31_Tab");
     test(TabConfig<16, 1, 15>{}, "1x16_m15_Tab");
@@ -58,7 +69,7 @@ void run_timings(Functor &&test) {
     test(TabConfig<4, 1>{}, "1x4_Tab");
     test(TabConfig<2, 1>{}, "1x2_Tab");
     */
-#else
+#if 0
     test(TabConfig<256, 2>{}, "2x256_Tab");
     test(TabConfig<256, 1>{}, "1x256_Tab");
 

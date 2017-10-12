@@ -125,7 +125,6 @@ auto word_count_factory = [](
         auto generator = [&zipf](size_t /* index */)
             { return WordCountPair(zipf.next(), 1); };
 
-        if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
         sRLOG << "Running ReduceByKey tests with" << manip_name
               << "manipulator," << config_name << "config," << reps << "reps";
 
@@ -223,8 +222,6 @@ auto word_count_unchecked = [](size_t words_per_worker, size_t distinct_words,
         zipf_generator<double> zipf(rng(), distinct_words, 1.0);
         auto generator = [&zipf](size_t /* index */)
             { return WordCountPair(zipf.next(), 1); };
-
-        if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
 
         sRLOG << "Running ReduceByKey tests without checker," << reps << "reps";
 
