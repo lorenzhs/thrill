@@ -671,12 +671,17 @@ struct ReduceManipulatorSwitchValues
     : public ReduceManipulatorBase<ReduceManipulatorSwitchValues>{
     template <typename It, typename Config>
     std::pair<It, It> manipulate(It begin, It end, Config config) {
-        It next = skip_empty_key(begin + 1, end, config);
-        if (next < end && *begin != *next) {
+        It a = skip_to_next_key(begin, end, config), b = a;
+        do { b++; }
+        while (b < end && (config.IsDefaultKey(*b) ||
+                           config.key_exq(*a, *b) ||
+                           b->second == decltype(b->second){} ||
+                           a->second == b->second));
+        if (b < end) {
             sLOG << "Manipulating" << end - begin << "elements,"
-                 << "switching values at pos 0 and" << next - begin
-                 << maybe_print(*begin) << maybe_print(*next);
-            std::swap(begin->second, next->second);
+                 << "switching values of" << maybe_print(*a) << "and"
+                 << maybe_print(*b);
+            std::swap(a->second, b->second);
             made_changes_ = true;
         }
         return std::make_pair(begin, end);
