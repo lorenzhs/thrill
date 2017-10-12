@@ -65,7 +65,7 @@ int main(int argc, char** argv) {
         word_count_unchecked(ctx, words_per_worker, distinct_words, seed, 10, true);
 
         auto test = [&ctx, words_per_worker, distinct_words, seed, reps]
-            (auto &config, const std::string& config_name,
+            (auto config, const std::string& config_name,
              auto &manipulator, const std::string& manip_name) {
             word_count(ctx, manipulator, config, manip_name, config_name,
                        words_per_worker, distinct_words, seed, reps);
