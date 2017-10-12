@@ -24,16 +24,16 @@ const size_t default_distinct_words = 1000000;
 
 // yikes, preprocessor
 #define TEST_CHECK(MANIP) if (run_ ## MANIP)                            \
-        run_accuracy(ctx, word_count_factory,                           \
+        run_accuracy(ctx, word_count,                           \
                      checkers::ReduceManipulator ## MANIP(),            \
                      #MANIP, words_per_worker, distinct_words, seed, reps)
 #define TEST_CHECK_I(MANIP, ITS) if (run_ ## MANIP)                     \
-        run_accuracy(ctx, word_count_factory,                           \
+        run_accuracy(ctx, word_count,                           \
                      checkers::ReduceManipulator ## MANIP(),            \
                      #MANIP, words_per_worker, distinct_words, seed, ITS)
 // run with template parameter
 #define TEST_CHECK_T(NAME, FULL) if (run_ ## NAME)                      \
-        run_accuracy(ctx, word_count_factory,                           \
+        run_accuracy(ctx, word_count,                           \
                      checkers::ReduceManipulator ## FULL(),             \
                      #NAME, words_per_worker, distinct_words, seed, reps)
 
@@ -67,7 +67,7 @@ int main(int argc, char** argv) {
     api::Run([&](Context &ctx){
         ctx.enable_consume();
         // warmup
-        word_count_unchecked(words_per_worker, distinct_words, seed, 10, true)(ctx);
+        word_count_unchecked(ctx, words_per_worker, distinct_words, seed, 10, true);
 
         TEST_CHECK(RandFirstKey);
         TEST_CHECK(SwitchValues);

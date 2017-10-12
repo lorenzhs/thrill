@@ -23,16 +23,16 @@ const size_t default_elems_per_worker = 125000;
 
 // yikes, preprocessor
 #define TEST_CHECK(MANIP) if (run_ ## MANIP) \
-        run_accuracy(ctx, reduce_by_key_test_factory,                    \
+        run_accuracy(ctx, reduce_by_key,                    \
                      checkers::ReduceManipulator ## MANIP(), #MANIP,     \
                      elems_per_worker, seed, reps)
 #define TEST_CHECK_I(MANIP, ITS) if (run_ ## MANIP) \
-        run_accuracy(ctx, reduce_by_key_test_factory,                    \
+        run_accuracy(ctx, reduce_by_key,                    \
                      checkers::ReduceManipulator ## MANIP(), #MANIP,     \
                      elems_per_worker, seed, ITS)
 // run with template parameter
 #define TEST_CHECK_T(NAME, FULL) if (run_ ## NAME) \
-        run_accuracy(ctx, reduce_by_key_test_factory,                    \
+        run_accuracy(ctx, reduce_by_key,                    \
                      checkers::ReduceManipulator ## FULL(), #NAME,       \
                      elems_per_worker, seed, reps)
 
@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
     api::Run([&](Context &ctx){
         ctx.enable_consume();
         // warmup
-        reduce_by_key_unchecked(seed, 10, true)(ctx);
+        reduce_by_key_unchecked(ctx, seed, 10, true);
 
         TEST_CHECK(RandFirstKey);
         TEST_CHECK(SwitchValues);

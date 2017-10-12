@@ -25,9 +25,9 @@ void run_accuracy(Context &ctx, Functor &&f, const Manipulator &manipulator,
     auto test = [&f, &manipulator, &name, &arg_tuple, &ctx](
         auto config, const std::string& config_name) {
         auto arg = std::tuple_cat(
-            std::tie(manipulator, config, name, config_name),
+            std::tie(ctx, manipulator, config, name, config_name),
             arg_tuple);
-        std::apply(f, arg)(ctx);
+        std::apply(f, arg);
     };
 
     test(CRC32Config<16, 4, 7>{}, "4x16_CRC32_m7");

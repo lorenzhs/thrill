@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
         my_rank = ctx.net.my_rank();
         // warmup
         RLOG << "Warmup...";
-        word_count_unchecked(words_per_worker, distinct_words, seed, std::min(100, reps), true)(ctx);
+        word_count_unchecked(ctx, words_per_worker, distinct_words, seed, std::min(100, reps), true);
 
         auto test = [words_per_worker, distinct_words, seed, reps, config_param, &ctx](
             auto config, const std::string& config_name) {
@@ -58,15 +58,14 @@ int main(int argc, char** argv) {
                 return;
             }
             RLOG << "Executing chosen configuration " << config_name;
-            word_count_factory(checkers::ReduceManipulatorDummy(), config,
-                               "Dummy", config_name, words_per_worker,
-                               distinct_words, seed, reps)(ctx);
+            word_count(ctx, checkers::ReduceManipulatorDummy(), config, "Dummy",
+                       config_name, words_per_worker, distinct_words, seed, reps);
         };
 
         run_timings(test);
 
         if (config_param == "unchecked") {
-            word_count_unchecked(words_per_worker, distinct_words, seed, reps)(ctx);
+            word_count_unchecked(ctx, words_per_worker, distinct_words, seed, reps);
         }
     });
 }

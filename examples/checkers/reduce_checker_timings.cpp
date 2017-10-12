@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
         my_rank = ctx.net.my_rank();
         // warmup
         RLOG << "Warmup...";
-        reduce_by_key_unchecked(elems_per_worker, seed, std::min(100, reps), true)(ctx);
+        reduce_by_key_unchecked(ctx, elems_per_worker, seed, std::min(100, reps), true);
 
         auto test = [reps, elems_per_worker, seed, config_param, &ctx](
             auto config, const std::string& config_name) {
@@ -48,15 +48,14 @@ int main(int argc, char** argv) {
                 return;
             }
             RLOG << "Executing chosen configuration " << config_name;
-            reduce_by_key_test_factory(checkers::ReduceManipulatorDummy(),
-                                       config, "Dummy", config_name,
-                                       elems_per_worker, seed, reps)(ctx);
+            reduce_by_key(ctx, checkers::ReduceManipulatorDummy(), config,
+                          "Dummy", config_name, elems_per_worker, seed, reps);
         };
 
         run_timings(test);
 
         if (config_param == "unchecked") {
-            reduce_by_key_unchecked(elems_per_worker, seed, reps)(ctx);
+            reduce_by_key_unchecked(ctx, elems_per_worker, seed, reps);
         }
     });
 }
