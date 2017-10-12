@@ -22,18 +22,18 @@ const int default_reps = 100;
 const size_t default_elems_per_worker = 125000;
 
 // yikes, preprocessor
-#define TEST_CHECK(MANIP) if (run_ ## MANIP) \
-        run_accuracy(ctx, reduce_by_key,                    \
-                     checkers::ReduceManipulator ## MANIP(), #MANIP,     \
+#define TEST_CHECK(MANIP) if (run_ ## MANIP)                            \
+        run_accuracy(ctx, reduce_by_key,                                \
+                     checkers::ReduceManipulator ## MANIP(), #MANIP,    \
                      elems_per_worker, seed, reps)
-#define TEST_CHECK_I(MANIP, ITS) if (run_ ## MANIP) \
-        run_accuracy(ctx, reduce_by_key,                    \
-                     checkers::ReduceManipulator ## MANIP(), #MANIP,     \
+#define TEST_CHECK_I(MANIP, ITS) if (run_ ## MANIP)                     \
+        run_accuracy(ctx, reduce_by_key,                                \
+                     checkers::ReduceManipulator ## MANIP(), #MANIP,    \
                      elems_per_worker, seed, ITS)
 // run with template parameter
-#define TEST_CHECK_T(NAME, FULL) if (run_ ## NAME) \
-        run_accuracy(ctx, reduce_by_key,                    \
-                     checkers::ReduceManipulator ## FULL(), #NAME,       \
+#define TEST_CHECK_T(NAME, FULL) if (run_ ## NAME)                      \
+        run_accuracy(ctx, reduce_by_key,                                \
+                     checkers::ReduceManipulator ## FULL(), #NAME,      \
                      elems_per_worker, seed, reps)
 
 int main(int argc, char** argv) {
@@ -42,8 +42,8 @@ int main(int argc, char** argv) {
     int reps = default_reps;
     size_t elems_per_worker = default_elems_per_worker, seed = 42;
     clp.add_int('n', "iterations", reps, "iterations");
-    clp.add_size_t('e', "elems", elems_per_worker, "elements per worker");
-    clp.add_size_t('s', "seed", seed, "seed for input generation (0: random)");
+    clp.add_size_t('w', "elems", elems_per_worker, "elements per worker");
+    clp.add_size_t('e', "seed", seed, "seed for input generation (0: random)");
 
     bool run_RandFirstKey = false, run_SwitchValues = false,
         run_Bitflip = false, run_IncDec1 = false, run_IncDec2 = false,
