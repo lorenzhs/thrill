@@ -72,8 +72,8 @@ int main(int argc, char** argv) {
         TEST_CHECK(Bitflip);
         TEST_CHECK_T(IncDec1, IncDec<1>);
         TEST_CHECK_T(IncDec2, IncDec<2>);
-        TEST_CHECK_T(IncDec4, IncDec<4>);
-        TEST_CHECK_T(IncDec8, IncDec<8>);
+        // TEST_CHECK_T(IncDec4, IncDec<4>);
+        // TEST_CHECK_T(IncDec8, IncDec<8>);
         // TEST_CHECK(DropFirst); // disabled because always detected
         // TEST_CHECK(IncFirst); // disabled because always detected
         // TEST_CHECK(RandFirst); // disabled because always detected
