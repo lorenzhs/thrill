@@ -66,6 +66,7 @@ int main(int argc, char** argv) {
 
     api::Run([&](Context &ctx){
         ctx.enable_consume();
+        my_rank = ctx.net.my_rank();
         // warmup
         word_count_unchecked(ctx, words_per_worker, distinct_words, seed, 10, true);
 

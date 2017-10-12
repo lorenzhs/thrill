@@ -62,6 +62,7 @@ int main(int argc, char** argv) {
 
     api::Run([&](Context &ctx){
         ctx.enable_consume();
+        my_rank = ctx.net.my_rank();
         // warmup
         reduce_by_key_unchecked(ctx, seed, 10, true);
 
