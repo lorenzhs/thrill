@@ -40,6 +40,9 @@ thread_local int my_rank = -1;
 #define RLOG LOGC(my_rank == 0)
 #define sRLOG sLOGC(my_rank == 0)
 
+constexpr int loop_fct = 50;
+constexpr int warmup_its = 5;
+
 // to subtract traffic RX/TX pairs
 template <typename T, typename U>
 std::pair<T, U> operator - (const std::pair<T, U>& a, const std::pair<T, U>& b) {
@@ -99,11 +102,11 @@ public:
 };
 
 auto word_count = [](
-    Context& ctx,
     const auto& manipulator, const auto& config,
     const std::string& manip_name,
     const std::string& config_name,
-    size_t words_per_worker, size_t distinct_words, size_t seed, int reps)
+    const size_t words_per_worker, const size_t distinct_words,
+    const size_t seed, const int reps)
 {
     using Key = uint64_t;
     using Value = uint64_t;
@@ -116,7 +119,6 @@ auto word_count = [](
     using Manipulator = std::decay_t<decltype(manipulator)>;
     using Driver = checkers::Driver<Checker, Manipulator>;
 
-    const size_t num_words = words_per_worker * ctx.num_workers();
     size_t true_seed = seed;
     if (seed == 0) true_seed = std::random_device{}();
     std::mt19937 rng(true_seed);
@@ -124,98 +126,115 @@ auto word_count = [](
     auto generator = [&zipf](size_t /* index */)
         { return WordCountPair(zipf.next(), 1); };
 
-    sRLOG << "Running ReduceByKey tests with" << manip_name
-          << "manipulator," << config_name << "config," << reps << "reps";
 
     common::StatsTimerStopped run_timer, check_timer;
     size_t failures = 0, manips = 0;
-    for (int i = -3; i < reps; ++i) {
-        auto driver = std::make_shared<Driver>();
-        driver->silence();
+    int i_outer_max = reps/loop_fct;
+    for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
+        api::Run([&](Context &ctx) {
+            ctx.enable_consume();
+            my_rank = ctx.net.my_rank();
 
-        // Synchronize with barrier
-        ctx.net.Barrier();
-        auto traffic_before = ctx.net_manager().Traffic();
-        common::StatsTimerStart current_run;
+            const size_t num_words = words_per_worker * ctx.num_workers();
 
-        Generate(ctx, num_words, generator)
-            .ReduceByKey(
-                common::TupleGet<0, WordCountPair>(),
-                common::TupleReduceIndex<1, WordCountPair, ReduceFn>(),
-                api::DefaultReduceConfig(), driver)
-            .Size();
+            if (i_outer == 0)
+                sRLOG << "Running WordCount tests with" << manip_name
+                      << "manipulator," << config_name << "config," << reps
+                      << "=" << i_outer_max << "x" << loop_fct << "reps";
+
+            for (int i_inner = -1*warmup_its; i_inner < loop_fct; ++i_inner) {
+
+                auto driver = std::make_shared<Driver>();
+                driver->silence();
+
+                // Synchronize with barrier
+                ctx.net.Barrier();
+                auto traffic_before = ctx.net_manager().Traffic();
+                common::StatsTimerStart current_run;
+
+                Generate(ctx, num_words, generator)
+                    .ReduceByKey(
+                        common::TupleGet<0, WordCountPair>(),
+                        common::TupleReduceIndex<1, WordCountPair, ReduceFn>(),
+                        api::DefaultReduceConfig(), driver)
+                    .Size();
 
 
-        // Re-synchronize, then run final checking pass
-        ctx.net.Barrier();
-        current_run.Stop();
-        auto traffic_precheck = ctx.net_manager().Traffic();
+                // Re-synchronize, then run final checking pass
+                ctx.net.Barrier();
+                current_run.Stop();
+                auto traffic_precheck = ctx.net_manager().Traffic();
 
-        common::StatsTimerStart current_check;
-        auto success = driver->check(ctx);
-        // No need for a barrier, it returns as soon as the global result is
-        // determined
-        current_check.Stop();
+                common::StatsTimerStart current_check;
+                auto success = driver->check(ctx);
+                // No need for a barrier, it returns as soon as the global result is
+                // determined
+                current_check.Stop();
 
-        if (i >= 0) { // ignore warmup
-            if (!success.first) { failures++; }
-            if (success.second) { manips++; }
+                if (my_rank == 0 && i_inner >= 0) { // ignore warmup
+                    if (!success.first) { failures++; }
+                    if (success.second) { manips++; }
 
-            // add current iteration timers to total
-            run_timer += current_run;
-            check_timer += current_check;
-        }
+                    // add current iteration timers to total
+                    run_timer += current_run;
+                    check_timer += current_check;
+                }
 
-        if (my_rank == 0 && i >= 0) { // ignore warmup
-            auto traffic_after = ctx.net_manager().Traffic();
-            auto traffic_reduce = traffic_precheck - traffic_before;
-            auto traffic_check = traffic_after - traffic_precheck;
-            LOG1 << "RESULT"
-                 << " benchmark=wordcount"
-                 << " config=" << config_name
-                 << " c_its=" << Config::num_parallel
-                 << " c_buckets=" << Config::num_buckets
-                 << " c_mod_min=" << Config::mod_min
-                 << " c_mod_max=" << Config::mod_max
-                 << " manip=" << manip_name
-                 << " run_time=" << current_run.Microseconds()
-                 << " check_time=" << current_check.Microseconds()
-                 << " detection=" << success.first
-                 << " manipulated=" << success.second
-                 << " traffic_reduce=" << traffic_reduce.first + traffic_reduce.second
-                 << " traffic_check=" << traffic_check.first + traffic_check.second
-                 << " words_per_worker=" << words_per_worker
-                 << " distinct_words=" << distinct_words
-                 << " machines=" << ctx.num_hosts()
-                 << " workers_per_host=" << ctx.workers_per_host();
-        }
+                if (my_rank == 0 && i_inner >= 0) { // ignore warmup
+                    auto traffic_after = ctx.net_manager().Traffic();
+                    auto traffic_reduce = traffic_precheck - traffic_before;
+                    auto traffic_check = traffic_after - traffic_precheck;
+                    LOG1 << "RESULT"
+                         << " benchmark=wordcount"
+                         << " config=" << config_name
+                         << " c_its=" << Config::num_parallel
+                         << " c_buckets=" << Config::num_buckets
+                         << " c_mod_min=" << Config::mod_min
+                         << " c_mod_max=" << Config::mod_max
+                         << " manip=" << manip_name
+                         << " run_time=" << current_run.Microseconds()
+                         << " check_time=" << current_check.Microseconds()
+                         << " detection=" << success.first
+                         << " manipulated=" << success.second
+                         << " traffic_reduce=" << traffic_reduce.first + traffic_reduce.second
+                         << " traffic_check=" << traffic_check.first + traffic_check.second
+                         << " words_per_worker=" << words_per_worker
+                         << " distinct_words=" << distinct_words
+                         << " machines=" << ctx.num_hosts()
+                         << " workers_per_host=" << ctx.workers_per_host();
+                }
+            }
+            if (i_outer == i_outer_max - 1) { // print summary at the end
+                double expected_failures = config.exp_delta * manips;
+                RLOG << "WordCount with " << manip_name << " manip and "
+                     << config_name << " config: "
+                     << (failures > 0 ? common::log::fg_red() : "")
+                     << failures << " / " << reps << " tests failed, expected approx. "
+                     << expected_failures << " given " << manips << " manipulations"
+                     << common::log::reset();
+                sRLOG << "Reduce:" << run_timer.Microseconds()/(1000.0*reps) << "ms;"
+                      << "Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms;"
+                      << "Config:" << config_name;
+                sRLOG << "";
+            }
+        });
+
     }
-
-    double expected_failures = config.exp_delta * manips;
-    RLOG << "WordCount with " << manip_name << " manip and "
-         << config_name << " config: "
-         << (failures > 0 ? common::log::fg_red() : "")
-         << failures << " / " << reps << " tests failed, expected approx. "
-         << expected_failures << " given " << manips << " manipulations"
-         << common::log::reset();
-    sRLOG << "Reduce:" << run_timer.Microseconds()/(1000.0*reps) << "ms;"
-          << "Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms;"
-          << "Config:" << config_name;
-    sRLOG << "";
 };
 
 
 
-auto word_count_unchecked = [](Context &ctx,
-                               size_t words_per_worker, size_t distinct_words,
-                               size_t seed, int reps, const bool warmup = false)
+auto word_count_unchecked = [](const size_t words_per_worker,
+                               const size_t distinct_words,
+                               const size_t seed,
+                               const int reps,
+                               const bool warmup = false)
 {
     using Key = uint64_t;
     using Value = uint64_t;
     using WordCountPair = std::pair<Key, Value>;
     using ReduceFn = checkers::checked_plus<Value>;//std::plus<Value>;
 
-    const size_t num_words = words_per_worker * ctx.num_workers();
     size_t true_seed = seed;
     if (seed == 0) true_seed = std::random_device{}();
     std::mt19937 rng(true_seed);
@@ -223,45 +242,62 @@ auto word_count_unchecked = [](Context &ctx,
     auto generator = [&zipf](size_t /* index */)
         { return WordCountPair(zipf.next(), 1); };
 
-    sRLOG << "Running ReduceByKey tests without checker," << reps << "reps";
-
     common::StatsTimerStopped run_timer;
-    for (int i = -3; i < reps; ++i) {
-        // Synchronize with barrier
-        ctx.net.Barrier();
-        auto traffic_before = ctx.net_manager().Traffic();
-        common::StatsTimerStart current_run;
 
-        Generate(ctx, num_words, generator)
-            .ReduceByKey(
-                common::TupleGet<0, WordCountPair>(),
-                common::TupleReduceIndex<1, WordCountPair, ReduceFn>())
-            .Size();
+    int i_outer_max = reps/loop_fct;
+    for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
+        api::Run([&](Context &ctx) {
+            ctx.enable_consume();
+            my_rank = ctx.net.my_rank();
+
+            const size_t num_words = words_per_worker * ctx.num_workers();
+
+            if (i_outer == 0)
+                sRLOG << "Running WordCount tests without checker," << reps
+                      << "=" << i_outer_max << "x" << loop_fct << "reps";
+
+            for (int i_inner = -1*warmup_its; i_inner < loop_fct; ++i_inner) {
+                // Synchronize with barrier
+                ctx.net.Barrier();
+                auto traffic_before = ctx.net_manager().Traffic();
+                common::StatsTimerStart current_run;
+
+                Generate(ctx, num_words, generator)
+                    .ReduceByKey(
+                        common::TupleGet<0, WordCountPair>(),
+                        common::TupleReduceIndex<1, WordCountPair, ReduceFn>())
+                    .Size();
 
 
-        // Re-synchronize
-        ctx.net.Barrier();
-        current_run.Stop();
-        // add current iteration timer to total
-        if (i >= 0) // ignore warmup
-            run_timer += current_run;
+                // Re-synchronize
+                ctx.net.Barrier();
+                current_run.Stop();
+                // add current iteration timer to total
+                if (my_rank == 0 && i_inner >= 0) {
+                    // ignore warmup iterations, but preserve stats for warmup runs
+                    run_timer += current_run;
+                }
 
-        if (my_rank == 0 && !warmup && i >= 0) { // ignore warmup
-            auto traffic_after = ctx.net_manager().Traffic();
-            auto traffic_reduce = traffic_after - traffic_before;
-            LOG1 << "RESULT"
-                 << " benchmark=wordcount_unchecked"
-                 << " run_time=" << current_run.Microseconds()
-                 << " traffic_reduce=" << traffic_reduce.first + traffic_reduce.second
-                 << " words_per_worker=" << words_per_worker
-                 << " distinct_words=" << distinct_words
-                 << " machines=" << ctx.num_hosts()
-                 << " workers_per_host=" << ctx.workers_per_host();
-        }
+                if (my_rank == 0 && !warmup && i_inner >= 0) { // ignore warmup
+                    auto traffic_after = ctx.net_manager().Traffic();
+                    auto traffic_reduce = traffic_after - traffic_before;
+                    LOG1 << "RESULT"
+                         << " benchmark=wordcount_unchecked"
+                         << " run_time=" << current_run.Microseconds()
+                         << " traffic_reduce=" << traffic_reduce.first + traffic_reduce.second
+                         << " words_per_worker=" << words_per_worker
+                         << " distinct_words=" << distinct_words
+                         << " machines=" << ctx.num_hosts()
+                         << " workers_per_host=" << ctx.workers_per_host();
+                }
+            }
+            if (i_outer == i_outer_max - 1) { // print summary at the end
+                sRLOG << "Reduce:" << run_timer.Microseconds()/(1000.0*reps)
+                      << "ms (no checking, no manipulation)";
+                sRLOG << "";
+            }
+        });
     }
-    sRLOG << "Reduce:" << run_timer.Microseconds()/(1000.0*reps)
-          << "ms (no checking, no manipulation)";
-    sRLOG << "";
 };
 
 using T = uint64_t;

@@ -66,35 +66,31 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    api::Run([&](Context &ctx){
-        ctx.enable_consume();
-        my_rank = ctx.net.my_rank();
-        // warmup
-        word_count_unchecked(ctx, words_per_worker, distinct_words, seed, 10, true);
+    // warmup
+    word_count_unchecked(words_per_worker, distinct_words, seed, 10, true);
 
-        auto test = [&ctx, words_per_worker, distinct_words, seed, reps, &config_param]
-            (auto config, const std::string& config_name,
-             auto &manipulator, const std::string& manip_name) {
-            if (config_name != config_param) {
-                return;
-            }
-            RLOG << "Executing chosen configuration " << config_name;
-            word_count(ctx, manipulator, config, manip_name, config_name,
-                       words_per_worker, distinct_words, seed, reps);
-        };
+    auto test = [words_per_worker, distinct_words, seed, reps, &config_param]
+        (auto config, const std::string& config_name,
+         auto &manipulator, const std::string& manip_name) {
+        if (config_name != config_param) {
+            return;
+        }
+        RLOG << "Executing chosen configuration " << config_name;
+        word_count(manipulator, config, manip_name, config_name,
+                   words_per_worker, distinct_words, seed, reps);
+    };
 
-        TEST_CHECK(RandFirstKey);
-        TEST_CHECK(SwitchValues);
-        TEST_CHECK(Bitflip);
-        TEST_CHECK_T(IncDec1, IncDec<1>);
-        TEST_CHECK_T(IncDec2, IncDec<2>);
-        // TEST_CHECK_T(IncDec4, IncDec<4>);
-        // TEST_CHECK_T(IncDec8, IncDec<8>);
-        // TEST_CHECK(DropFirst); // disabled because always detected
-        // TEST_CHECK(IncFirst); // disabled because always detected
-        // TEST_CHECK(RandFirst); // disabled because always detected
-        TEST_CHECK(IncFirstKey);
-    });
+    TEST_CHECK(RandFirstKey);
+    TEST_CHECK(SwitchValues);
+    TEST_CHECK(Bitflip);
+    TEST_CHECK_T(IncDec1, IncDec<1>);
+    TEST_CHECK_T(IncDec2, IncDec<2>);
+    // TEST_CHECK_T(IncDec4, IncDec<4>);
+    // TEST_CHECK_T(IncDec8, IncDec<8>);
+    // TEST_CHECK(DropFirst); // disabled because always detected
+    // TEST_CHECK(IncFirst); // disabled because always detected
+    // TEST_CHECK(RandFirst); // disabled because always detected
+    TEST_CHECK(IncFirstKey);
 }
 
 /******************************************************************************/
