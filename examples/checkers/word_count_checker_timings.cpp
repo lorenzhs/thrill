@@ -57,7 +57,6 @@ int main(int argc, char** argv) {
         if (config_name != config_param) {
             return;
         }
-        RLOG << "Executing chosen configuration " << config_name;
         word_count(checkers::ReduceManipulatorDummy(), config, "Dummy",
                    config_name, words_per_worker, distinct_words, seed, reps);
     };

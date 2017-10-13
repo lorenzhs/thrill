@@ -175,9 +175,7 @@ auto word_count = [](
                     // add current iteration timers to total
                     run_timer += current_run;
                     check_timer += current_check;
-                }
 
-                if (my_rank == 0 && i_inner >= 0) { // ignore warmup
                     auto traffic_after = ctx.net_manager().Traffic();
                     auto traffic_reduce = traffic_precheck - traffic_before;
                     auto traffic_check = traffic_after - traffic_precheck;
@@ -289,7 +287,7 @@ auto word_count_unchecked = [](const size_t words_per_worker,
                 }
             }
             if (i_outer == i_outer_max - 1) { // print summary at the end
-                sRLOG << "Reduce:" << run_timer.Microseconds()/(1000.0*reps)
+                sRLOG << "WordCount:" << run_timer.Microseconds()/(1000.0*reps)
                       << "ms (no checking, no manipulation)";
                 sRLOG << "";
             }

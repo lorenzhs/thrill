@@ -78,7 +78,6 @@ int main(int argc, char** argv) {
         if (config_name != config_param) {
             return;
         }
-        RLOG << "Executing chosen configuration " << config_name;
         word_count(manipulator, config, manip_name, config_name,
                    words_per_worker, distinct_words, seed, reps);
     };
