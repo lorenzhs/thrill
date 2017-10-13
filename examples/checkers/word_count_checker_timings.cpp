@@ -11,6 +11,9 @@
 #include <thrill/api/context.hpp>
 #include <tlx/cmdline_parser.hpp>
 
+constexpr int loop_fct = 50;
+constexpr int warmup_its = 5;
+
 #include "word_count.hpp"
 #include "timings.hpp"
 

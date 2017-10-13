@@ -40,9 +40,6 @@ thread_local int my_rank = -1;
 #define RLOG LOGC(my_rank == 0)
 #define sRLOG sLOGC(my_rank == 0)
 
-constexpr int loop_fct = 50;
-constexpr int warmup_its = 5;
-
 // to subtract traffic RX/TX pairs
 template <typename T, typename U>
 std::pair<T, U> operator - (const std::pair<T, U>& a, const std::pair<T, U>& b) {
