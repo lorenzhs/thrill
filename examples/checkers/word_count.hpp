@@ -126,7 +126,7 @@ auto word_count = [](
 
     common::StatsTimerStopped run_timer, check_timer;
     size_t failures = 0, manips = 0;
-    int i_outer_max = reps/loop_fct;
+    int i_outer_max = (reps - 1)/loop_fct + 1;
     for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
         api::Run([&](Context &ctx) {
             ctx.enable_consume();
@@ -241,7 +241,7 @@ auto word_count_unchecked = [](const size_t words_per_worker,
 
     common::StatsTimerStopped run_timer;
 
-    int i_outer_max = reps/loop_fct;
+    int i_outer_max = (reps - 1)/loop_fct + 1;
     for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
         api::Run([&](Context &ctx) {
             ctx.enable_consume();
