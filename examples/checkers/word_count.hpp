@@ -118,17 +118,18 @@ auto word_count = [](
 
     size_t true_seed = seed;
     if (seed == 0) true_seed = std::random_device{}();
-    std::mt19937 rng(true_seed);
-    zipf_generator<double> zipf(rng(), distinct_words, 1.0);
-    auto generator = [&zipf](size_t /* index */)
-        { return WordCountPair(zipf.next(), 1); };
-
 
     common::StatsTimerStopped run_timer, check_timer;
     size_t failures = 0, manips = 0;
     int i_outer_max = (reps - 1)/loop_fct + 1;
     for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
+        ++true_seed; // rng foobar
         api::Run([&](Context &ctx) {
+            std::mt19937 rng(true_seed);
+            zipf_generator<double> zipf(rng(), distinct_words, 1.0);
+            auto generator = [&zipf](size_t /* index */)
+                { return WordCountPair(zipf.next(), 1); };
+
             ctx.enable_consume();
             my_rank = ctx.net.my_rank();
 
@@ -230,18 +231,20 @@ auto word_count_unchecked = [](const size_t words_per_worker,
     using WordCountPair = std::pair<Key, Value>;
     using ReduceFn = checkers::checked_plus<Value>;//std::plus<Value>;
 
+    common::StatsTimerStopped run_timer;
+
     size_t true_seed = seed;
     if (seed == 0) true_seed = std::random_device{}();
-    std::mt19937 rng(true_seed);
-    zipf_generator<double> zipf(rng(), distinct_words, 1.0);
-    auto generator = [&zipf](size_t /* index */)
-        { return WordCountPair(zipf.next(), 1); };
-
-    common::StatsTimerStopped run_timer;
 
     int i_outer_max = (reps - 1)/loop_fct + 1;
     for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
+        ++true_seed; // rng foobar
         api::Run([&](Context &ctx) {
+            std::mt19937 rng(true_seed);
+            zipf_generator<double> zipf(rng(), distinct_words, 1.0);
+            auto generator = [&zipf](size_t /* index */)
+                { return WordCountPair(zipf.next(), 1); };
+
             ctx.enable_consume();
             my_rank = ctx.net.my_rank();
 
