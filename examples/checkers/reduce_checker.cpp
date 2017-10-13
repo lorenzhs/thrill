@@ -35,6 +35,7 @@ int main(int argc, char** argv) {
 
     int reps = default_reps;
     size_t elems_per_worker = default_elems_per_worker, seed = 42;
+    std::string config_param = "4x2_CRC32_m4";
     clp.add_int('n', "iterations", reps, "iterations");
     clp.add_size_t('w', "elems", elems_per_worker, "elements per worker");
     clp.add_size_t('e', "seed", seed, "seed for input generation (0: random)");
@@ -50,9 +51,16 @@ int main(int argc, char** argv) {
     clp.add_flag('4', "IncDec4", run_IncDec4, "run IncDec4 manip");
     clp.add_flag('8', "IncDec8", run_IncDec8, "run IncDec8 manip");
     clp.add_flag('i', "IncFirstKey", run_IncFirstKey, "run IncFirstKey manip");
+    clp.add_string('c', "config", config_param, "which configuration to run");
 
     if (!clp.process(argc, argv)) return -1;
     clp.print_result();
+
+    if (std::find(known_configs.begin(), known_configs.end(), config_param) ==
+        known_configs.end()) {
+        LOG1 << "unknown config: " << config_param;
+        return 1;
+    }
 
     api::Run([&](Context &ctx){
         ctx.enable_consume();
@@ -60,9 +68,13 @@ int main(int argc, char** argv) {
         // warmup
         reduce_by_key_unchecked(ctx, seed, 10, true);
 
-        auto test = [&ctx, elems_per_worker, seed, reps]
+        auto test = [&ctx, elems_per_worker, seed, reps, &config_param]
             (auto config, const std::string& config_name,
              auto &manipulator, const std::string& manip_name) {
+            if (config_name != config_param) {
+                return;
+            }
+            RLOG << "Executing chosen configuration " << config_name;
             reduce_by_key(ctx, manipulator, config, manip_name, config_name,
                           elems_per_worker, seed, reps);
         };

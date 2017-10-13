@@ -16,6 +16,27 @@
 
 #include <tuple>
 
+static const std::vector<std::string> known_configs = {
+    "4x16_CRC32_m7",
+    "4x8_CRC32_m7",
+    "4x8_CRC32_m5",
+    "4x8_CRC32_m3",
+    "4x4_CRC32_m5",
+    "4x4_CRC32_m3",
+    "4x2_CRC32_m4",
+    "1x4_CRC32",
+    "1x2_CRC32",
+    "4x16_Tab_m7",
+    "4x8_Tab_m7",
+    "4x8_Tab_m5",
+    "4x8_Tab_m3",
+    "4x4_Tab_m5",
+    "4x4_Tab_m3",
+    "4x2_Tab_m4",
+    "1x4_Tab",
+    "1x2_Tab"
+};
+
 template <typename Functor, typename Manipulator>
 void run_accuracy(Functor &&test, const Manipulator &manip,
                   const std::string& name) {
