@@ -208,7 +208,7 @@ auto word_count = [](
                      << failures << " / " << reps << " tests failed, expected approx. "
                      << expected_failures << " given " << manips << " manipulations"
                      << common::log::reset();
-                sRLOG << "Reduce:" << run_timer.Microseconds()/(1000.0*reps) << "ms;"
+                sRLOG << "WordCount:" << run_timer.Microseconds()/(1000.0*reps) << "ms;"
                       << "Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms;"
                       << "Config:" << config_name;
                 sRLOG << "";
