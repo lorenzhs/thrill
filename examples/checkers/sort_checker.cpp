@@ -49,6 +49,13 @@ std::pair<T, U> operator - (const std::pair<T, U>& a, const std::pair<T, U>& b) 
     return std::make_pair(a.first - b.first, a.second - b.second);
 }
 
+// Check whether a hash function type has a static member named "Bits"
+template <typename T, typename = int>
+struct HasBits : std::false_type { };
+
+template <typename T>
+struct HasBits <T, decltype((void) T::Bits, 0)> : std::true_type { };
+
 
 template <typename Manipulator, typename HashFn>
 void sort_random(const Manipulator& /*manipulator*/, const HashFn& /*hash*/,
@@ -59,6 +66,14 @@ void sort_random(const Manipulator& /*manipulator*/, const HashFn& /*hash*/,
     using Compare = std::less<Value>;
     using Checker = checkers::SortChecker<Value, Compare, HashFn>;
     using Driver = checkers::Driver<Checker, Manipulator>;
+
+    // Determine number of bits in Hash Function
+    size_t hash_bits;
+    if constexpr (HasBits<HashFn>::value) {
+        hash_bits = HashFn::Bits;
+    } else {
+        hash_bits = 8 * sizeof(decltype(std::declval<HashFn>()(Value())));
+    }
 
     size_t true_seed = seed;
     if (seed == 0) true_seed = std::random_device{}();
@@ -126,6 +141,7 @@ void sort_random(const Manipulator& /*manipulator*/, const HashFn& /*hash*/,
                          << " manipulated=" << success.second
                          << " traffic_sort=" << traffic_sort.first + traffic_sort.second
                          << " traffic_check=" << traffic_check.first + traffic_check.second
+                         << " hashbits=" << hash_bits
                          << " machines=" << ctx.num_hosts()
                          << " workers_per_host=" << ctx.workers_per_host();
                 }
@@ -251,8 +267,8 @@ void run(Functor &&test, const Manipulator &manip, const std::string& name) {
     test(CRC32Config<2>{ }, "CRC32-2", manip, name);
     test(TabConfig<2>{ }, "Tab-2", manip, name);
 
-    test(CRC32Config<2>{ }, "CRC32-1", manip, name);
-    test(TabConfig<2>{ }, "Tab-1", manip, name);
+    test(CRC32Config<1>{ }, "CRC32-1", manip, name);
+    test(TabConfig<1>{ }, "Tab-1", manip, name);
 }
 
 // yikes, preprocessor
