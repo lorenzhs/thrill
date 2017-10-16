@@ -300,7 +300,7 @@ int main(int argc, char** argv) {
     clp.add_flag('b', "Bitflip", run_Bitflip, "run Bitflip manip");
     clp.add_flag('f', "RandFirst", run_RandFirst, "run RandFirst manip (boring)");
     clp.add_flag('r', "ResetToDefault", run_ResetToDefault, "run ResetToDefault manip");
-    clp.add_flag('e', "SetEqual", run_SetEqual, "run SetEqual manip");
+    clp.add_flag('q', "SetEqual", run_SetEqual, "run SetEqual manip");
 
     if (!clp.process(argc, argv)) return -1;
     clp.print_result();
