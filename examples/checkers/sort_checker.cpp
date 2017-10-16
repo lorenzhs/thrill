@@ -33,6 +33,9 @@ const size_t default_reps = 100;
 const size_t default_size = 1000000;
 const size_t default_distinct = 100000000;
 
+constexpr int loop_fct = 1000;
+constexpr int warmup_its = 1;
+
 thread_local static int my_rank = -1;
 
 #define RLOG LOGC(my_rank == 0)
@@ -51,146 +54,161 @@ template <typename Manipulator, typename HashFn>
 void sort_random(const Manipulator& /*manipulator*/, const HashFn& /*hash*/,
                  const std::string& manip_name,
                  const std::string& config_name,
-                 size_t size, size_t distinct, int reps) {
+                 size_t size, size_t distinct, size_t seed, int reps) {
     using Value = T;
     using Compare = std::less<Value>;
     using Checker = checkers::SortChecker<Value, Compare, HashFn>;
     using Driver = checkers::Driver<Checker, Manipulator>;
 
-    api::Run([&](Context& ctx) {
-        ctx.enable_consume();
-        my_rank = ctx.net.my_rank();
+    size_t true_seed = seed;
+    if (seed == 0) true_seed = std::random_device{}();
 
-        std::default_random_engine gen(std::random_device { } ());
-        std::uniform_int_distribution<Value> distribution(0, distinct);
-        auto generator = [&distribution, &gen](const size_t&) -> Value
-            { return distribution(gen); };
+    int i_outer_max = (reps - 1)/loop_fct + 1;
+    for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
+        ++true_seed; // rng foobar
+        api::Run([&](Context& ctx) {
+            ctx.enable_consume();
+            my_rank = ctx.net.my_rank();
 
-        sRLOG << "Running sort tests with" << manip_name << "manip and"
-              << config_name << "config," << reps << "reps";
+            std::default_random_engine gen(true_seed);
+            std::uniform_int_distribution<Value> distribution(0, distinct);
+            auto generator = [&distribution, &gen](const size_t&) -> Value
+                { return distribution(gen); };
 
-        common::StatsTimerStopped run_timer, check_timer;
-        size_t failures = 0, dummy = 0, manips = 0;
-        for (int i = -3; i < reps; ++i) {
-            auto driver = std::make_shared<Driver>();
-            driver->silence();
+            sRLOG << "Running sort tests with" << manip_name << "manip and"
+                  << config_name << "config," << reps << "reps";
 
-            // Synchronize with barrier
-            ctx.net.Barrier();
-            auto traffic_before = ctx.net_manager().Traffic();
-            common::StatsTimerStart current_run;
+            common::StatsTimerStopped run_timer, check_timer;
+            size_t failures = 0, dummy = 0, manips = 0;
+            for (int i_inner = -3; i_inner < loop_fct && i_inner < reps; ++i_inner) {
+                auto driver = std::make_shared<Driver>();
+                driver->silence();
 
-            size_t force_eval =
-                Generate(ctx, size, generator)
-                .Sort(Compare{}, driver)
-                .Size();
-            dummy += force_eval;
+                // Synchronize with barrier
+                ctx.net.Barrier();
+                auto traffic_before = ctx.net_manager().Traffic();
+                common::StatsTimerStart current_run;
 
-            // Re-synchronize, then run final checking pass
-            ctx.net.Barrier();
-            current_run.Stop();
-            auto traffic_precheck = ctx.net_manager().Traffic();
+                size_t force_eval =
+                    Generate(ctx, size, generator)
+                    .Sort(Compare{}, driver)
+                    .Size();
+                dummy += force_eval;
 
-            common::StatsTimerStart current_check;
-            auto success = driver->check(ctx);
-            current_check.Stop();
+                // Re-synchronize, then run final checking pass
+                ctx.net.Barrier();
+                current_run.Stop();
+                auto traffic_precheck = ctx.net_manager().Traffic();
 
-            if (i >= 0) { // ignore warmup
-                if (!success.first) { failures++; }
-                if (success.second) { manips++; }
+                common::StatsTimerStart current_check;
+                auto success = driver->check(ctx);
+                current_check.Stop();
 
-                // add current iteration timers to total
-                run_timer += current_run;
-                check_timer += current_check;
+                if (my_rank == 0 && i_inner >= 0) { // ignore warmup
+                    if (!success.first) { failures++; }
+                    if (success.second) { manips++; }
+
+                    // add current iteration timers to total
+                    run_timer += current_run;
+                    check_timer += current_check;
+
+                    auto traffic_after = ctx.net_manager().Traffic();
+                    auto traffic_sort = traffic_precheck - traffic_before;
+                    auto traffic_check = traffic_after - traffic_precheck;
+                    LOG1 << "RESULT benchmark=sort"
+                         << " config=" << config_name
+                         << " manip=" << manip_name
+                         << " size=" << size
+                         << " distinct=" << distinct
+                         << " run_time=" << current_run.Microseconds()
+                         << " check_time=" << current_check.Microseconds()
+                         << " detection=" << success.first
+                         << " manipulated=" << success.second
+                         << " traffic_sort=" << traffic_sort.first + traffic_sort.second
+                         << " traffic_check=" << traffic_check.first + traffic_check.second
+                         << " machines=" << ctx.num_hosts()
+                         << " workers_per_host=" << ctx.workers_per_host();
+                }
             }
 
-            if (my_rank == 0 && i >= 0) { // ignore warmup
-                auto traffic_after = ctx.net_manager().Traffic();
-                auto traffic_sort = traffic_precheck - traffic_before;
-                auto traffic_check = traffic_after - traffic_precheck;
-                LOG1 << "RESULT benchmark=sort"
-                     << " config=" << config_name
-                     << " manip=" << manip_name
-                     << " size=" << size
-                     << " distinct=" << distinct
-                     << " run_time=" << current_run.Microseconds()
-                     << " check_time=" << current_check.Microseconds()
-                     << " detection=" << success.first
-                     << " manipulated=" << success.second
-                     << " traffic_sort=" << traffic_sort.first + traffic_sort.second
-                     << " traffic_check=" << traffic_check.first + traffic_check.second
-                     << " machines=" << ctx.num_hosts()
-                     << " workers_per_host=" << ctx.workers_per_host();
+            if (i_outer == i_outer_max - 1) { // print summary at the end
+                RLOG << "Sort with " << manip_name << " manip and "
+                     << config_name << " config: "
+                     << (failures > 0 ? common::log::fg_red() : "")
+                     << failures << " / " << reps << " tests failed; "
+                     << manips << " manipulations" << common::log::reset();
+
+                sRLOG
+                    << "Sort:" << run_timer.Microseconds()/(1000.0*reps) << "ms;"
+                    << "Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms;"
+                    << "Config:" << config_name << "\n";
             }
-        }
-
-        RLOG << "Sort with " << manip_name << " manip and "
-             << config_name << " config: "
-             << (failures > 0 ? common::log::fg_red() : "")
-             << failures << " / " << reps << " tests failed; "
-             << manips << " manipulations" << common::log::reset();
-
-        sRLOG
-            << "Sort:" << run_timer.Microseconds()/(1000.0*reps) << "ms;"
-            << "Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms;"
-            << "Config:" << config_name << "\n";
-    });
+        });
+    }
 }
 
 
-void sort_unchecked(size_t size, size_t distinct, int reps = 100,
-                    bool warmup = false) {
+void sort_unchecked(const size_t size, const size_t distinct, const size_t seed,
+                    const int reps, const bool warmup = false) {
     using Value = T;
     using Compare = std::less<Value>;
 
-    api::Run([&](Context& ctx) {
-        ctx.enable_consume();
-        my_rank = ctx.net.my_rank();
+    size_t true_seed = seed;
+    if (seed == 0) true_seed = std::random_device{}();
 
-        std::default_random_engine gen(std::random_device { } ());
-        std::uniform_int_distribution<Value> distribution(0, distinct);
-        auto generator = [&distribution, &gen](const size_t&) -> Value
-            { return distribution(gen); };
+    int i_outer_max = (reps - 1)/loop_fct + 1;
+    for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
+        ++true_seed; // rng foobar
+        api::Run([&](Context& ctx) {
+            ctx.enable_consume();
+            my_rank = ctx.net.my_rank();
 
-        sRLOG << "Running sort tests without checker," << reps << "reps";
+            std::default_random_engine gen(true_seed);
+            std::uniform_int_distribution<Value> distribution(0, distinct);
+            auto generator = [&distribution, &gen](const size_t&) -> Value
+                { return distribution(gen); };
 
-        common::StatsTimerStopped run_timer;
-        size_t dummy = 0;
-        for (int i = -3; i < reps; ++i) {
-            // Synchronize with barrier
-            ctx.net.Barrier();
-            auto traffic_before = ctx.net_manager().Traffic();
-            common::StatsTimerStart current_run;
+            sRLOG << "Running sort tests without checker," << reps << "reps";
 
-            size_t force_eval =
-                Generate(ctx, size, generator)
-                .Sort(Compare{})
-                .Size();
-            dummy += force_eval;
+            common::StatsTimerStopped run_timer;
+            size_t dummy = 0;
+            for (int i_inner = -1*warmup_its; i_inner < loop_fct && i_inner < reps; ++i_inner) {
+                // Synchronize with barrier
+                ctx.net.Barrier();
+                auto traffic_before = ctx.net_manager().Traffic();
+                common::StatsTimerStart current_run;
 
-            // Re-synchronize
-            ctx.net.Barrier();
-            current_run.Stop();
+                size_t force_eval =
+                    Generate(ctx, size, generator)
+                    .Sort(Compare{})
+                    .Size();
+                dummy += force_eval;
 
-            if (i >= 0) run_timer += current_run;
+                // Re-synchronize
+                ctx.net.Barrier();
+                current_run.Stop();
 
-            if (my_rank == 0 && !warmup && i >= 0) { // ignore warmup
-                auto traffic_after = ctx.net_manager().Traffic();
-                auto traffic_sort = traffic_after - traffic_before;
-                LOG1 << "RESULT benchmark=sort_unchecked"
-                     << " size=" << size
-                     << " distinct=" << distinct
-                     << " run_time=" << current_run.Microseconds()
-                     << " traffic_sort=" << traffic_sort.first + traffic_sort.second
-                     << " machines=" << ctx.num_hosts()
-                     << " workers_per_host=" << ctx.workers_per_host();
+                if (my_rank == 0 && i_inner >= 0) run_timer += current_run;
+
+                if (my_rank == 0 && !warmup && i_inner >= 0) { // ignore warmup
+                    auto traffic_after = ctx.net_manager().Traffic();
+                    auto traffic_sort = traffic_after - traffic_before;
+                    LOG1 << "RESULT benchmark=sort_unchecked"
+                         << " size=" << size
+                         << " distinct=" << distinct
+                         << " run_time=" << current_run.Microseconds()
+                         << " traffic_sort=" << traffic_sort.first + traffic_sort.second
+                         << " machines=" << ctx.num_hosts()
+                         << " workers_per_host=" << ctx.workers_per_host();
+                }
+
             }
 
-        }
-
-        sRLOG << "Sort:" << run_timer.Microseconds()/(1000.0*reps)
-              << "ms (no checking, no manipulation)\n";
-    });
+            if (i_outer == i_outer_max - 1)
+                sRLOG << "Sort:" << run_timer.Microseconds()/(1000.0*reps)
+                      << "ms (no checking, no manipulation)\n";
+        });
+    }
 }
 
 template <size_t bits>
@@ -200,8 +218,9 @@ template <size_t bits>
 using TabConfig = common::masked_hash<T, bits, common::HashTabulated<T>>;
 
 static const std::vector<std::string> known_configs = {
-    "CRC32", "Tab", "CRC32-16", "Tab-16", "CRC32-8", "Tab-8",
-    "CRC32-4", "Tab-4", "CRC32-2", "Tab-2"
+    "CRC32", "Tab", "CRC32-16", "Tab-16", "CRC32-12", "Tab-12",
+    "CRC32-8", "Tab-8", "CRC32-6", "Tab-6", "CRC32-4", "Tab-4",
+    "CRC32-3", "Tab-3", "CRC32-2", "Tab-2", "CRC32-1", "Tab-1"
 };
 
 template <typename Functor, typename Manipulator>
@@ -209,17 +228,31 @@ void run(Functor &&test, const Manipulator &manip, const std::string& name) {
 #ifdef CHECKERS_FULL
     test(common::HashCrc32<T>{}, "CRC32", manip, name);
     test(common::HashTabulated<T>{}, "Tab", manip, name);
+#endif
 
     test(CRC32Config<16>{ }, "CRC32-16", manip, name);
     test(TabConfig<16>{ }, "Tab-16", manip, name);
 
+    test(CRC32Config<12>{ }, "CRC32-12", manip, name);
+    test(TabConfig<12>{ }, "Tab-12", manip, name);
+
     test(CRC32Config<8>{ }, "CRC32-8", manip, name);
     test(TabConfig<8>{ }, "Tab-8", manip, name);
-#endif
+
+    test(CRC32Config<6>{ }, "CRC32-6", manip, name);
+    test(TabConfig<6>{ }, "Tab-6", manip, name);
+
     test(CRC32Config<4>{ }, "CRC32-4", manip, name);
     test(TabConfig<4>{ }, "Tab-4", manip, name);
+
+    test(CRC32Config<3>{ }, "CRC32-3", manip, name);
+    test(TabConfig<3>{ }, "Tab-3", manip, name);
+
     test(CRC32Config<2>{ }, "CRC32-2", manip, name);
     test(TabConfig<2>{ }, "Tab-2", manip, name);
+
+    test(CRC32Config<2>{ }, "CRC32-1", manip, name);
+    test(TabConfig<2>{ }, "Tab-1", manip, name);
 }
 
 // yikes, preprocessor
@@ -262,20 +295,20 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    auto test = [&config_param, size, distinct, reps]
+    auto test = [&config_param, size, distinct, seed, reps]
         (auto config, const std::string& config_name,
          auto &manipulator, const std::string& manip_name) {
         if (config_name != config_param) {
             return;
         }
         sort_random(manipulator, config, manip_name, config_name,
-                    size, distinct, reps);
+                    size, distinct, seed, reps);
     };
 
     // Warmup
-    sort_unchecked(size, distinct, std::min(100, reps), true);
+    sort_unchecked(size, distinct, seed, std::min(100, reps), true);
 
-    if (run_unchecked) sort_unchecked(size, distinct, reps);
+    if (run_unchecked) sort_unchecked(size, distinct, seed, reps);
     TEST_CHECK(Dummy);
     TEST_CHECK(IncFirst);
     TEST_CHECK(Bitflip);
