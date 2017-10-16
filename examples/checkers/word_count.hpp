@@ -125,8 +125,7 @@ auto word_count = [](
     for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
         ++true_seed; // rng foobar
         api::Run([&](Context &ctx) {
-            std::mt19937 rng(true_seed);
-            zipf_generator<double> zipf(rng(), distinct_words, 1.0);
+            zipf_generator<double> zipf(true_seed, distinct_words, 1.0);
             auto generator = [&zipf](size_t /* index */)
                 { return WordCountPair(zipf.next(), 1); };
 
@@ -240,8 +239,7 @@ auto word_count_unchecked = [](const size_t words_per_worker,
     for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
         ++true_seed; // rng foobar
         api::Run([&](Context &ctx) {
-            std::mt19937 rng(true_seed);
-            zipf_generator<double> zipf(rng(), distinct_words, 1.0);
+            zipf_generator<double> zipf(true_seed, distinct_words, 1.0);
             auto generator = [&zipf](size_t /* index */)
                 { return WordCountPair(zipf.next(), 1); };
 
