@@ -47,24 +47,24 @@ std::pair<T, U> operator - (const std::pair<T, U>& a, const std::pair<T, U>& b) 
 }
 
 
-auto sort_random = [](const auto& manipulator, const auto& hash,
-                      const std::string& manip_name,
-                      const std::string& config_name,
-                      size_t size, size_t distinct, int reps) {
+template <typename Manipulator, typename HashFn>
+void sort_random(const Manipulator& /*manipulator*/, const HashFn& /*hash*/,
+                 const std::string& manip_name,
+                 const std::string& config_name,
+                 size_t size, size_t distinct, int reps) {
     using Value = T;
     using Compare = std::less<Value>;
-    using Manipulator = std::decay_t<decltype(manipulator)>;
-    using HashFn = std::decay_t<decltype(hash)>;
     using Checker = checkers::SortChecker<Value, Compare, HashFn>;
     using Driver = checkers::Driver<Checker, Manipulator>;
 
-    return [reps, size, distinct, manip_name, config_name](Context& ctx) {
+    api::Run([&](Context& ctx) {
+        ctx.enable_consume();
+        my_rank = ctx.net.my_rank();
+
         std::default_random_engine gen(std::random_device { } ());
         std::uniform_int_distribution<Value> distribution(0, distinct);
         auto generator = [&distribution, &gen](const size_t&) -> Value
             { return distribution(gen); };
-
-        if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
 
         sRLOG << "Running sort tests with" << manip_name << "manip and"
               << config_name << "config," << reps << "reps";
@@ -134,22 +134,23 @@ auto sort_random = [](const auto& manipulator, const auto& hash,
             << "Sort:" << run_timer.Microseconds()/(1000.0*reps) << "ms;"
             << "Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms;"
             << "Config:" << config_name << "\n";
-    };
-};
+    });
+}
 
 
-auto sort_unchecked = [](size_t size, size_t distinct, int reps = 100,
-                         bool warmup = false) {
+void sort_unchecked(size_t size, size_t distinct, int reps = 100,
+                    bool warmup = false) {
     using Value = T;
     using Compare = std::less<Value>;
 
-    return [reps, warmup, size, distinct](Context& ctx) {
+    api::Run([&](Context& ctx) {
+        ctx.enable_consume();
+        my_rank = ctx.net.my_rank();
+
         std::default_random_engine gen(std::random_device { } ());
         std::uniform_int_distribution<Value> distribution(0, distinct);
         auto generator = [&distribution, &gen](const size_t&) -> Value
             { return distribution(gen); };
-
-        if (my_rank < 0) { my_rank = ctx.net.my_rank(); }
 
         sRLOG << "Running sort tests without checker," << reps << "reps";
 
@@ -189,8 +190,8 @@ auto sort_unchecked = [](size_t size, size_t distinct, int reps = 100,
 
         sRLOG << "Sort:" << run_timer.Microseconds()/(1000.0*reps)
               << "ms (no checking, no manipulation)\n";
-    };
-};
+    });
+}
 
 template <size_t bits>
 using CRC32Config = common::masked_hash<T, bits, common::HashCrc32<T>>;
@@ -198,53 +199,54 @@ using CRC32Config = common::masked_hash<T, bits, common::HashCrc32<T>>;
 template <size_t bits>
 using TabConfig = common::masked_hash<T, bits, common::HashTabulated<T>>;
 
-auto run = [](Context &ctx, const auto& manipulator, const std::string& name,
-              size_t size, size_t distinct, size_t reps) {
-
-    auto test = [&](auto config, auto config_name) {
-        sort_random(manipulator, config, name, config_name, size, distinct, reps)(ctx);
-    };
-
-#ifdef CHECKERS_FULL
-    test(common::HashCrc32<T>{}, "CRC32");
-    test(common::HashTabulated<T>{}, "Tab");
-
-    test(CRC32Config<16>{ }, "CRC32-16");
-    test(TabConfig<16>{ }, "Tab-16");
-
-    test(CRC32Config<8>{ }, "CRC32-8");
-    test(TabConfig<8>{ }, "Tab-8");
-#endif
-    test(CRC32Config<4>{ }, "CRC32-4");
-    test(TabConfig<4>{ }, "Tab-4");
-    test(CRC32Config<2>{ }, "CRC32-2");
-    test(TabConfig<2>{ }, "Tab-2");
+static const std::vector<std::string> known_configs = {
+    "CRC32", "Tab", "CRC32-16", "Tab-16", "CRC32-8", "Tab-8",
+    "CRC32-4", "Tab-4", "CRC32-2", "Tab-2"
 };
+
+template <typename Functor, typename Manipulator>
+void run(Functor &&test, const Manipulator &manip, const std::string& name) {
+#ifdef CHECKERS_FULL
+    test(common::HashCrc32<T>{}, "CRC32", manip, name);
+    test(common::HashTabulated<T>{}, "Tab", manip, name);
+
+    test(CRC32Config<16>{ }, "CRC32-16", manip, name);
+    test(TabConfig<16>{ }, "Tab-16", manip, name);
+
+    test(CRC32Config<8>{ }, "CRC32-8", manip, name);
+    test(TabConfig<8>{ }, "Tab-8", manip, name);
+#endif
+    test(CRC32Config<4>{ }, "CRC32-4", manip, name);
+    test(TabConfig<4>{ }, "Tab-4", manip, name);
+    test(CRC32Config<2>{ }, "CRC32-2", manip, name);
+    test(TabConfig<2>{ }, "Tab-2", manip, name);
+}
 
 // yikes, preprocessor
 #define TEST_CHECK(MANIP) if (run_ ## MANIP) \
-        run(ctx, checkers::SortManipulator ## MANIP(), #MANIP, size, distinct, reps)
-#define TEST_CHECK_A(MANIP, ...) if (run_ ## MANIP) \
-        run(ctx, checkers::SortManipulator ## MANIP(), #MANIP, size, distinct, __VA_ARGS__)
+    run(test, checkers::SortManipulator ## MANIP(), #MANIP)
 
 // run with template parameter
 #define TEST_CHECK_T(NAME, FULL) \
-    run(checkers::SortManipulator ## FULL(), #NAME, reps)
+    run(test, checkers::SortManipulator ## FULL(), #NAME)
 
 int main(int argc, char** argv) {
     tlx::CmdlineParser clp;
 
     int reps = default_reps;
-    size_t size = default_size, distinct = default_distinct;
+    size_t size = default_size, distinct = default_distinct, seed = 42;
+    std::string config_param = "Tab-2";
     clp.add_int('n', "iterations", reps, "iterations");
     clp.add_size_t('s', "size", size, "input size");
-    clp.add_size_t('c', "distinct", distinct, "number of distinct elements");
+    clp.add_size_t('d', "distinct", distinct, "number of distinct elements");
+    clp.add_size_t('e', "seed", seed, "seed for input generation (0: random)");
+    clp.add_string('c', "config", config_param, "which configuration to run");
 
     bool run_unchecked = false, run_Dummy = false, run_Bitflip = false,
         run_IncFirst = false, run_RandFirst = false, run_ResetToDefault = false,
         run_SetEqual = false;
     clp.add_flag('u', "unchecked", run_unchecked, "run unchecked");
-    clp.add_flag('d', "Dummy", run_Dummy, "run Dummy manip");
+    clp.add_flag('x', "Dummy", run_Dummy, "run Dummy manip");
     clp.add_flag('i', "IncFirst", run_IncFirst, "run IncFirst manip");
     clp.add_flag('b', "Bitflip", run_Bitflip, "run Bitflip manip");
     clp.add_flag('f', "RandFirst", run_RandFirst, "run RandFirst manip (boring)");
@@ -254,24 +256,36 @@ int main(int argc, char** argv) {
     if (!clp.process(argc, argv)) return -1;
     clp.print_result();
 
-    api::Run([&](Context &ctx) {
-        ctx.enable_consume();
+    if (std::find(known_configs.begin(), known_configs.end(), config_param) ==
+        known_configs.end()) {
+        LOG1 << "unknown config: " << config_param;
+        return 1;
+    }
 
-        // Warmup
-        sort_unchecked(size, distinct, std::min(100, reps), true)(ctx);
+    auto test = [&config_param, size, distinct, reps]
+        (auto config, const std::string& config_name,
+         auto &manipulator, const std::string& manip_name) {
+        if (config_name != config_param) {
+            return;
+        }
+        sort_random(manipulator, config, manip_name, config_name,
+                    size, distinct, reps);
+    };
 
-        if (run_unchecked) sort_unchecked(size, distinct, reps)(ctx);
-        TEST_CHECK_A(Dummy, std::min(reps, 100));
-        TEST_CHECK(IncFirst);
-        TEST_CHECK(Bitflip);
-        TEST_CHECK(RandFirst);  // random value is easily caught
-        // TEST_CHECK(DropLast);  // disabled: always caught by size check
-        TEST_CHECK(ResetToDefault);
-        // TEST_CHECK(AddToEmpty);  // disabled: always caught by size check
-        TEST_CHECK(SetEqual);
-        // TEST_CHECK(DuplicateLast);  // disabled: always caught by size check
-        // TEST_CHECK_T(MoveToNextBlock, MoveToNextBlock<int>); // disabled: boring
-    });
+    // Warmup
+    sort_unchecked(size, distinct, std::min(100, reps), true);
+
+    if (run_unchecked) sort_unchecked(size, distinct, reps);
+    TEST_CHECK(Dummy);
+    TEST_CHECK(IncFirst);
+    TEST_CHECK(Bitflip);
+    TEST_CHECK(RandFirst);  // random value is easily caught
+    // TEST_CHECK(DropLast);  // disabled: always caught by size check
+    TEST_CHECK(ResetToDefault);
+    // TEST_CHECK(AddToEmpty);  // disabled: always caught by size check
+    TEST_CHECK(SetEqual);
+    // TEST_CHECK(DuplicateLast);  // disabled: always caught by size check
+    // TEST_CHECK_T(MoveToNextBlock, MoveToNextBlock<int>); // disabled: boring
 }
 
 /******************************************************************************/
