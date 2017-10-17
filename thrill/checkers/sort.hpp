@@ -27,9 +27,26 @@
 namespace thrill {
 namespace checkers {
 
+namespace _detail {
+
+template <typename HashFn, typename Value, typename = int>
+struct HashBits {
+    static constexpr size_t Bits = 8 *
+        sizeof(decltype(std::declval<HashFn>()(Value())));
+};
+
+template <typename HashFn, typename Value>
+struct HashBits<HashFn, Value, decltype((void) HashFn::Bits, 0)> {
+    static constexpr size_t Bits = HashFn::Bits;
+};
+
+}
+
 class SortCheckerDummy : public noncopynonmove
 {
 public:
+    static constexpr size_t HashBits = 0;
+
     SortCheckerDummy() = default;
     void reset() { }
 
@@ -62,6 +79,11 @@ class SortChecker : public noncopynonmove
     static const bool debug = false;
 
 public:
+    // Number of bits in the hash function's output
+    static constexpr size_t HashBits = _detail::HashBits<Hash, ValueType>::Bits;
+    // Mask to cut down a value to the hash function's output range
+    static constexpr size_t mask = (1ULL << HashBits) - 1;
+
     /*!
      * Construct a checker
      *
@@ -82,7 +104,7 @@ public:
     //! Process an input element (before sorting)
     TLX_ATTRIBUTE_ALWAYS_INLINE
     void add_pre(const ValueType& v) {
-        sum_pre += hash(v);
+        sum_pre = (sum_pre + hash(v)) & mask;
         ++count_pre;
     }
 
@@ -102,7 +124,7 @@ public:
         // Init "first" (= minimum)
         if (TLX_UNLIKELY(count_post == 0)) { first_post = v; }
 
-        sum_post += hash(v);
+        sum_post = (sum_post + hash(v)) & mask;
         ++count_post;
     }
 
@@ -149,6 +171,10 @@ public:
     bool is_likely_permutation(api::Context& ctx) {
         std::array<uint64_t, 4> sum { { count_pre, count_post, sum_pre, sum_post } };
         sum = ctx.net.AllReduce(sum, common::ComponentSum<decltype(sum)>());
+
+        // apply mask
+        sum[2] &= mask;
+        sum[3] &= mask;
 
         const bool success = (sum[0] == sum[1]) && (sum[2] == sum[3]);
 
