@@ -47,7 +47,7 @@ public:
     void unsilence() { silent = false; }
 
     std::pair<bool, bool> check(api::Context& ctx) {
-        bool success = checker_.check(ctx);
+        bool detection = checker_.check(ctx);
         bool manipulated = manipulator_.made_changes();
 
         // We need to check whether a manipulation was made on *any* worker
@@ -55,16 +55,16 @@ public:
         manipulated = (manipulated_count > 0);
 
         sLOGC(debug && ctx.net.my_rank() == 0)
-            << "checking driver: check" << success << "manip" << manipulated;
+            << "checking driver: check" << detection << "manip" << manipulated;
 
-        LOGC(!silent && success == manipulated && ctx.net.my_rank() == 0)
+        LOGC(!silent && detection == manipulated && ctx.net.my_rank() == 0)
             << common::log::bold() << common::log::fg_red()
-            << "Checker failure: check " << success << "; manip " << manipulated
+            << "Checker failure: check " << detection << "; manip " << manipulated
             << common::log::reset();
 
         // If it was manipulated and detected, or not manipulated and passed,
         // then we're good
-        return std::make_pair(success == !manipulated, manipulated);
+        return std::make_pair(detection == !manipulated, manipulated);
     }
 
     Checker& checker() { return checker_; }
