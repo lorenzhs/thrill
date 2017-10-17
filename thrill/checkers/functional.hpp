@@ -161,6 +161,22 @@ struct if_<true, if_true, if_false>{
 template <bool cond, auto if_true, auto if_false>
 constexpr auto if_v = if_<cond, if_true, if_false>::value;
 
+// Compile time exponentiation (pow isn't constexpr)
+template<size_t n>
+struct pow_helper{
+    static constexpr double pow(const double& a){
+        return a * pow_helper<n-1>::pow(a);
+    }
+};
+
+//final specialization pow
+template<>
+struct pow_helper<0>{
+    static constexpr double pow(const double& /* unused */){
+        return 1.0;
+    }
+};
+
 } // namespace checkers
 } // namespace thrill
 

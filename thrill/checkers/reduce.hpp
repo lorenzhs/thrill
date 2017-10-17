@@ -50,8 +50,8 @@ struct MinireductionConfig {
     //! maximum value for the minireduction's modulus
     static constexpr size_t mod_max = 2 * mod_range;
     //! Expected failure rate delta for this configuration
-    static constexpr double exp_delta = pow(1.0/num_buckets + 1.0/mod_min,
-                                            num_parallel);
+    static constexpr double exp_delta = pow_helper<num_parallel>::pow(
+        1.0/num_buckets + 1.0/mod_min);
 };
 
 //! A default configuration with 4 instances, 256 buckets and CRC-32C hashing
