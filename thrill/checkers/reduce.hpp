@@ -630,16 +630,23 @@ private:
 struct ReduceManipulatorIncFirstKey
     : public ReduceManipulatorBase<ReduceManipulatorIncFirstKey>{
     template <typename It, typename Config>
-    std::pair<It, It> manipulate(It begin, It end, Config /* config */) {
-        sLOG << "Manipulating" << end - begin
-             << "elements, incrementing key of first:" << maybe_print(*begin);
-
-        if constexpr (std::is_same_v<std::string, typename Config::Key>) {
-            begin->first += "1";
-        } else {
-            begin->first++; // XXX
+    std::pair<It, It> manipulate(It begin, It end, Config config) {
+        while (begin != end && (config.IsDefaultKey(*begin) ||
+                                begin->second == decltype(begin->second){})) {
+            ++begin;
         }
-        made_changes_ = true;
+        if (begin != end) {
+            sLOG << "Manipulating" << end - begin
+                 << "elements, incrementing key of first:"
+                 << maybe_print(*begin);
+
+            if constexpr (std::is_same_v<std::string, typename Config::Key>) {
+                begin->first += "1";
+            } else {
+                begin->first++;
+            }
+            made_changes_ = true;
+        }
         return std::make_pair(begin, end);
     }
 };
