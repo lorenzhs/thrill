@@ -139,7 +139,7 @@ auto word_count = [](
                       << "manipulator," << config_name << "config," << reps
                       << "=" << i_outer_max << "x" << loop_fct << "reps";
 
-            for (int i_inner = -1*warmup_its; i_inner < loop_fct; ++i_inner) {
+            for (int i_inner = -1*warmup_its; i_inner < loop_fct && i_inner < reps; ++i_inner) {
 
                 auto driver = std::make_shared<Driver>();
                 driver->silence();
@@ -252,7 +252,7 @@ auto word_count_unchecked = [](const size_t words_per_worker,
                 sRLOG << "Running WordCount tests without checker," << reps
                       << "=" << i_outer_max << "x" << loop_fct << "reps";
 
-            for (int i_inner = -1*warmup_its; i_inner < loop_fct; ++i_inner) {
+            for (int i_inner = -1*warmup_its; i_inner < loop_fct && i_inner < reps; ++i_inner) {
                 // Synchronize with barrier
                 ctx.net.Barrier();
                 auto traffic_before = ctx.net_manager().Traffic();
