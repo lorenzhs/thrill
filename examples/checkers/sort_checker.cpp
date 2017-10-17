@@ -78,6 +78,8 @@ void sort_random(const Manipulator& /*manipulator*/, const HashFn& /*hash*/,
     size_t true_seed = seed;
     if (seed == 0) true_seed = std::random_device{}();
 
+    common::StatsTimerStopped run_timer, check_timer;
+    size_t failures = 0, dummy = 0, manips = 0;
     int i_outer_max = (reps - 1)/loop_fct + 1;
     for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
         ++true_seed; // rng foobar
@@ -93,8 +95,6 @@ void sort_random(const Manipulator& /*manipulator*/, const HashFn& /*hash*/,
             sRLOG << "Running sort tests with" << manip_name << "manip and"
                   << config_name << "config," << reps << "reps";
 
-            common::StatsTimerStopped run_timer, check_timer;
-            size_t failures = 0, dummy = 0, manips = 0;
             for (int i_inner = -3; i_inner < loop_fct && i_inner < reps; ++i_inner) {
                 auto driver = std::make_shared<Driver>();
                 driver->silence();
@@ -172,6 +172,8 @@ void sort_unchecked(const size_t size, const size_t distinct, const size_t seed,
     size_t true_seed = seed;
     if (seed == 0) true_seed = std::random_device{}();
 
+    common::StatsTimerStopped run_timer;
+    size_t dummy = 0;
     int i_outer_max = (reps - 1)/loop_fct + 1;
     for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
         ++true_seed; // rng foobar
@@ -186,8 +188,6 @@ void sort_unchecked(const size_t size, const size_t distinct, const size_t seed,
 
             sRLOG << "Running sort tests without checker," << reps << "reps";
 
-            common::StatsTimerStopped run_timer;
-            size_t dummy = 0;
             for (int i_inner = -1*warmup_its; i_inner < loop_fct && i_inner < reps; ++i_inner) {
                 // Synchronize with barrier
                 ctx.net.Barrier();
