@@ -123,14 +123,17 @@ auto word_count = [](
     size_t failures = 0, manips = 0;
     int i_outer_max = (reps - 1)/loop_fct + 1;
     for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
-        ++true_seed; // rng foobar
         api::Run([&](Context &ctx) {
-            zipf_generator<double> zipf(true_seed, distinct_words, 1.0);
+            ctx.enable_consume();
+            my_rank = ctx.net.my_rank();
+
+            zipf_generator<double> zipf(true_seed + my_rank, distinct_words, 1.0);
             auto generator = [&zipf](size_t /* index */)
                 { return WordCountPair(zipf.next(), 1); };
 
-            ctx.enable_consume();
-            my_rank = ctx.net.my_rank();
+            // advance seed for next round
+            ctx.net.Barrier();
+            if (my_rank == 0) true_seed += ctx.num_workers();
 
             const size_t num_words = words_per_worker * ctx.num_workers();
 
@@ -237,14 +240,17 @@ auto word_count_unchecked = [](const size_t words_per_worker,
 
     int i_outer_max = (reps - 1)/loop_fct + 1;
     for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
-        ++true_seed; // rng foobar
         api::Run([&](Context &ctx) {
-            zipf_generator<double> zipf(true_seed, distinct_words, 1.0);
+            ctx.enable_consume();
+            my_rank = ctx.net.my_rank();
+
+            zipf_generator<double> zipf(true_seed + my_rank, distinct_words, 1.0);
             auto generator = [&zipf](size_t /* index */)
                 { return WordCountPair(zipf.next(), 1); };
 
-            ctx.enable_consume();
-            my_rank = ctx.net.my_rank();
+            // advance seed for next round
+            ctx.net.Barrier();
+            if (my_rank == 0) true_seed += ctx.num_workers();
 
             const size_t num_words = words_per_worker * ctx.num_workers();
 
