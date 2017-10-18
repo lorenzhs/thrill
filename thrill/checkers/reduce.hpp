@@ -431,7 +431,7 @@ struct ReduceManipulatorConfig {
 //! Pattern to provide the implementation of 'manipulate'
 template <typename Strategy>
 struct ReduceManipulatorBase : public ManipulatorBase {
-    //! by default, manipulate all blocks (ranges)
+    //! by default, manipulate only one block (range)
     static const bool manipulate_only_once = true;
 
     //! Skip all items whose key is the default

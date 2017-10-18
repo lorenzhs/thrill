@@ -277,13 +277,13 @@ int main(int argc, char** argv) {
     clp.add_string('c', "config", config_param, "which configuration to run");
 
     bool run_unchecked = false, run_Dummy = false, run_Bitflip = false,
-        run_IncFirst = false, run_RandFirst = false, run_ResetToDefault = false,
+        run_Inc = false, run_Rand = false, run_ResetToDefault = false,
         run_SetEqual = false;
     clp.add_flag('u', "unchecked", run_unchecked, "run unchecked");
     clp.add_flag('x', "Dummy", run_Dummy, "run Dummy manip");
-    clp.add_flag('i', "IncFirst", run_IncFirst, "run IncFirst manip");
+    clp.add_flag('i', "Inc", run_Inc, "run Inc manip");
     clp.add_flag('b', "Bitflip", run_Bitflip, "run Bitflip manip");
-    clp.add_flag('f', "RandFirst", run_RandFirst, "run RandFirst manip (boring)");
+    clp.add_flag('f', "Rand", run_Rand, "run Rand manip (boring)");
     clp.add_flag('r', "ResetToDefault", run_ResetToDefault, "run ResetToDefault manip");
     clp.add_flag('q', "SetEqual", run_SetEqual, "run SetEqual manip");
 
@@ -311,9 +311,9 @@ int main(int argc, char** argv) {
 
     if (run_unchecked) sort_unchecked(size, distinct, seed, reps);
     TEST_CHECK(Dummy);
-    TEST_CHECK(IncFirst);
+    TEST_CHECK(Inc);
     TEST_CHECK(Bitflip);
-    TEST_CHECK(RandFirst);  // random value is easily caught
+    TEST_CHECK(Rand);  // random value is easily caught
     // TEST_CHECK(DropLast);  // disabled: always caught by size check
     TEST_CHECK(ResetToDefault);
     // TEST_CHECK(AddToEmpty);  // disabled: always caught by size check

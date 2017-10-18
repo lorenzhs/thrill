@@ -217,18 +217,36 @@ protected:
     bool sorted_;
 };
 
+template <typename Strategy>
+struct SortManipulatorBase : public ManipulatorBase {
+    //! by default, manipulate only one partition
+    static const bool manipulate_only_once = true;
+
+    size_t choose_random(size_t size) {
+        return (rng() % size);
+    }
+    template <typename ValueType>
+    void operator () (std::vector<ValueType>& vec) {
+        if (Strategy::manipulate_only_once && made_changes())
+            return;
+
+        static_cast<Strategy*>(this)->manipulate(vec);
+    }
+protected:
+    std::mt19937 rng { std::random_device{}() };
+};
+
 //! Dummy no-op sort manipulator
-struct SortManipulatorDummy : public ManipulatorBase {
+struct SortManipulatorDummy : public SortManipulatorBase<SortManipulatorDummy> {
     template <typename Ignored>
-    void operator () (Ignored) { }
-    bool made_changes() const { return false; }
-    void reset() { }
+    void manipulate (Ignored&) { }
 };
 
 //! Drop last element from vector
-struct SortManipulatorDropLast : public ManipulatorBase {
+struct SortManipulatorDropLast :
+    public SortManipulatorBase<SortManipulatorDropLast> {
     template <typename ValueType>
-    void operator () (std::vector<ValueType>& vec) {
+    void manipulate (std::vector<ValueType>& vec) {
         if (vec.size() > 1) { // don't leave it empty
             vec.pop_back();
             made_changes_ = true;
@@ -237,9 +255,10 @@ struct SortManipulatorDropLast : public ManipulatorBase {
 };
 
 //! Add a default-constructed element to empty vectors
-struct SortManipulatorAddToEmpty : public ManipulatorBase {
+struct SortManipulatorAddToEmpty :
+    public SortManipulatorBase<SortManipulatorAddToEmpty> {
     template <typename ValueType>
-    void operator () (std::vector<ValueType>& vec) {
+    void manipulate (std::vector<ValueType>& vec) {
         if (vec.size() == 0) {
             vec.emplace_back();
             made_changes_ = true;
@@ -247,78 +266,92 @@ struct SortManipulatorAddToEmpty : public ManipulatorBase {
     }
 };
 
-//! Set second element equal to first
-struct SortManipulatorSetEqual : public ManipulatorBase {
+//! Set some element equal to another
+struct SortManipulatorSetEqual :
+    public SortManipulatorBase<SortManipulatorSetEqual> {
     template <typename ValueType>
-    void operator () (std::vector<ValueType>& vec) {
-        if (vec.size() >= 2 && vec[0] != vec[1]) {
-            vec[1] = vec[0];
-            made_changes_ = true;
+    void manipulate (std::vector<ValueType>& vec) {
+        if (vec.size() < 2) return;
+
+        size_t pos1 = rng() % vec.size(), pos2;
+        do { pos2 = rng() % vec.size(); } while (pos1 == pos2);
+
+        vec[pos1] = vec[pos2];
+        made_changes_ = true;
+    }
+};
+
+//! Reset some element to default-constructed value
+struct SortManipulatorResetToDefault :
+    public SortManipulatorBase<SortManipulatorResetToDefault> {
+    template <typename ValueType>
+    void manipulate (std::vector<ValueType>& vec) {
+        if (vec.empty()) return;
+
+        ssize_t cpos = rng() % vec.size(), pos = cpos;
+        do { pos++; } while (pos < (ssize_t)vec.size() &&
+                             vec[pos] == ValueType());
+        if (pos == (ssize_t)vec.size()) {
+            pos = cpos;
+            do { pos--; } while (pos >= 0 && vec[pos] == ValueType());
         }
+        if (pos < 0) return;
+
+        assert(pos >= 0 && pos < (ssize_t)vec.size() &&
+               vec[pos] != ValueType());
+        vec[pos] = ValueType();
+        made_changes_ = true;
     }
 };
 
 //! Reset first element to default-constructed value
-struct SortManipulatorResetToDefault : public ManipulatorBase {
+struct SortManipulatorInc :
+    public SortManipulatorBase<SortManipulatorInc> {
     template <typename ValueType>
-    void operator () (std::vector<ValueType>& vec) {
-        if (vec.size() > 0 && vec[0] != ValueType()) {
-            vec[0] = ValueType();
-            made_changes_ = true;
-        }
-    }
-};
-
-//! Reset first element to default-constructed value
-struct SortManipulatorIncFirst : public ManipulatorBase {
-    template <typename ValueType>
-    void operator () (std::vector<ValueType>& vec) {
-        if (vec.size() > 0) {
-            vec[0]++;
-            made_changes_ = true;
-        }
+    void manipulate (std::vector<ValueType>& vec) {
+        if (vec.empty()) return;
+        size_t pos = rng() % vec.size();
+        vec[pos]++;
+        made_changes_ = true;
     }
 };
 
 //! Flip a random bit
-struct SortManipulatorBitflip : public ManipulatorBase {
+struct SortManipulatorBitflip :
+    public SortManipulatorBase<SortManipulatorBitflip> {
     template <typename ValueType>
-    void operator () (std::vector<ValueType>& vec) {
-        if (vec.size() > 0) {
-            size_t pos = rng() % vec.size();
-            const size_t bit = rng() & (8 * sizeof(ValueType) - 1);
-            vec[pos] ^= (1ULL << bit);
-            made_changes_ = true;
-        }
+    void manipulate (std::vector<ValueType>& vec) {
+        if (vec.empty()) return;
+        size_t pos = rng() % vec.size();
+        const size_t bit = rng() & (8 * sizeof(ValueType) - 1);
+        vec[pos] ^= (1ULL << bit);
+        made_changes_ = true;
     }
-
-private:
-    std::mt19937 rng { std::random_device { } () };
 };
 
 //! Reset first element to default-constructed value
-struct SortManipulatorRandFirst : public ManipulatorBase {
+struct SortManipulatorRand :
+    public SortManipulatorBase<SortManipulatorRand> {
     template <typename ValueType>
-    void operator () (std::vector<ValueType>& vec) {
-        if (vec.size() > 0) {
-            ValueType old = vec[0];
-            do {
-                vec[0] = static_cast<ValueType>(rng());
-            } while (vec[0] == old);
-            made_changes_ = true;
-        }
+    void manipulate (std::vector<ValueType>& vec) {
+        if (vec.empty()) return;
+        size_t pos = rng() % vec.size();
+        ValueType old = vec[pos];
+        do {
+            vec[pos] = static_cast<ValueType>(rng());
+        } while (vec[pos] == old);
+        made_changes_ = true;
     }
-
-private:
-    std::mt19937 rng { std::random_device { } () };
 };
 
-//! Duplicate the last element of the first (local) block
-struct SortManipulatorDuplicateLast : public ManipulatorBase {
+//! Duplicate some element of the first (local) block
+struct SortManipulatorDuplicate :
+    public SortManipulatorBase<SortManipulatorDuplicate> {
     template <typename ValueType>
-    void operator () (std::vector<ValueType>& vec) {
+    void manipulate (std::vector<ValueType>& vec) {
         if (!made_changes_ && vec.size() > 0) {
-            vec.push_back(vec.back());
+            size_t pos = rng() % vec.size();
+            vec.push_back(vec[pos]);
             made_changes_ = true;
         }
     }
@@ -327,13 +360,16 @@ struct SortManipulatorDuplicateLast : public ManipulatorBase {
 //! Move the last element of the first (local) block to the beginning of the
 //! second block, if one exists. Otherwise the element is dropped.
 template <typename ValueType>
-struct SortManipulatorMoveToNextBlock : public ManipulatorBase {
-    void operator () (std::vector<ValueType>& vec) {
-        if (!made_changes_ && vec.size() > 0) {
+struct SortManipulatorMoveToNextBlock :
+    public SortManipulatorBase<SortManipulatorMoveToNextBlock<ValueType>> {
+    // this one needs to be invoked twice
+    static const bool manipulate_only_once = false;
+    void manipulate (std::vector<ValueType>& vec) {
+        if (!this->made_changes_ && vec.size() > 0) {
             tmp_ = vec.back();
             vec.pop_back();
             has_stored_ = true;
-            made_changes_ = true;
+            this->made_changes_ = true;
         }
         else if (has_stored_) {
             vec.insert(vec.begin(), tmp_);
