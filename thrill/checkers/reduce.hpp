@@ -448,11 +448,11 @@ struct ReduceManipulatorBase : public ManipulatorBase {
         assert(begin <= elem && elem <= end);
 
         It it = elem;
-        while (it != end && config.IsEitherDefault(*it)) { ++it; }
-        if (it != end) { return it; }
+        while (it < end && config.IsEitherDefault(*it)) { ++it; }
+        if (it < end) { return it; }
 
         it = elem - 1;
-        while (it != begin && config.IsEitherDefault(*it)) { --it; }
+        while (it >= begin && config.IsEitherDefault(*it)) { --it; }
         if (it >= begin) { return it; }
 
         return end;
@@ -517,7 +517,7 @@ struct ReduceManipulatorBase : public ManipulatorBase {
                 return std::make_pair(begin, end);
             } else if (target_partition == (size_t)-1) {
                 // choose a random partition to manipulate
-                assert(partition_id == 0);
+                // XXX replace 0 with partition_id?
                 std::uniform_int_distribution<size_t> dist(0, num_partitions - 1);
                 target_partition = dist(rng);
                 LOG << "Choosing partition " << target_partition << " of " << num_partitions;
@@ -719,9 +719,18 @@ struct ReduceManipulatorSwitchValues
     template <typename It, typename Config>
     std::pair<It, It> manipulate(It begin, It end, It random, Config config) {
         It a = random, b = skip_to_next_key(random, end, config);
+        while (b != end && (config.GetKey(*b) == config.GetKey(*a) ||
+                            b->second == a->second)) {
+            ++b;
+        }
         // if no success, look from the front
         if (b == end) b = skip_to_next_key(begin, random, config);
-        if (b != end) {
+        while (b < random && (config.GetKey(*b) == config.GetKey(*a) ||
+                              b->second == a->second)) {
+            ++b;
+        }
+        if (b != random && b < end) {
+            assert(a->second != b->second);
             sLOG << "Manipulating" << end - begin << "elements,"
                  << "switching values of" << maybe_print(*a) << "and"
                  << maybe_print(*b);
