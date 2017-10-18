@@ -415,15 +415,19 @@ struct ReduceManipulatorBase : public ManipulatorBase {
     //! Find an element whose key isn't the default, behind the element if
     //! possible, otherwise before it.  Returns end if none found.
     template <typename It, typename Config>
-    It find_nonempty_key(It begin, It elem, It end, Config config) const {
+    It find_nonempty_elem(It begin, It elem, It end, Config config) const {
         assert(begin <= elem && elem <= end);
 
         It it = elem;
-        while (it != end && config.IsDefaultKey(*it)) { ++it; }
+        while (it != end && (config.IsDefaultKey(*it) ||
+                             it->second == decltype(it->second){}))
+            ++it;
         if (it != end) { return it; }
 
         it = elem - 1;
-        while (it >= begin && config.IsDefaultKey(*it)) { --it; }
+        while (it != begin && (config.IsDefaultKey(*it) ||
+                               it->second == decltype(it->second){}))
+            --it;
         if (it >= begin) { return it; }
 
         return end;
@@ -434,9 +438,16 @@ struct ReduceManipulatorBase : public ManipulatorBase {
     It skip_to_next_key(It begin, It end, Config config) const {
         It next = begin + 1;
         while (next < end && (config.IsDefaultKey(*next) ||
-                              config.key_exq(*next, *begin)))
+                              config.key_exq(*next, *begin) ||
+                              next->second == decltype(next->second){}))
             ++next;
         return next;
+    }
+
+    template <typename It, typename Config>
+    It choose_random_nonempty_elem(It begin, It end, Config config) {
+        It elem = begin + (rng() % (end - begin));
+        return this->find_nonempty_elem(begin, elem, end, config);
     }
 
     template <typename It, typename Config>
@@ -464,32 +475,56 @@ struct ReduceManipulatorBase : public ManipulatorBase {
 
     //! No-op manipulator
     template <typename It, typename Config>
-    std::pair<It, It> manipulate(It begin, It end, Config /* config */) {
+    std::pair<It, It> manipulate(It begin, It end, It /* random */,
+                                 Config /* config */) {
         return std::make_pair(begin, end);
     }
 
     //! Call operator, performing the manipulation.
     //! This wraps skipping empty keys and empty blocks (ranges)
     template <typename It, typename Config>
-    std::pair<It, It> operator () (It begin, It end, Config config) {
-        if (Strategy::manipulate_only_once && made_changes()) {
-            // abort
-            return std::make_pair(begin, end);
+    std::pair<It, It> operator () (It begin, It end, Config config,
+                                   size_t partition_id, size_t num_partitions) {
+        if (Strategy::manipulate_only_once) {
+            if (made_changes()) {
+                // abort
+                return std::make_pair(begin, end);
+            } else if (target_partition == (size_t)-1) {
+                // choose a random partition to manipulate
+                assert(partition_id == 0);
+                std::uniform_int_distribution<size_t> dist(0, num_partitions - 1);
+                target_partition = dist(rng);
+                LOG << "Choosing partition " << target_partition << " of " << num_partitions;
+            }
+            assert(0 <= target_partition && target_partition < num_partitions);
+
+            if (partition_id != target_partition) {
+                // abort, wrong partition
+                return std::make_pair(begin, end);
+            }
         }
 
+        LOG << "Manipulating partition " << partition_id;
         It it = skip_empty_key(begin, end, config);
+        It random = choose_random_nonempty_elem(begin, end, config);
         std::pair<It, It> ret;
-        if (it < end) {
-            ret = static_cast<Strategy*>(this)->manipulate(it, end, config);
+        if (it < end && random < end) {
+            ret = static_cast<Strategy*>(this)->manipulate(it, end, random, config);
         }
 
         if (made_changes()) {
             return ret;
         }
-        else {
-            return std::make_pair(begin, end);
+        else if (Strategy::manipulate_only_once) {
+            target_partition++; // try again next time
         }
+
+        return std::make_pair(begin, end);
     }
+
+protected:
+    std::mt19937 rng { std::random_device{}() };
+    size_t target_partition = -1;
 };
 
 //! Dummy No-Op Reduce Manipulator
@@ -499,17 +534,11 @@ struct ReduceManipulatorDummy : public ReduceManipulatorBase<ReduceManipulatorDu
 struct ReduceManipulatorBitflip
     : public ReduceManipulatorBase<ReduceManipulatorBitflip>{
     template <typename It, typename Config>
-    std::pair<It, It> manipulate(It begin, It end, Config config) {
-        // First, randomize position and find a non-empty key
-        It elem = begin + (rng() % (end - begin));
-        elem = this->find_nonempty_key(begin, elem, end, config);
-        if (elem == end) {
-            // there isn't a nonempty key in the input! nothing we can do here.
-            return std::make_pair(begin, end);
-        }
+    std::pair<It, It> manipulate(It begin, It end, It random, Config /* config */) {
+        It elem = random;
 
         auto old = *elem; // for debug logging
-        auto rand = rng();
+        auto rand = this->rng();
         // manipulate key or value?
         if (rand & 0x1) {
             if constexpr (std::is_same_v<std::string, typename Config::Key>) {
@@ -543,40 +572,31 @@ struct ReduceManipulatorBitflip
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
-
-private:
-    std::mt19937 rng { std::random_device { } () };
 };
 
-//! Drops first element
-struct ReduceManipulatorDropFirst
-    : public ReduceManipulatorBase<ReduceManipulatorDropFirst>{
+//! Drops some element
+struct ReduceManipulatorDrop
+    : public ReduceManipulatorBase<ReduceManipulatorDrop>{
     template <typename It, typename Config>
-    std::pair<It, It> manipulate(It begin, It end, Config config) {
-        while (begin < end && (config.IsDefaultKey(*begin) ||
-                               begin->second == typename Config::Value())) {
-            ++begin;
-        }
-        if (begin < end) {
-            sLOG << "Manipulating" << end - begin << "elements, dropping first:"
-                 << maybe_print(*begin);
-            begin->first = typename Config::Key();
-            begin->second = typename Config::Value();
-            ++begin;
-            made_changes_ = true;
-        }
+    std::pair<It, It> manipulate(It begin, It end, It random, Config /* config */) {
+        sLOG << "Manipulating" << end - begin << "elements, dropping no"
+             << random - begin << ": " << maybe_print(*random);
+        random->first = typename Config::Key();
+        random->second = decltype(random->second){};
+        made_changes_ = true;
         return std::make_pair(begin, end);
     }
 };
 
-//! Increments value of first element
-struct ReduceManipulatorIncFirst
-    : public ReduceManipulatorBase<ReduceManipulatorIncFirst>{
+//! Increments value of some element
+struct ReduceManipulatorInc
+    : public ReduceManipulatorBase<ReduceManipulatorInc>{
     template <typename It, typename Config>
-    std::pair<It, It> manipulate(It begin, It end, Config /* config */) {
+    std::pair<It, It> manipulate(It begin, It end, It random, Config /* config */) {
         sLOG << "Manipulating" << end - begin
-             << "elements, incrementing first:" << maybe_print(*begin);
-        begin->second++;
+             << "elements, incrementing no" << random - begin << ":"
+             << maybe_print(*random);
+        random->second++;
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
@@ -588,7 +608,7 @@ template <size_t n = 1>
 struct ReduceManipulatorIncDec
     : public ReduceManipulatorBase<ReduceManipulatorIncDec<n> >{
     template <typename It, typename Config>
-    std::pair<It, It> manipulate(It begin, It end, Config config) {
+    std::pair<It, It> manipulate(It begin, It end, It /* random */, Config config) {
         auto arr = this->get_distinct_keys(begin, end, 2 * n, config);
 
         if (arr.back() < end) {
@@ -605,89 +625,76 @@ struct ReduceManipulatorIncDec
     }
 };
 
-//! Increments value of first element
-struct ReduceManipulatorRandFirst
-    : public ReduceManipulatorBase<ReduceManipulatorRandFirst>{
+//! Increments value of some element
+struct ReduceManipulatorRandomize
+    : public ReduceManipulatorBase<ReduceManipulatorRandomize>{
     template <typename It, typename Config>
-    std::pair<It, It> manipulate(It begin, It end, Config /* config */) {
+    std::pair<It, It> manipulate(It begin, It end, It random, Config /* config */) {
         sLOG << "Manipulating" << end - begin
-             << "elements, randomizing first value:" << maybe_print(*begin);
-        typename Config::Value old = begin->second;
+             << "elements, randomizing value of no" << random - begin << ":"
+             << maybe_print(*random);
+        auto old = random->second;
         do {
-            begin->second = static_cast<typename Config::Value>(rng());
-        } while (old == begin->second);
+            random->second = static_cast<decltype(random->second)>(this->rng());
+        } while (old == random->second);
         sLOG << "Update: old val" << maybe_print(old)
-             << "new" << maybe_print(begin->second);
+             << "new" << maybe_print(random->second);
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
-
-private:
-    std::mt19937 rng { std::random_device { } () };
 };
 
-//! Increments key of first element
-struct ReduceManipulatorIncFirstKey
-    : public ReduceManipulatorBase<ReduceManipulatorIncFirstKey>{
+//! Increments key of some element
+struct ReduceManipulatorIncKey
+    : public ReduceManipulatorBase<ReduceManipulatorIncKey>{
     template <typename It, typename Config>
-    std::pair<It, It> manipulate(It begin, It end, Config config) {
-        while (begin != end && (config.IsDefaultKey(*begin) ||
-                                begin->second == decltype(begin->second){})) {
-            ++begin;
-        }
-        if (begin != end) {
-            sLOG << "Manipulating" << end - begin
-                 << "elements, incrementing key of first:"
-                 << maybe_print(*begin);
+    std::pair<It, It> manipulate(It begin, It end, It random, Config /* config */) {
+        sLOG << "Manipulating" << end - begin
+             << "elements, incrementing key of no" << random - begin << ":"
+             << maybe_print(*random);
 
-            if constexpr (std::is_same_v<std::string, typename Config::Key>) {
-                begin->first += "1";
-            } else {
-                begin->first++;
-            }
-            made_changes_ = true;
+        if constexpr (std::is_same_v<std::string, typename Config::Key>) {
+            random->first += "1";
+        } else {
+            random->first++;
         }
+        made_changes_ = true;
         return std::make_pair(begin, end);
     }
 };
 
 //! Increments value of first element
-struct ReduceManipulatorRandFirstKey
-    : public ReduceManipulatorBase<ReduceManipulatorRandFirstKey>{
+struct ReduceManipulatorRandKey
+    : public ReduceManipulatorBase<ReduceManipulatorRandKey>{
     template <typename It, typename Config>
-    std::pair<It, It> manipulate(It begin, It end, Config config) {
+    std::pair<It, It> manipulate(It begin, It end, It random, Config config) {
         sLOG << "Manipulating" << end - begin
-             << "elements, randomizing first key" << maybe_print(*begin);
-        auto old_key = config.GetKey(*begin);
+             << "elements, randomizing key of no" << random - begin << ":"
+             << maybe_print(*begin);
+        auto old_key = config.GetKey(*random);
         do {
             if constexpr (std::is_same_v<std::string, typename Config::Key>) {
-                begin->first = "a"; // chosen by fair dice roll, very random lol
+                random->first = "a"; // chosen by fair dice roll, very random lol
             } else {
-                begin->first = static_cast<typename Config::Key>(rng()); // XXX
+                random->first = static_cast<typename Config::Key>(this->rng());
             }
-        } while (config.key_eq(old_key, config.GetKey(*begin)));
+        } while (config.key_eq(old_key, config.GetKey(*random)));
         sLOG << "Update: old key" << maybe_print(old_key)
-             << "new" << maybe_print(begin->first);
+             << "new" << maybe_print(random->first);
         made_changes_ = true;
         return std::make_pair(begin, end);
     }
-
-private:
-    std::mt19937 rng { std::random_device { } () };
 };
 
-//! Switches values of first and second element
+//! Switches values of some two elements
 struct ReduceManipulatorSwitchValues
     : public ReduceManipulatorBase<ReduceManipulatorSwitchValues>{
     template <typename It, typename Config>
-    std::pair<It, It> manipulate(It begin, It end, Config config) {
-        It a = skip_to_next_key(begin, end, config), b = a;
-        do { b++; }
-        while (b < end && (config.IsDefaultKey(*b) ||
-                           config.key_exq(*a, *b) ||
-                           b->second == decltype(b->second){} ||
-                           a->second == b->second));
-        if (b < end) {
+    std::pair<It, It> manipulate(It begin, It end, It random, Config config) {
+        It a = random, b = skip_to_next_key(random, end, config);
+        // if no success, look from the front
+        if (b == end) b = skip_to_next_key(begin, random, config);
+        if (b != end) {
             sLOG << "Manipulating" << end - begin << "elements,"
                  << "switching values of" << maybe_print(*a) << "and"
                  << maybe_print(*b);

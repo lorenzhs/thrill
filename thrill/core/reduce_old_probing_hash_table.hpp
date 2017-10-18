@@ -363,7 +363,8 @@ public:
                 KeyExtractor, KeyEqualFunction,
                 ReduceMakeTableItem<Value, TableItem, VolatileKey> >
             cfg(this->key_extractor(), this->key_equal_function());
-            std::tie(iter, end) = this->manipulator_(iter, end, cfg);
+            std::tie(iter, end) = this->manipulator_(
+                iter, end, cfg, partition_id, num_partitions_);
         }
 
         for ( ; iter != end; ++iter)

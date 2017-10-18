@@ -48,17 +48,17 @@ int main(int argc, char** argv) {
     clp.add_size_t('e', "seed", seed, "seed for input generation (0: random)");
     clp.add_string('c', "config", config_param, "which configuration to run");
 
-    bool run_RandFirstKey = false, run_SwitchValues = false,
+    bool run_RandKey = false, run_SwitchValues = false,
         run_Bitflip = false, run_IncDec1 = false, run_IncDec2 = false,
-        run_IncDec4 = false, run_IncDec8 = false, run_IncFirstKey = false;
-    clp.add_flag('r', "RandFirstKey", run_RandFirstKey, "run RandFirstKey manip");
+        run_IncDec4 = false, run_IncDec8 = false, run_IncKey = false;
+    clp.add_flag('r', "RandKey", run_RandKey, "run RandKey manip");
     clp.add_flag('s', "SwitchValues", run_SwitchValues, "run SwitchValues manip");
     clp.add_flag('b', "Bitflip", run_Bitflip, "run Bitflip manip");
     clp.add_flag('1', "IncDec1", run_IncDec1, "run IncDec1 manip");
     clp.add_flag('2', "IncDec2", run_IncDec2, "run IncDec2 manip");
     clp.add_flag('4', "IncDec4", run_IncDec4, "run IncDec4 manip");
     clp.add_flag('8', "IncDec8", run_IncDec8, "run IncDec8 manip");
-    clp.add_flag('i', "IncFirstKey", run_IncFirstKey, "run IncFirstKey manip");
+    clp.add_flag('i', "IncKey", run_IncKey, "run IncKey manip");
 
     if (!clp.process(argc, argv)) return -1;
     clp.print_result();
@@ -82,17 +82,17 @@ int main(int argc, char** argv) {
                    words_per_worker, distinct_words, seed, reps);
     };
 
-    TEST_CHECK(RandFirstKey);
+    TEST_CHECK(RandKey);
     TEST_CHECK(SwitchValues);
     TEST_CHECK(Bitflip);
     TEST_CHECK_T(IncDec1, IncDec<1>);
     TEST_CHECK_T(IncDec2, IncDec<2>);
     // TEST_CHECK_T(IncDec4, IncDec<4>);
     // TEST_CHECK_T(IncDec8, IncDec<8>);
-    // TEST_CHECK(DropFirst); // disabled because always detected
-    // TEST_CHECK(IncFirst); // disabled because always detected
-    // TEST_CHECK(RandFirst); // disabled because always detected
-    TEST_CHECK(IncFirstKey);
+    // TEST_CHECK(Drop); // disabled because always detected
+    // TEST_CHECK(Inc); // disabled because always detected
+    // TEST_CHECK(Randomize); // disabled because always detected
+    TEST_CHECK(IncKey);
 }
 
 /******************************************************************************/
