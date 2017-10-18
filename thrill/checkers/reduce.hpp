@@ -385,8 +385,37 @@ struct ReduceManipulatorConfig {
         return RMTI::GetKey(t, key_ex);
     }
 
+    template <typename V = Value, typename = int>
+    static auto GetVal(const TableItem& t) {
+        return t;
+    }
+
+    template <typename V = Value, decltype((void)V::second_type, 0)>
+    static auto GetVal(const TableItem& t) {
+        return t->second;
+    }
+
     bool IsDefaultKey(const TableItem& t) const {
         return key_eq(GetKey(t), Key());
+    }
+
+    template <typename V = decltype(GetVal<Value>(std::declval<TableItem>()))>
+    typename std::enable_if_t<!has_equal<V,V>::value ||
+                              !std::is_default_constructible_v<V>, bool>
+    IsDefaultVal(const TableItem& /*t*/) const {
+        // If no operator== or default constructor exist, just return false
+        return false;
+    }
+
+    template <typename V = decltype(GetVal<Value>(std::declval<TableItem>()))>
+    typename std::enable_if_t<has_equal<V,V>::value &&
+                              std::is_default_constructible_v<V>, bool>
+    IsDefaultVal(const TableItem& t) const {
+        return GetVal(t) == V{};
+    }
+
+    bool IsEitherDefault(const TableItem& t) const {
+        return IsDefaultKey(t) || IsDefaultVal(t);
     }
 
     //! Extract and Equality check in one
@@ -419,15 +448,11 @@ struct ReduceManipulatorBase : public ManipulatorBase {
         assert(begin <= elem && elem <= end);
 
         It it = elem;
-        while (it != end && (config.IsDefaultKey(*it) ||
-                             it->second == decltype(it->second){}))
-            ++it;
+        while (it != end && config.IsEitherDefault(*it)) { ++it; }
         if (it != end) { return it; }
 
         it = elem - 1;
-        while (it != begin && (config.IsDefaultKey(*it) ||
-                               it->second == decltype(it->second){}))
-            --it;
+        while (it != begin && config.IsEitherDefault(*it)) { --it; }
         if (it >= begin) { return it; }
 
         return end;
@@ -437,9 +462,8 @@ struct ReduceManipulatorBase : public ManipulatorBase {
     template <typename It, typename Config>
     It skip_to_next_key(It begin, It end, Config config) const {
         It next = begin + 1;
-        while (next < end && (config.IsDefaultKey(*next) ||
-                              config.key_exq(*next, *begin) ||
-                              next->second == decltype(next->second){}))
+        while (next < end && (config.IsEitherDefault(*next) ||
+                              config.key_exq(*next, *begin)))
             ++next;
         return next;
     }
@@ -451,7 +475,7 @@ struct ReduceManipulatorBase : public ManipulatorBase {
     }
 
     template <typename It, typename Config>
-    std::vector<It> get_distinct_keys(It begin, It end, size_t n, Config config) const {
+    std::vector<It> get_distinct_keys(It begin, It end, size_t n, Config config) {
         std::vector<It> result(n);
         result[0] = skip_to_next_key(begin, end, config);
 
@@ -469,6 +493,8 @@ struct ReduceManipulatorBase : public ManipulatorBase {
                 result[i] = skip_to_next_key(result[i], end, config);
             } while (result[i] < end && !is_first_occurrence(i));
         }
+
+        std::shuffle(result.begin(), result.end(), rng);
 
         return result;
     }
@@ -515,7 +541,8 @@ struct ReduceManipulatorBase : public ManipulatorBase {
         if (made_changes()) {
             return ret;
         }
-        else if (Strategy::manipulate_only_once) {
+        else if (Strategy::manipulate_only_once &&
+                 partition_id + 1 < num_partitions) {
             target_partition++; // try again next time
         }
 

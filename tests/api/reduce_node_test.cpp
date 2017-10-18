@@ -28,6 +28,8 @@ using core::ReduceTableImpl;
 
 struct MyStruct {
     size_t x;
+    // XXX foobar for manipulator :(
+    bool operator==(const MyStruct &other) const { return x == other.x; }
 };
 
 struct MyStructHash {
