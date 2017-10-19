@@ -157,29 +157,6 @@ private:
     Operation op_;
 };
 
-//! Compute the component-wise sum of two std::array<std::array<T>, M>,N> of
-//! same sizes.
-template <typename Type, size_t M, size_t N, typename Operation>
-class ComponentSum<std::array<std::array<Type, M>, N>, Operation>
-    : public std::binary_function<
-          std::array<std::array<Type, M>, N>, std::array<std::array<Type, M>, N>,
-          std::array<std::array<Type, M>, N> >
-{
-public:
-    using ArrayType = std::array<std::array<Type, M>, N>;
-    explicit ComponentSum(const Operation& op = Operation()) : op_(op) { }
-    ArrayType operator () (const ArrayType& a, const ArrayType& b) const {
-        ArrayType out;
-        for (size_t i = 0; i < N; ++i)
-            for (size_t j = 0; j < M; ++j)
-                out[i][j] = op_(a[i][j], b[i][j]);
-        return out;
-    }
-
-private:
-    Operation op_;
-};
-
 //! Compute the component-wise sum of two std::vector<T> of same sizes.
 template <typename Type, typename Operation>
 class ComponentSum<std::vector<Type>, Operation>

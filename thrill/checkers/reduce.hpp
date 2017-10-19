@@ -106,6 +106,10 @@ class ReduceCheckerMinireduction : public noncopynonmove
     using reduction_t = std::array<Value, num_buckets>;
     //! data type for a number of parallel minireductions
     using table_t = std::array<reduction_t, num_parallel>;
+    //! data type for moduli
+    using modulus_t = std::array<Value, num_parallel>;
+    //! data type for reduce function array
+    using reducefn_t = std::array<ReduceFunction, num_parallel>;
 
     //! smallest integer type that fits a minireduction value for transmission
     //! (modulo some value between Config::mod_min and Config::mod_max)
@@ -137,13 +141,16 @@ public:
         // Randomize the modulus
         std::uniform_int_distribution<Value>
             dist(Config::mod_min, Config::mod_max);
-        modulus_ = dist(rng);
-        // communicate modulus to reduce function if supported
-        if constexpr (reduce_modulo_builtin_v<ReduceFunction>) {
-            reducefn.modulus = modulus_;
+        for (size_t i = 0; i < num_parallel; ++i) {
+            modulus_[i] = dist(rng);
+            // communicate modulus to reduce function if supported
+            if constexpr (reduce_modulo_builtin_v<ReduceFunction>) {
+                reducefn[i].modulus = modulus_[i];
+            }
+            LOG0 << "modulus " << i << " = " << modulus_[i];
         }
         sLOG0 << "minireduction initialized with" << (size_t)Config::mod_min
-              << "≤ modulus (" << modulus_ << ") ≤" << (size_t)Config::mod_max
+              << "≤ modulus ≤" << (size_t)Config::mod_max
               << "with" << (const size_t)num_buckets << "buckets";
         // reset table to zero
         for (size_t i = 0; i < num_parallel; ++i) {
@@ -166,10 +173,10 @@ public:
                                  << std::hex << bucket << h << std::dec;
             if constexpr (reduce_modulo_builtin_v<ReduceFunction>) {
                 reductions_[idx][bucket] =
-                    reducefn(reductions_[idx][bucket], value);
+                    reducefn[idx](reductions_[idx][bucket], value);
             } else {
                 reductions_[idx][bucket] =
-                    reducefn(reductions_[idx][bucket], value) % modulus_;
+                    reducefn[0](reductions_[idx][bucket], value) % modulus_[idx];
             }
         }
     }
@@ -190,7 +197,7 @@ public:
         // check all buckets for equality
         for (size_t i = 0; i < num_parallel; ++i) {
             for (size_t j = 0; j < num_buckets; ++j) {
-                assert(reductions_[i][j] < modulus_);
+                assert(reductions_[i][j] < modulus_[i]);
                 if (reductions_[i][j] != other.reductions_[i][j]) {
                     sLOG << "table entry mismatch at column" << i << "row" << j
                          << "values" << reductions_[i][j] << other.reductions_[i][j]
@@ -218,7 +225,7 @@ public:
                 // does the modulo before the value would overflow!
                 if constexpr (reduce_modulo_builtin_v<ReduceFunction>) {
                     transmit_table[i][j] =
-                        static_cast<transmit_t>(reductions_[i][j] % modulus_);
+                        static_cast<transmit_t>(reductions_[i][j] % modulus_[i]);
                 } else {
                     transmit_table[i][j] =
                         static_cast<transmit_t>(reductions_[i][j]);
@@ -227,13 +234,20 @@ public:
         }
 
         // Add a modulo to the reduce function
-        auto reducefn_mod = [&](const transmit_t &a, const transmit_t &b) {
-            auto red = reducefn(static_cast<Value>(a), static_cast<Value>(b));
-            return static_cast<transmit_t>(red % modulus_);
+        auto reducefn_mod = [&](const transmit_table_t &a,
+                                const transmit_table_t &b) {
+            transmit_table_t out;
+            for (size_t i = 0; i < num_parallel; ++i) {
+                for (size_t j = 0; j < num_buckets; ++j) {
+                    out[i][j] = static_cast<transmit_t>(
+                        reducefn[i](static_cast<Value>(a[i][j]),
+                                    static_cast<Value>(b[i][j]))
+                        ) % modulus_[i];
+                }
+            }
+            return out;
         };
-        common::ComponentSum<transmit_table_t, decltype(reducefn_mod)>
-            table_reduce(reducefn_mod);
-        transmit_table = ctx.net.Reduce(transmit_table, root, table_reduce);
+        transmit_table = ctx.net.Reduce(transmit_table, root, reducefn_mod);
 
         if (ctx.net.my_rank() != root) return;
 
@@ -254,7 +268,7 @@ protected:
     void dump_to_log(const std::string& name = "Run") {
         for (size_t i = 0; i < num_parallel; ++i) {
             std::stringstream s;
-            s << name << " " << i << ", mod " << modulus_ << ": ";
+            s << name << " " << i << ", mod " << modulus_[i] << ": ";
             for (size_t j = 0; j < num_buckets; ++j) {
                 s << reductions_[i][j] << " ";
             }
@@ -263,9 +277,9 @@ protected:
     }
 
     table_t reductions_;
-    Value modulus_;
+    modulus_t modulus_;
     hash_fn hash_;
-    ReduceFunction reducefn;
+    reducefn_t reducefn;
 };
 
 } // namespace _detail
