@@ -86,12 +86,11 @@ class ReduceCheckerMinireduction : public noncopynonmove
     //! Hash bits per instance.  If num_buckets is a power of two, simply crop
     //! out the correct number of bits.  Otherwise, use as many bits as possible
     //! to maximise uniformity of the scaling bucket assignment
-    static constexpr size_t hash_shift =
-        if_v<Config::pow2_buckets,
-             Config::log2_buckets,
-             (hash_bits / num_parallel)>;
+    static constexpr size_t hash_shift = (hash_bits / num_parallel);
     //! Mask to cut down hash values to required number of bits
-    static constexpr size_t bucket_mask = (1ULL << hash_shift) - 1;
+    static constexpr size_t bucket_mask = if_v<Config::pow2_buckets,
+                                               (1ULL << Config::log2_buckets) - 1,
+                                               (1ULL << hash_shift) - 1>;
     //! Scale factor for non-power-of-two num_buckets to avoid expensive modulo
     //! computations (divisions) in bucket assignment
     static constexpr double scale_factor =
