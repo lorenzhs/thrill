@@ -29,6 +29,9 @@
 #include <random>
 #include <utility>
 
+// for std::is_detected
+#include <experimental/type_traits>
+
 namespace thrill {
 namespace checkers {
 
@@ -121,8 +124,17 @@ public:
 
     //! Reset minireduction to initial state
     void reset(size_t seed) {
-        // randomize the modulus
         std::mt19937 rng(seed);
+
+        // Randomize hash function if supported
+        if constexpr(std::experimental::is_detected_v<has_init_t, hash_fn>) {
+            LOG << "initializing hash function with seed...";
+            hash_.init(rng());
+        } else {
+            LOG << "hash function does not support .init(const size_t seed)";
+        }
+
+        // Randomize the modulus
         std::uniform_int_distribution<Value>
             dist(Config::mod_min, Config::mod_max);
         modulus_ = dist(rng);

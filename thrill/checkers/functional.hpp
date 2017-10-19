@@ -199,6 +199,8 @@ using op_valid = typename op_valid_impl<X, Y, Op>::type;
 template<class X, class Y>
 using has_equal = op_valid<X, Y, std::equal_to<>>;
 
+template<class T>
+using has_init_t = decltype(std::declval<T&>().init(std::declval<const size_t>()));
 
 } // namespace checkers
 } // namespace thrill
