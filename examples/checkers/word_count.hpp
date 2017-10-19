@@ -143,8 +143,9 @@ auto word_count = [](
                       << "=" << i_outer_max << "x" << loop_fct << "reps";
 
             for (int i_inner = -1*warmup_its; i_inner < loop_fct && i_inner < reps; ++i_inner) {
-
-                auto driver = std::make_shared<Driver>();
+                // do something deterministic but random-ish to get a seed for the driver
+                size_t driver_seed = (true_seed + i_outer * loop_fct + i_inner) ^ 0x9e3779b9;
+                auto driver = std::make_shared<Driver>(driver_seed);
                 driver->silence();
 
                 // Synchronize with barrier
