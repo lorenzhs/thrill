@@ -242,7 +242,7 @@ public:
                     out[i][j] = static_cast<transmit_t>(
                         reducefn[i](static_cast<Value>(a[i][j]),
                                     static_cast<Value>(b[i][j]))
-                        ) % modulus_[i];
+                        % modulus_[i]);
                 }
             }
             return out;
