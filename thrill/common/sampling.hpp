@@ -13,6 +13,7 @@
 #ifndef THRILL_COMMON_SAMPLING_HEADER
 #define THRILL_COMMON_SAMPLING_HEADER
 
+#include <thrill/common/dSFMT.hpp>
 #include <thrill/common/hypergeometric_distribution.hpp>
 #include <thrill/common/logger.hpp>
 
@@ -34,7 +35,7 @@ class Sampling {
 public:
     static constexpr bool debug = false;
 
-    Sampling(RNG& rng) : rng_(rng), hyp_(rng()) {}
+    Sampling(RNG& rng) : rng_(rng), hyp_(rng()), dsfmt_(rng()) {}
 
     template <typename Iterator,
               typename Type = typename std::iterator_traits<Iterator>::value_type>
@@ -76,10 +77,9 @@ private:
             sLOG << "Mini case for size" << insize << "and" << size << "samples";
             std::vector<size_t> sample;
             sample.reserve(size);
-            std::uniform_int_distribution<size_t> dist(0, insize - 1);
             size_t remaining = size;
             while (remaining > 0) {
-                size_t elem = dist(rng_);
+                size_t elem = insize * dsfmt_.next();
                 if (std::find(sample.begin(), sample.end(), elem) == sample.end()) {
                     sample.push_back(elem);
                     *(out_begin + size - remaining) = *(begin + elem);
@@ -102,7 +102,6 @@ private:
         }
         sLOG << "HashSampling" << size << "of" << insize << "elements";
 
-        std::uniform_int_distribution<size_t> dist(0, insize - 1);
         const size_t dummy = -1;
         const size_t population_lg = tlx::integer_log2_floor(insize);
         const size_t table_lg = 3 + tlx::integer_log2_floor(size);
@@ -125,7 +124,7 @@ private:
             size_t variate, index;
             while (true) {
                 // Take sample
-                variate = dist(rng_); //N * randblock[array_index++];
+                variate = insize * dsfmt_.next(); // N * randblock[array_index++];
                 index = variate >> address_mask;
                 size_t hash_elem = hash_table[index];
 
@@ -158,6 +157,7 @@ private:
 
     RNG& rng_;
     common::hypergeometric hyp_;
+    common::dSFMT dsfmt_;
     std::vector<size_t> hash_table, indices;
 };
 
