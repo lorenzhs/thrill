@@ -60,6 +60,10 @@ static constexpr bool g_debug_push_file = false;
 #define THRILL_HAVE_MMAP_FILE 1
 #endif
 
+#if defined(__SSE2__)
+#define THRILL_HAVE_SSE2
+#endif
+
 // MSVC doesn't define __SSE4_1__, so also check for __AVX__ // NOLINT
 #if defined(__SSE4_1__) || defined(__AVX__)
 #define THRILL_HAVE_SSE4_1
