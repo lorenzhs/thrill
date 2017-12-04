@@ -59,6 +59,8 @@
 
 #include <thrill/common/logger.hpp>
 
+#include <tlx/define.hpp>
+
 #include <vector>
 
 namespace thrill {
@@ -828,7 +830,7 @@ class dSFMT {
 public:
     static constexpr bool debug = true;
 
-    dSFMT(size_t seed) {
+    dSFMT(size_t seed) : index_(0), block_size_(0), block_id_(0) {
         _dSFMT::dsfmt_init_gen_rand(&dsfmt_, seed);
     }
 
@@ -862,8 +864,30 @@ public:
         _dSFMT::dsfmt_fill_array_close_open(&dsfmt_, output, size);
     }
 
+    //! Get a single [0,1) double. Computes increasingly large blocks internally
+    //! so that this is fast.  May block while next block is generated.
+    TLX_ATTRIBUTE_ALWAYS_INLINE
+    double next() {
+        if (TLX_UNLIKELY(index_ >= block_size_)) {
+            if (block_id_ > 2 && ((block_id_ + 1) & block_id_) == 0) {
+                // block_id_ + 1 is a power of two. We appear to need a lot of
+                // random numbers, increase the blocksize to reduce RNG overhead
+                block_size_ *= 2;
+            }
+            block_size_ = std::max(block_size_,
+                                   (size_t)_dSFMT::dsfmt_get_min_array_size());
+            // generate_block takes care of resizing the vector for us
+            generate_block(randblock_, block_size_);
+            index_ = 0;
+            block_id_++;
+        }
+        return randblock_[index_++];
+    }
+
 private:
     _dSFMT::dsfmt_t dsfmt_;
+    std::vector<double> randblock_;
+    size_t index_, block_size_, block_id_;
 };
 
 } // namespace common
