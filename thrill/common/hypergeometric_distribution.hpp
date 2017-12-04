@@ -61,6 +61,7 @@
 #ifndef THRILL_COMMON_HYPERGEOMETRIC_DISTRIBUTION_HEADER
 #define THRILL_COMMON_HYPERGEOMETRIC_DISTRIBUTION_HEADER
 
+#include <thrill/common/dSFMT.hpp>
 #include <thrill/common/logger.hpp>
 
 #include <cmath>
@@ -78,7 +79,7 @@ public:
     using real_type = fp_t;
 
     hypergeometric_distribution(size_t seed = 0)
-        : rng(seed != 0 ? seed : std::random_device{}()) {}
+        : uniform_(seed != 0 ? seed : std::random_device{}()) {}
 
     int_t operator()(int_t good, int_t bad, int_t sample) {
         if (sample < 1) {
@@ -94,7 +95,7 @@ public:
     }
 
     void seed(size_t seed_val) {
-        rng.seed(seed_val);
+        uniform_.seed(seed_val);
     }
 
 private:
@@ -158,7 +159,7 @@ private:
         Y = d2;
         K = sample;
         while (Y > 0.0) {
-            U = dist(rng); // rk_double(state);
+            U = uniform_(); // dist(rng); // rk_double(state);
             Y -= static_cast<int_t>(floor(U + Y / (d1 + K)));
             K--;
             if (K == 0) break;
@@ -193,8 +194,8 @@ private:
         /* 16 for 16-decimal-digit precision in D1 and D2 */
 
         while (1) {
-            X = dist(rng); // rk_double(state);
-            Y = dist(rng); // rk_double(state);
+            X = uniform_(); // dist(rng); // rk_double(state);
+            Y = uniform_(); // dist(rng); // rk_double(state);
             W = d6 + d8 * (Y - 0.5) / X;
 
             /* fast rejection: */
@@ -231,8 +232,7 @@ private:
     }
 
     // Data members:
-    std::mt19937 rng; // random number generator
-    std::uniform_real_distribution<fp_t> dist; // [0.0...1.0) distribution
+    common::dSFMT uniform_;
 };
 
 using hypergeometric = hypergeometric_distribution<>;
