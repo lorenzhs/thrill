@@ -66,15 +66,15 @@ static void TestAddMyStructByHash(Context& ctx) {
     for (size_t i = 0; i < num_partitions; ++i)
         files.emplace_back(ctx.GetFile(nullptr));
 
-    std::vector<data::DynBlockWriter> emitters;
+    std::vector<data::File::Writer> emitters;
     for (size_t i = 0; i < num_partitions; ++i)
-        emitters.emplace_back(files[i].GetDynWriter());
+        emitters.emplace_back(files[i].GetWriter());
 
     // process items with phase
     using Phase = core::ReducePrePhase<
               MyStruct, size_t, MyStruct,
               decltype(key_ex), decltype(red_fn), decltype(manipulator),
-              /* VolatileKey */ false,
+              /* VolatileKey */ false, data::File::Writer,
               MyReduceConfig<table_impl> >;
 
     Phase phase(ctx, 0, num_partitions, key_ex, red_fn, emitters, manipulator);
@@ -155,15 +155,16 @@ static void TestAddMyStructByIndex(Context& ctx) {
     for (size_t i = 0; i < num_partitions; ++i)
         files.emplace_back(ctx.GetFile(nullptr));
 
-    std::vector<data::DynBlockWriter> emitters;
+    std::vector<data::File::Writer> emitters;
     for (size_t i = 0; i < num_partitions; ++i)
-        emitters.emplace_back(files[i].GetDynWriter());
+        emitters.emplace_back(files[i].GetWriter());
 
     // process items with phase
     using Phase = core::ReducePrePhase<
               MyStruct, size_t, MyStruct,
               decltype(key_ex), decltype(red_fn), decltype(manipulator),
               /* VolatileKey */ false,
+              data::File::Writer,
               MyReduceConfig<table_impl>,
               core::ReduceByIndex<size_t> >;
 

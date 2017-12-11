@@ -43,6 +43,7 @@ void Connection::SyncSend(
     std::unique_lock<std::mutex> lock(g_mutex);
 
     LOG << "MPI_Send()"
+        << " data=" << data
         << " size=" << size
         << " peer_=" << peer_
         << " group_tag_=" << group_tag_;
@@ -62,6 +63,7 @@ void Connection::SyncRecv(void* out_data, size_t size) {
     std::unique_lock<std::mutex> lock(g_mutex);
 
     LOG << "MPI_Recv()"
+        << " out_data=" << out_data
         << " size=" << size
         << " peer_=" << peer_
         << " group_tag_=" << group_tag_;
@@ -90,7 +92,9 @@ void Connection::SyncSendRecv(const void* send_data, size_t send_size,
     std::unique_lock<std::mutex> lock(g_mutex);
 
     LOG << "MPI_Sendrecv()"
+        << " send_data=" << send_data
         << " send_size=" << send_size
+        << " recv_data=" << recv_data
         << " recv_size=" << recv_size
         << " peer_=" << peer_
         << " group_tag_=" << group_tag_;
@@ -358,8 +362,8 @@ static inline void Initialize() {
         const char* argv[] = { "thrill", nullptr };
 
         int provided;
-        r = MPI_Init_thread(&argc, reinterpret_cast<char***>(&argv),
-                            MPI_THREAD_SERIALIZED, &provided);
+        int r = MPI_Init_thread(&argc, reinterpret_cast<char***>(&argv),
+                                MPI_THREAD_MULTIPLE, &provided);
         if (r != MPI_SUCCESS)
             throw Exception("Error during MPI_Init_thread()", r);
 

@@ -57,6 +57,9 @@ set_property(CACHE THRILL_USE_BZIP2 PROPERTY STRINGS AUTO ON OFF)
 set(THRILL_USE_MPI AUTO CACHE STRING "Use (optional) MPI net backend.")
 set_property(CACHE THRILL_USE_MPI PROPERTY STRINGS AUTO ON OFF)
 
+option(THRILL_USE_TBB
+  "Use (optional) Intel TBB library if available." ON)
+
 option(THRILL_USE_JEMALLOC
   "Use (optional) JeMalloc allocation library if available." ON)
 
@@ -72,11 +75,11 @@ option(THRILL_USE_IWYU
 option(THRILL_USE_LTO
   "Compile with -flto (link-time optimization)." OFF)
 
-option(THRILL_FULL_BUILD
-  "Disable large compilation units for faster development." OFF)
-
 option(THRILL_TRY_COMPILE_HEADERS
   "Test header files for self-sufficiency: try to compile them." OFF)
+
+option(THRILL_ON_TRAVIS
+  "Flag for continuous integration building. Disables some unsupported platform features." OFF)
 
 # THRILL_USE_S3 tristate switch
 set(THRILL_USE_S3 AUTO CACHE
@@ -122,9 +125,12 @@ if(NOT MSVC)
 
   # enable ThreadSanitizer
   if(OFF)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=thread -pie -fPIC")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DTHRILL_HAVE_THREAD_SANITIZER=1")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=thread -pie -fPIC")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DTHRILL_HAVE_THREAD_SANITIZER=1")
     set(THRILL_USE_MPI OFF)
+    set(THRILL_USE_TBB OFF)
   endif()
 
   # enable UndefinedBehaviorSanitizer
@@ -255,6 +261,11 @@ if(APPLE)
   # disable warnings about "ranlib: file: libthrill.a(...cpp.o) has no symbols"
   set(CMAKE_C_ARCHIVE_FINISH   "<CMAKE_RANLIB> -no_warning_for_no_symbols -c <TARGET>")
   set(CMAKE_CXX_ARCHIVE_FINISH "<CMAKE_RANLIB> -no_warning_for_no_symbols -c <TARGET>")
+endif()
+
+if(THRILL_ON_TRAVIS)
+  # set define flag for disabling features unsupported on CI virtual machines
+  list(APPEND THRILL_DEFINITIONS "THRILL_ON_TRAVIS=1")
 endif()
 
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
@@ -521,9 +532,25 @@ if(THRILL_USE_HDFS3)
 
 endif()
 
-# use moodycamel's C++11 lock-free queue by Cameron Desrochers
+# try to find Intel TBB (optional)
 
-set(THRILL_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/extlib ${THRILL_INCLUDE_DIRS})
+if(THRILL_USE_TBB)
+  find_package(TBB)
+endif()
+
+if(NOT TBB_FOUND)
+  message(STATUS "Intel TBB not found. No problem, using slower replacements.")
+  list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_INTELTBB=0")
+elseif(TBB_INTERFACE_VERSION LESS 8000)
+  message(STATUS "Intel TBB ${TBB_INTERFACE_VERSION} is too old. "
+    "No problem, using slower replacements.")
+  list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_INTELTBB=0")
+else(NOT TBB_FOUND)
+  list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_INTELTBB=1")
+  set(THRILL_INCLUDE_DIRS ${TBB_INCLUDE_DIRS} ${THRILL_INCLUDE_DIRS})
+  link_directories(${TBB_LIBRARY_DIRS})
+  set(THRILL_LINK_LIBRARIES ${TBB_LIBRARIES} ${THRILL_LINK_LIBRARIES})
+endif()
 
 # use MPI library (optional)
 

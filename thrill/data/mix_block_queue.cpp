@@ -40,13 +40,13 @@ void MixBlockQueue::set_dia_id(size_t dia_id) {
 void MixBlockQueue::AppendBlock(size_t src, const Block& block) {
     LOG << "MixBlockQueue::AppendBlock"
         << " src=" << src << " block=" << block;
-    mix_queue_.enqueue(SrcBlockPair { src, block });
+    mix_queue_.emplace(SrcBlockPair { src, block });
 }
 
 void MixBlockQueue::AppendBlock(size_t src, Block&& block) {
     LOG << "MixBlockQueue::AppendBlock"
         << " src=" << src << " block=" << block;
-    mix_queue_.enqueue(SrcBlockPair { src, std::move(block) });
+    mix_queue_.emplace(SrcBlockPair { src, std::move(block) });
 }
 
 void MixBlockQueue::Close(size_t src) {
@@ -59,7 +59,7 @@ void MixBlockQueue::Close(size_t src) {
     --write_open_count_;
 
     // enqueue a closing Block.
-    mix_queue_.enqueue(SrcBlockPair { src, Block() });
+    mix_queue_.emplace(SrcBlockPair { src, Block() });
 }
 
 MixBlockQueue::SrcBlockPair MixBlockQueue::Pop() {
@@ -68,77 +68,13 @@ MixBlockQueue::SrcBlockPair MixBlockQueue::Pop() {
                    size_t(-1), Block()
         };
     SrcBlockPair b;
-    mix_queue_.wait_dequeue(b);
+    mix_queue_.pop(b);
     if (!b.block.IsValid()) {
         LOG << "MixBlockQueue()"
             << " read_open_ " << read_open_ << " -> " << read_open_ - 1;
         --read_open_;
     }
     return b;
-}
-
-/******************************************************************************/
-// MixBlockQueueSink
-
-MixBlockQueueSink::MixBlockQueueSink(
-    MixStream& dst_mix_stream, size_t from_global, size_t from_local)
-    : BlockSink(dst_mix_stream.queue_.block_pool(), from_local),
-      dst_mix_stream_(dst_mix_stream), dst_mix_queue_(dst_mix_stream.queue_),
-      from_global_(from_global)
-{ }
-
-void MixBlockQueueSink::AppendBlock(const Block& b, bool /* is_last_block */) {
-    LOG << "MixBlockQueueSink::AppendBlock()"
-        << " from_global_=" << from_global_ << " b=" << b;
-    item_counter_ += b.num_items();
-    byte_counter_ += b.size();
-    ++block_counter_;
-    dst_mix_queue_.AppendBlock(from_global_, b);
-}
-
-void MixBlockQueueSink::AppendBlock(Block&& b, bool /* is_last_block */) {
-    LOG << "MixBlockQueueSink::AppendBlock()"
-        << " from_global_=" << from_global_ << " b=" << b;
-    item_counter_ += b.num_items();
-    byte_counter_ += b.size();
-    ++block_counter_;
-    dst_mix_queue_.AppendBlock(from_global_, std::move(b));
-}
-
-void MixBlockQueueSink::Close() {
-    // enqueue a closing Block.
-    LOG << "MixBlockQueueSink::Close()"
-        << " from_global_=" << from_global_;
-    ++block_counter_;
-    dst_mix_queue_.Close(from_global_);
-    write_closed_ = true;
-
-    logger()
-        << "class" << "StreamSink"
-        << "subclass" << "MixBlockQueueSink"
-        << "event" << "close"
-        << "id" << dst_mix_stream_.id_
-        << "peer_host" << dst_mix_stream_.my_host_rank()
-        << "src_worker" << from_global_
-        << "tgt_worker" << dst_mix_stream_.my_worker_rank()
-        << "loopback" << true
-        << "items" << item_counter_
-        << "bytes" << byte_counter_
-        << "blocks" << block_counter_;
-
-    if (src_mix_stream_) {
-        src_mix_stream_->tx_int_items_ += item_counter_;
-        src_mix_stream_->tx_int_bytes_ += byte_counter_;
-        src_mix_stream_->tx_int_blocks_ += block_counter_;
-    }
-
-    dst_mix_stream_.rx_int_items_ += item_counter_;
-    dst_mix_stream_.rx_int_bytes_ += byte_counter_;
-    dst_mix_stream_.rx_int_blocks_ += block_counter_;
-}
-
-void MixBlockQueueSink::set_src_mix_stream(MixStream* src_mix_stream) {
-    src_mix_stream_ = src_mix_stream;
 }
 
 /******************************************************************************/

@@ -30,6 +30,7 @@ namespace data {
 //! \addtogroup data_layer
 //! \{
 
+class BlockQueueSink;
 class ConsumeBlockQueueSource;
 
 /*!
@@ -48,7 +49,7 @@ class BlockQueue final : public BlockSink
 public:
     static constexpr bool debug = false;
 
-    using Writer = BlockWriter<BlockQueue>;
+    using Writer = BlockWriter<BlockQueueSink>;
     using Reader = DynBlockReader;
     using ConsumeReader = BlockReader<ConsumeBlockQueueSource>;
 
@@ -73,14 +74,14 @@ public:
         item_counter_ += b.num_items();
         byte_counter_ += b.size();
         block_counter_++;
-        queue_.enqueue(b);
+        queue_.emplace(b);
     }
     void AppendBlock(Block&& b, bool /* is_last_block */) final {
         LOG << "BlockQueue::AppendBlock() move " << b;
         item_counter_ += b.num_items();
         byte_counter_ += b.size();
         block_counter_++;
-        queue_.enqueue(std::move(b));
+        queue_.emplace(std::move(b));
     }
 
     //! Close called by BlockWriter.
@@ -91,7 +92,7 @@ public:
     Block Pop() {
         if (read_closed_) return Block();
         Block b;
-        queue_.wait_dequeue(b);
+        queue_.pop(b);
         read_closed_ = !b.IsValid();
         return b;
     }
@@ -110,13 +111,13 @@ public:
     //! check if writer side Close() was called.
     bool write_closed() const { return write_closed_; }
 
-    bool empty() const { return queue_.size_approx() == 0; }
+    bool empty() const { return queue_.empty(); }
 
     //! check if reader side has returned a closing sentinel block
     bool read_closed() const { return read_closed_; }
 
     //! return number of block in the queue. Use this ONLY for DEBUGGING!
-    size_t size() { return queue_.size_approx() - (write_closed() ? 1 : 0); }
+    size_t size() { return queue_.size() - (write_closed() ? 1 : 0); }
 
     //! Returns item_counter_
     size_t item_counter() const { return item_counter_; }
@@ -128,9 +129,7 @@ public:
     const common::StatsTimer& timespan() const { return timespan_; }
 
     //! Return a BlockWriter delivering to this BlockQueue.
-    Writer GetWriter(size_t block_size = default_block_size) {
-        return Writer(this, block_size);
-    }
+    Writer GetWriter(size_t block_size = default_block_size);
 
     //! return BlockReader specifically for a BlockQueue
     ConsumeReader GetConsumeReader(size_t local_worker_id);
@@ -140,12 +139,6 @@ public:
 
     //! return polymorphic BlockReader variant
     Reader GetReader(bool consume, size_t local_worker_id);
-
-    //! Returns source_
-    void * source() const { return source_; }
-
-    //! set opaque source pointer
-    void set_source(void* source) { source_ = source; }
 
 private:
     common::ConcurrentBoundedQueue<Block> queue_;
@@ -172,11 +165,65 @@ private:
     //! stats
     CloseCallback close_callback_;
 
-    //! opaque pointer to the source (used by close_callback_ if needed).
-    void* source_ = nullptr;
-
     //! for access to file_
     friend class CacheBlockQueueSource;
+};
+
+/*!
+ * BlockSink which interfaces to a File
+ */
+class BlockQueueSink final : public BlockSink
+{
+    static constexpr bool debug = false;
+
+public:
+    BlockQueueSink()
+        : BlockSink(nullptr, -1), queue_(nullptr)
+    { }
+
+    explicit BlockQueueSink(BlockQueue* queue)
+        : BlockSink(queue->block_pool(), queue->local_worker_id()),
+          queue_(std::move(queue)) {
+        LOG << "BlockQueueSink() new for " << queue;
+    }
+
+    //! default copy-constructor
+    BlockQueueSink(const BlockQueueSink&) = default;
+    //! default assignment operator
+    BlockQueueSink& operator = (const BlockQueueSink&) = default;
+
+    ~BlockQueueSink() {
+        LOG << "~BlockQueueSink() for " << queue_;
+    }
+
+    //! \name Methods of a BlockSink
+    //! \{
+
+    //! Append a block to this file, the block must contain given number of
+    //! items after the offset first.
+    void AppendBlock(const Block& b, bool is_last_block) final {
+        assert(queue_);
+        return queue_->AppendBlock(b, is_last_block);
+    }
+
+    //! Append a block to this file, the block must contain given number of
+    //! items after the offset first.
+    void AppendBlock(Block&& b, bool is_last_block) final {
+        assert(queue_);
+        return queue_->AppendBlock(std::move(b), is_last_block);
+    }
+
+    void Close() final {
+        if (queue_) {
+            queue_->Close();
+            queue_ = nullptr;
+        }
+    }
+
+    //! \}
+
+private:
+    BlockQueue* queue_;
 };
 
 /*!

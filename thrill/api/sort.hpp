@@ -23,6 +23,7 @@
 #include <thrill/common/math.hpp>
 #include <thrill/common/porting.hpp>
 #include <thrill/common/qsort.hpp>
+#include <thrill/common/reservoir_sampling.hpp>
 #include <thrill/core/multiway_merge.hpp>
 #include <thrill/data/file.hpp>
 #include <thrill/net/group.hpp>
@@ -114,22 +115,7 @@ public:
             checking_driver_->checker().add_pre(input);
         }
         unsorted_writer_.Put(input);
-        // In this stage we do not know how many elements are there in total.
-        // Therefore we draw samples based on current number of elements and
-        // randomly replace older samples when we have too many.
-        if (--sample_interval_ == 0) {
-            if (samples_.size() < wanted_sample_size()) {
-                while (samples_.size() < wanted_sample_size())
-                    samples_.emplace_back(SampleIndexPair(input, local_items_));
-            }
-            else {
-                samples_[rng_() % samples_.size()] =
-                    SampleIndexPair(input, local_items_);
-            }
-            sample_interval_ = std::max(
-                size_t(1), (local_items_ + 1) / wanted_sample_size());
-            LOG0 << "SortNode::PreOp() sample_interval_=" << sample_interval_;
-        }
+        res_sampler_.add(SampleIndexPair(input, local_items_));
         local_items_++;
     }
 
@@ -345,24 +331,22 @@ private:
     //! Number of items on this worker
     size_t local_items_ = 0;
 
+    //! epsilon
+    static constexpr double desired_imbalance_ = 0.1;
+
     std::shared_ptr<CheckingDriver> checking_driver_;
 
     //! Sample vector: pairs of (sample,local index)
     std::vector<SampleIndexPair> samples_;
-    //! Number of items to process before the next sample was drawn
-    size_t sample_interval_ = 1;
     //! Random generator
     std::default_random_engine rng_ { std::random_device { } () };
-
-    //! epsilon
-    static constexpr double desired_imbalance_ = 0.1;
-
+    //! Reservoir sampler
+    common::ReservoirSamplingGrow<SampleIndexPair> res_sampler_ {
+        samples_, rng_, desired_imbalance_
+    };
     //! calculate currently desired number of samples
     size_t wanted_sample_size() const {
-        size_t s = static_cast<size_t>(
-            std::log2((local_items_ + 1) * context_.num_workers())
-            * (1.0 / (desired_imbalance_ * desired_imbalance_)));
-        return std::max(s, size_t(1));
+        return res_sampler_.calc_sample_size(local_items_);
     }
 
     //! \}
@@ -508,8 +492,9 @@ private:
         assert(data_writers.size() == actual_k);
         assert(actual_k <= k);
 
+        data_writers.reserve(k);
         while (data_writers.size() < k)
-            data_writers.emplace_back(nullptr);
+            data_writers.emplace_back(data::MixStream::Writer());
 
         std::swap(data_writers[actual_k - 1], data_writers[k - 1]);
 
@@ -653,7 +638,7 @@ private:
             }
         }
         sample_writers.clear();
-        sample_stream->Close();
+        sample_stream.reset();
 
         // code from SS2NPartition, slightly altered
 
@@ -696,7 +681,7 @@ private:
         else
             ReceiveItems(data_stream);
 
-        data_stream->Close();
+        data_stream.reset();
 
         double balance = 0;
         if (local_out_size_ > 0) {
