@@ -370,6 +370,7 @@ auto word_count_checkonly = [](
                 for (size_t i = 0; i < words_per_worker; ++i) {
                     input.emplace_back(generator(i));
                 }
+                ctx.net.Barrier();
                 t_generate.Stop();
 
                 common::StatsTimerStart t_check;
@@ -378,9 +379,7 @@ auto word_count_checkonly = [](
                 for (const auto &elem : input) {
                     checker.add_pre(elem);
                 }
-                checker.add_post(input[0]);
-                checker.add_post(input[1]);
-                checker.check(ctx);
+                ctx.net.Barrier();
                 t_check.Stop();
 
                 if (my_rank == 0 && i_inner < 0) {

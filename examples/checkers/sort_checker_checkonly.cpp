@@ -91,15 +91,16 @@ void sort_checkonly(const HashFn& /*hash*/, const std::string& config_name,
                 for (size_t i = 0; i < local_size; ++i) {
                     input.emplace_back(generator(i));
                 }
+                ctx.net.Barrier();
                 t_generate.Stop();
 
                 common::StatsTimerStart t_check;
                 Checker checker;
-
                 checker.reset(); // checker needs to be reset to initialize
                 for (const auto &elem : input) {
                     checker.add_pre(elem);
                 }
+                ctx.net.Barrier();
                 t_check.Stop();
 
                 if (my_rank == 0 && i_inner >= 0) { // ignore warmup
