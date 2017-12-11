@@ -119,7 +119,7 @@ auto word_count = [](
     size_t true_seed = seed;
     if (seed == 0) true_seed = std::random_device{}();
 
-    common::StatsTimerStopped run_timer, check_timer;
+    common::StatsTimerStopped generate_timer, reduce_timer, check_timer;
     size_t failures = 0, manips = 0;
     int i_outer_max = (reps - 1)/loop_fct + 1;
     for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
@@ -151,10 +151,14 @@ auto word_count = [](
                 // Synchronize with barrier
                 ctx.net.Barrier();
                 auto traffic_before = ctx.net_manager().Traffic();
-                common::StatsTimerStart current_run;
 
-                Generate(ctx, num_words, generator)
-                    .ReduceByKey(
+                common::StatsTimerStart t_generate;
+                auto input = Generate(ctx, num_words, generator).Keep();
+                input.Size(); // force evaluation of GenerateNode
+                t_generate.Stop();
+
+                common::StatsTimerStart t_reduce;
+                input.ReduceByKey(
                         common::TupleGet<0, WordCountPair>(),
                         common::TupleReduceIndex<1, WordCountPair, ReduceFn>(),
                         api::DefaultReduceConfig(), driver)
@@ -163,22 +167,23 @@ auto word_count = [](
 
                 // Re-synchronize, then run final checking pass
                 ctx.net.Barrier();
-                current_run.Stop();
+                t_reduce.Stop();
                 auto traffic_precheck = ctx.net_manager().Traffic();
 
-                common::StatsTimerStart current_check;
+                common::StatsTimerStart t_check;
                 auto success = driver->check(ctx);
                 // No need for a barrier, it returns as soon as the global result is
                 // determined
-                current_check.Stop();
+                t_check.Stop();
 
                 if (my_rank == 0 && i_inner >= 0) { // ignore warmup
                     if (!success.first) { failures++; }
                     if (success.second) { manips++; }
 
                     // add current iteration timers to total
-                    run_timer += current_run;
-                    check_timer += current_check;
+                    generate_timer += t_generate;
+                    reduce_timer += t_reduce;
+                    check_timer += t_check;
 
                     auto traffic_after = ctx.net_manager().Traffic();
                     auto traffic_reduce = traffic_precheck - traffic_before;
@@ -191,8 +196,9 @@ auto word_count = [](
                          << " c_mod_min=" << Config::mod_min
                          << " c_mod_max=" << Config::mod_max
                          << " manip=" << manip_name
-                         << " run_time=" << current_run.Microseconds()
-                         << " check_time=" << current_check.Microseconds()
+                         << " gen_time=" << t_generate.Microseconds()
+                         << " reduce_time=" << t_reduce.Microseconds()
+                         << " check_time=" << t_check.Microseconds()
                          << " detection=" << success.first
                          << " manipulated=" << success.second
                          << " traffic_reduce=" << traffic_reduce.first + traffic_reduce.second
@@ -211,8 +217,9 @@ auto word_count = [](
                      << failures << " / " << reps << " tests failed, expected approx. "
                      << expected_failures << " given " << manips << " manipulations"
                      << common::log::reset();
-                sRLOG << "WordCount:" << run_timer.Microseconds()/(1000.0*reps) << "ms;"
+                sRLOG << "WordCount:" << reduce_timer.Microseconds()/(1000.0*reps) << "ms;"
                       << "Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms;"
+                      << "Generate:" << generate_timer.Microseconds()/(1000.0*reps) << "ms;"
                       << "Config:" << config_name;
                 sRLOG << "";
             }
@@ -234,7 +241,7 @@ auto word_count_unchecked = [](const size_t words_per_worker,
     using WordCountPair = std::pair<Key, Value>;
     using ReduceFn = checkers::checked_plus<Value>;//std::plus<Value>;
 
-    common::StatsTimerStopped run_timer;
+    common::StatsTimerStopped generate_timer, reduce_timer;
 
     size_t true_seed = seed;
     if (seed == 0) true_seed = std::random_device{}();
@@ -263,10 +270,14 @@ auto word_count_unchecked = [](const size_t words_per_worker,
                 // Synchronize with barrier
                 ctx.net.Barrier();
                 auto traffic_before = ctx.net_manager().Traffic();
-                common::StatsTimerStart current_run;
 
-                Generate(ctx, num_words, generator)
-                    .ReduceByKey(
+                common::StatsTimerStart t_generate;
+                auto input = Generate(ctx, num_words, generator).Keep();
+                input.Size(); // force evaluation of GenerateNode
+                t_generate.Stop();
+
+                common::StatsTimerStart t_reduce;
+                input.ReduceByKey(
                         common::TupleGet<0, WordCountPair>(),
                         common::TupleReduceIndex<1, WordCountPair, ReduceFn>())
                     .Size();
@@ -274,11 +285,12 @@ auto word_count_unchecked = [](const size_t words_per_worker,
 
                 // Re-synchronize
                 ctx.net.Barrier();
-                current_run.Stop();
+                t_reduce.Stop();
                 // add current iteration timer to total
                 if (my_rank == 0 && i_inner >= 0) {
                     // ignore warmup iterations, but preserve stats for warmup runs
-                    run_timer += current_run;
+                    generate_timer += t_generate;
+                    reduce_timer += t_reduce;
                 }
 
                 if (my_rank == 0 && !warmup && i_inner >= 0) { // ignore warmup
@@ -286,7 +298,8 @@ auto word_count_unchecked = [](const size_t words_per_worker,
                     auto traffic_reduce = traffic_after - traffic_before;
                     LOG1 << "RESULT"
                          << " benchmark=wordcount_unchecked"
-                         << " run_time=" << current_run.Microseconds()
+                         << " gen_time=" << t_generate.Microseconds()
+                         << " reduce_time=" << t_reduce.Microseconds()
                          << " traffic_reduce=" << traffic_reduce.first + traffic_reduce.second
                          << " words_per_worker=" << words_per_worker
                          << " distinct_words=" << distinct_words
@@ -295,7 +308,8 @@ auto word_count_unchecked = [](const size_t words_per_worker,
                 }
             }
             if (i_outer == i_outer_max - 1) { // print summary at the end
-                sRLOG << "WordCount:" << run_timer.Microseconds()/(1000.0*reps)
+                sRLOG << "WordCount:" << reduce_timer.Microseconds()/(1000.0*reps)
+                      << "ms; Generate:" << generate_timer.Microseconds()/(1000.0*reps)
                       << "ms (no checking, no manipulation)";
                 sRLOG << "";
             }
