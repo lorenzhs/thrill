@@ -34,7 +34,7 @@ const size_t default_size = 1000000;
 const size_t default_distinct = 100000000;
 
 constexpr int loop_fct = 1000;
-constexpr int warmup_its = 1;
+constexpr int warmup_its = 3;
 
 thread_local static int my_rank = -1;
 
@@ -83,7 +83,7 @@ void sort_random(const Manipulator& /*manipulator*/, const HashFn& /*hash*/,
             sRLOG << "Running sort tests with" << manip_name << "manip and"
                   << config_name << "config," << reps << "reps";
 
-            for (int i_inner = -3; i_inner < loop_fct && i_inner < reps; ++i_inner) {
+            for (int i_inner = -1*warmup_its; i_inner < loop_fct && i_inner < reps; ++i_inner) {
                 auto driver = std::make_shared<Driver>();
                 driver->silence();
 

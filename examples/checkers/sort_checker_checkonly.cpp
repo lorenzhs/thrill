@@ -35,7 +35,7 @@ const size_t default_size = 1000000;
 const size_t default_distinct = 100000000;
 
 constexpr int loop_fct = 1000;
-constexpr int warmup_its = 1;
+constexpr int warmup_its = 10;
 
 thread_local static int my_rank = -1;
 
@@ -81,7 +81,7 @@ void sort_checkonly(const HashFn& /*hash*/, const std::string& config_name,
             sRLOG << "Running sort checkonly tests with" << config_name
                   << "config," << reps << "reps";
 
-            for (int i_inner = -3; i_inner < loop_fct && i_inner < reps; ++i_inner) {
+            for (int i_inner = -1*warmup_its; i_inner < loop_fct && i_inner < reps; ++i_inner) {
                 // Synchronize with barrier
                 ctx.net.Barrier();
 
