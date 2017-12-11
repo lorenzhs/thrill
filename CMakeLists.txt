@@ -383,9 +383,9 @@ set(THRILL_INCLUDE_DIRS
 ###############################################################################
 # add highwayhash
 
-include_directories(SYSTEM ${CMAKE_CURRENT_SOURCE_DIR}/extlib/highwayhash)
-# build highwayhash as follows: make HH_CXXFLAGS=-fPIC libhighwayhash.a
-list(APPEND THRILL_LINK_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR}/extlib/highwayhash/libhighwayhash.a)
+add_subdirectory(extlib/highwayhash)
+include_directories(SYSTEM ${CMAKE_CURRENT_SOURCE_DIR}/extlib/highwayhash/highwayhash)
+list(APPEND THRILL_LINK_LIBRARIES ${CMAKE_CURRENT_SOURCE_DIR}/extlib/highwayhash/highwayhash/libhighwayhash.a)
 
 ################################################################################
 ### Find Required Libraries
