@@ -139,8 +139,7 @@ auto word_count = [](
                 auto traffic_before = ctx.net_manager().Traffic();
 
                 common::StatsTimerStart t_generate;
-                auto input = Generate(ctx, num_words, generator).Keep();
-                input.Size(); // force evaluation of GenerateNode
+                auto input = Generate(ctx, num_words, generator).Cache().Execute();
                 t_generate.Stop();
 
                 common::StatsTimerStart t_reduce;
@@ -258,8 +257,7 @@ auto word_count_unchecked = [](const size_t words_per_worker,
                 auto traffic_before = ctx.net_manager().Traffic();
 
                 common::StatsTimerStart t_generate;
-                auto input = Generate(ctx, num_words, generator).Keep();
-                input.Size(); // force evaluation of GenerateNode
+                auto input = Generate(ctx, num_words, generator).Cache().Execute();
                 t_generate.Stop();
 
                 common::StatsTimerStart t_reduce;
