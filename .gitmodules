@@ -14,5 +14,5 @@
 	path = extlib/tlx
 	url = https://github.com/tlx/tlx.git
 [submodule "extlib/highwayhash"]
-        path = extlib/highwayhash
-        url = https://github.com/google/highwayhash/
+	path = extlib/highwayhash
+	url = https://github.com/google/highwayhash/
