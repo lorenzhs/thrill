@@ -22,6 +22,7 @@
 #include <thrill/api/size.hpp>
 #include <thrill/checkers/driver.hpp>
 #include <thrill/checkers/reduce.hpp>
+#include <thrill/common/aggregate.hpp>
 #include <thrill/common/dSFMT.hpp>
 #include <thrill/common/logger.hpp>
 #include <thrill/common/stats_timer.hpp>
@@ -105,7 +106,7 @@ auto word_count = [](
     size_t true_seed = seed;
     if (seed == 0) true_seed = std::random_device{}();
 
-    common::StatsTimerStopped generate_timer, reduce_timer, check_timer;
+    common::Aggregate<double> generate_time, reduce_time, check_time;
     size_t failures = 0, manips = 0;
     int i_outer_max = (reps - 1)/loop_fct + 1;
     for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
@@ -166,9 +167,9 @@ auto word_count = [](
                     if (success.second) { manips++; }
 
                     // add current iteration timers to total
-                    generate_timer += t_generate;
-                    reduce_timer += t_reduce;
-                    check_timer += t_check;
+                    generate_time.Add(t_generate.Microseconds() / 1000.0);
+                    reduce_time.Add(t_reduce.Microseconds() / 1000.0);
+                    check_time.Add(t_check.Microseconds() / 1000.0);
 
                     auto traffic_after = ctx.net_manager().Traffic();
                     auto traffic_reduce = traffic_precheck - traffic_before;
@@ -202,10 +203,11 @@ auto word_count = [](
                      << failures << " / " << reps << " tests failed, expected approx. "
                      << expected_failures << " given " << manips << " manipulations"
                      << common::log::reset();
-                sRLOG << "WordCount:" << reduce_timer.Microseconds()/(1000.0*reps) << "ms;"
-                      << "Check:" << check_timer.Microseconds()/(1000.0*reps) << "ms;"
-                      << "Generate:" << generate_timer.Microseconds()/(1000.0*reps) << "ms;"
-                      << "Config:" << config_name;
+                RLOG << "WordCount: " << reduce_time.Mean() << "ms (stdev "
+                     << reduce_time.StDev() << "); Check: " << check_time.Mean()
+                     << "ms (" << check_time.StDev() << "); Generate: "
+                     << generate_time.Mean() << "ms (" << generate_time.StDev()
+                     << "); Config: " << config_name;
                 sRLOG << "";
             }
         });
@@ -226,7 +228,7 @@ auto word_count_unchecked = [](const size_t words_per_worker,
     using WordCountPair = std::pair<Key, Value>;
     using ReduceFn = checkers::checked_plus<Value>;//std::plus<Value>;
 
-    common::StatsTimerStopped generate_timer, reduce_timer;
+    common::Aggregate<double> generate_time, reduce_time;
 
     size_t true_seed = seed;
     if (seed == 0) true_seed = std::random_device{}();
@@ -273,8 +275,8 @@ auto word_count_unchecked = [](const size_t words_per_worker,
                 // add current iteration timer to total
                 if (my_rank == 0 && i_inner >= 0) {
                     // ignore warmup iterations, but preserve stats for warmup runs
-                    generate_timer += t_generate;
-                    reduce_timer += t_reduce;
+                    generate_time.Add(t_generate.Microseconds()/1000.0);
+                    reduce_time.Add(t_reduce.Microseconds()/1000.0);
                 }
 
                 if (my_rank == 0 && !warmup && i_inner >= 0) { // ignore warmup
@@ -292,9 +294,10 @@ auto word_count_unchecked = [](const size_t words_per_worker,
                 }
             }
             if (i_outer == i_outer_max - 1) { // print summary at the end
-                sRLOG << "WordCount:" << reduce_timer.Microseconds()/(1000.0*reps)
-                      << "ms; Generate:" << generate_timer.Microseconds()/(1000.0*reps)
-                      << "ms (no checking, no manipulation)";
+                RLOG << "WordCount: " << reduce_time.Mean() << "ms (stdev "
+                     << reduce_time.StDev() << "); Generate: "
+                     << generate_time.Mean() << "ms (" << generate_time.StDev()
+                     << "), no checking, no manipulation";
                 sRLOG << "";
             }
         });
