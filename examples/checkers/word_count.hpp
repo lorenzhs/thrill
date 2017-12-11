@@ -161,6 +161,13 @@ auto word_count = [](
                 // determined
                 t_check.Stop();
 
+                if (my_rank == 0 && i_inner < 0) {
+                    sLOG1 << "Warmup round" << i_inner << "generate took"
+                          << t_generate.Microseconds() / 1000.0
+                          << "ms, reducing" << t_reduce.Microseconds() / 1000.0
+                          << "ms, and checking"
+                          << t_check.Microseconds() / 1000.0 << "ms";
+                }
                 if (my_rank == 0 && i_inner >= 0) { // ignore warmup
                     if (!success.first) { failures++; }
                     if (success.second) { manips++; }
@@ -278,6 +285,12 @@ auto word_count_unchecked = [](const size_t words_per_worker,
                     reduce_time.Add(t_reduce.Microseconds()/1000.0);
                 }
 
+                if (my_rank == 0 && !warmup && i_inner < 0) {
+                    sLOG1 << "Warmup round" << i_inner << "generate took"
+                          << t_generate.Microseconds() / 1000.0
+                          << "ms, reducing took"
+                          << t_reduce.Microseconds() / 1000.0 << "ms";
+                }
                 if (my_rank == 0 && !warmup && i_inner >= 0) { // ignore warmup
                     auto traffic_after = ctx.net_manager().Traffic();
                     auto traffic_reduce = traffic_after - traffic_before;
@@ -370,6 +383,12 @@ auto word_count_checkonly = [](
                 checker.check(ctx);
                 t_check.Stop();
 
+                if (my_rank == 0 && i_inner < 0) {
+                    sLOG1 << "Warmup round" << i_inner << "generate took"
+                          << t_generate.Microseconds() / 1000.0
+                          << "ms, checking took"
+                          << t_check.Microseconds() / 1000.0 << "ms";
+                }
                 if (my_rank == 0 && i_inner >= 0) { // ignore warmup
                     // add current iteration timers to total
                     generate_time.Add(t_generate.Microseconds() / 1000.0);
