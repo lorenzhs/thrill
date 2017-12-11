@@ -17,6 +17,7 @@
 #define THRILL_EXAMPLES_CHECKERS_WORD_COUNT_HEADER
 
 #include <thrill/api/context.hpp>
+#include <thrill/api/gather.hpp>
 #include <thrill/api/generate.hpp>
 #include <thrill/api/reduce_by_key.hpp>
 #include <thrill/api/size.hpp>
@@ -27,8 +28,6 @@
 #include <thrill/common/logger.hpp>
 #include <thrill/common/stats_timer.hpp>
 #include <thrill/common/string_view.hpp>
-
-#include "../word_count/random_text_writer.hpp"
 
 #include <algorithm>
 #include <functional>
@@ -303,6 +302,106 @@ auto word_count_unchecked = [](const size_t words_per_worker,
         });
     }
 };
+
+
+
+auto word_count_checkonly = [](
+    const auto& config, const std::string& config_name,
+    const size_t words_per_worker, const size_t distinct_words,
+    const size_t seed, const int reps)
+{
+    using Key = uint64_t;
+    using Value = uint64_t;
+    using WordCountPair = std::pair<Key, Value>;
+    // checked_plus is important for making modulo efficient
+    using ReduceFn = checkers::checked_plus<Value>;
+
+    using Config = std::decay_t<decltype(config)>;
+    using Checker = checkers::ReduceChecker<Key, Value, ReduceFn, Config>;
+
+    size_t true_seed = seed;
+    if (seed == 0) true_seed = std::random_device{}();
+
+    common::Aggregate<double> generate_time, check_time;
+    int i_outer_max = (reps - 1)/loop_fct + 1;
+    for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
+        api::Run([&](Context &ctx) {
+            ctx.enable_consume();
+            my_rank = ctx.net.my_rank();
+
+            zipf_generator<double> zipf(true_seed + my_rank, distinct_words, 1.0);
+            auto generator = [&zipf](size_t /* index */)
+                { return WordCountPair(zipf.next(), 1); };
+
+            // advance seed for next round
+            ctx.net.Barrier();
+            if (my_rank == 0) true_seed += ctx.num_workers();
+
+            //const size_t num_words = words_per_worker * ctx.num_workers();
+
+            if (i_outer == 0)
+                sRLOG << "Running WordCount check-only tests with"
+                      << config_name << "config," << reps << "="
+                      << i_outer_max << "x" << loop_fct << "reps";
+
+            for (int i_inner = -1*warmup_its; i_inner < loop_fct && i_inner < reps; ++i_inner) {
+                // do something deterministic but random-ish to get a seed for the driver
+                size_t driver_seed = (true_seed + i_outer * loop_fct + i_inner) ^ 0x9e3779b9;
+
+                // Synchronize with barrier
+                ctx.net.Barrier();
+
+                common::StatsTimerStart t_generate;
+                std::vector<WordCountPair> input;
+                input.reserve(words_per_worker);
+                for (size_t i = 0; i < words_per_worker; ++i) {
+                    input.emplace_back(generator(i));
+                }
+                t_generate.Stop();
+
+                common::StatsTimerStart t_check;
+                Checker checker(driver_seed);
+                checker.reset(); // checker needs to be reset to initialize
+                for (const auto &elem : input) {
+                    checker.add_pre(elem);
+                }
+                checker.add_post(input[0]);
+                checker.add_post(input[1]);
+                checker.check(ctx);
+                t_check.Stop();
+
+                if (my_rank == 0 && i_inner >= 0) { // ignore warmup
+                    // add current iteration timers to total
+                    generate_time.Add(t_generate.Microseconds() / 1000.0);
+                    check_time.Add(t_check.Microseconds() / 1000.0);
+
+                    LOG1 << "RESULT"
+                         << " benchmark=wordcount_checkonly"
+                         << " config=" << config_name
+                         << " c_its=" << Config::num_parallel
+                         << " c_buckets=" << Config::num_buckets
+                         << " c_mod_min=" << Config::mod_min
+                         << " c_mod_max=" << Config::mod_max
+                         << " gen_time=" << t_generate.Microseconds()
+                         << " check_time=" << t_check.Microseconds()
+                         << " words_per_worker=" << words_per_worker
+                         << " distinct_words=" << distinct_words
+                         << " machines=" << ctx.num_hosts()
+                         << " workers_per_host=" << ctx.workers_per_host();
+                }
+            }
+            if (i_outer == i_outer_max - 1) { // print summary at the end
+                RLOG << "WordCount checkonly, Check: " << check_time.Mean()
+                     << "ms (" << check_time.StDev() << "); Generate: "
+                     << generate_time.Mean() << "ms (" << generate_time.StDev()
+                     << "); Config: " << config_name << " - CHECKONLY MODE";
+                RLOG << "";
+            }
+        });
+
+    }
+};
+
 
 using T = uint64_t;
 
