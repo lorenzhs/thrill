@@ -71,14 +71,11 @@ void sort_random(const Manipulator& /*manipulator*/, const HashFn& /*hash*/,
             ctx.enable_consume();
             my_rank = ctx.net.my_rank();
 
-            std::default_random_engine gen(true_seed + my_rank);
+            const size_t gen_seed = true_seed + i_outer * ctx.num_workers() + my_rank;
+            std::default_random_engine gen(gen_seed);
             std::uniform_int_distribution<Value> distribution(0, distinct);
             auto generator = [&distribution, &gen](const size_t&) -> Value
                 { return distribution(gen); };
-
-            // advance seed for next round
-            ctx.net.Barrier();
-            if (my_rank == 0) true_seed += ctx.num_workers();
 
             sRLOG << "Running sort tests with" << manip_name << "manip and"
                   << config_name << "config," << reps << "reps";
@@ -168,14 +165,11 @@ void sort_unchecked(const size_t size, const size_t distinct, const size_t seed,
             ctx.enable_consume();
             my_rank = ctx.net.my_rank();
 
-            std::default_random_engine gen(true_seed + my_rank);
+            const size_t gen_seed = true_seed + i_outer * ctx.num_workers() + my_rank;
+            std::default_random_engine gen(gen_seed);
             std::uniform_int_distribution<Value> distribution(0, distinct);
             auto generator = [&distribution, &gen](const size_t&) -> Value
                 { return distribution(gen); };
-
-            // advance seed for next round
-            ctx.net.Barrier();
-            if (my_rank == 0) true_seed += ctx.num_workers();
 
             sRLOG << "Running sort tests without checker," << reps << "reps";
 

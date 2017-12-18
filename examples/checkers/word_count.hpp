@@ -102,8 +102,7 @@ auto word_count = [](
     using Manipulator = std::decay_t<decltype(manipulator)>;
     using Driver = checkers::Driver<Checker, Manipulator>;
 
-    size_t true_seed = seed;
-    if (seed == 0) true_seed = std::random_device{}();
+    const size_t true_seed = (seed != 0) ? seed : std::random_device{}();
 
     common::Aggregate<double> generate_time, reduce_time, check_time;
     size_t failures = 0, manips = 0;
@@ -113,13 +112,10 @@ auto word_count = [](
             ctx.enable_consume();
             my_rank = ctx.net.my_rank();
 
-            zipf_generator<double> zipf(true_seed + my_rank, distinct_words, 1.0);
+            const size_t gen_seed = true_seed + i_outer * ctx.num_workers() + my_rank;
+            zipf_generator<double> zipf(gen_seed, distinct_words, 1.0);
             auto generator = [&zipf](size_t /* index */)
                 { return WordCountPair(zipf.next(), 1); };
-
-            // advance seed for next round
-            ctx.net.Barrier();
-            if (my_rank == 0) true_seed += ctx.num_workers();
 
             const size_t num_words = words_per_worker * ctx.num_workers();
 
@@ -130,7 +126,8 @@ auto word_count = [](
 
             for (int i_inner = -1*warmup_its; i_inner < loop_fct && i_inner < reps; ++i_inner) {
                 // do something deterministic but random-ish to get a seed for the driver
-                size_t driver_seed = (true_seed + i_outer * loop_fct + i_inner) ^ 0x9e3779b9;
+                const int offset = i_outer * loop_fct + i_inner;
+                const size_t driver_seed = (true_seed + std::max(0, offset)) ^ 0x9e3779b9;
                 auto driver = std::make_shared<Driver>(driver_seed);
                 driver->silence();
 
@@ -236,8 +233,7 @@ auto word_count_unchecked = [](const size_t words_per_worker,
 
     common::Aggregate<double> generate_time, reduce_time;
 
-    size_t true_seed = seed;
-    if (seed == 0) true_seed = std::random_device{}();
+    const size_t true_seed = (seed != 0) ? seed : std::random_device{}();
 
     int i_outer_max = (reps - 1)/loop_fct + 1;
     for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
@@ -245,13 +241,10 @@ auto word_count_unchecked = [](const size_t words_per_worker,
             ctx.enable_consume();
             my_rank = ctx.net.my_rank();
 
-            zipf_generator<double> zipf(true_seed + my_rank, distinct_words, 1.0);
+            const size_t gen_seed = true_seed + i_outer * ctx.num_workers() + my_rank;
+            zipf_generator<double> zipf(gen_seed, distinct_words, 1.0);
             auto generator = [&zipf](size_t /* index */)
                 { return WordCountPair(zipf.next(), 1); };
-
-            // advance seed for next round
-            ctx.net.Barrier();
-            if (my_rank == 0) true_seed += ctx.num_workers();
 
             const size_t num_words = words_per_worker * ctx.num_workers();
 
@@ -332,8 +325,7 @@ auto word_count_checkonly = [](
     using Config = std::decay_t<decltype(config)>;
     using Checker = checkers::ReduceChecker<Key, Value, ReduceFn, Config>;
 
-    size_t true_seed = seed;
-    if (seed == 0) true_seed = std::random_device{}();
+    const size_t true_seed = (seed != 0) ? seed : std::random_device{}();
 
     common::Aggregate<double> generate_time, check_time;
     int i_outer_max = (reps - 1)/loop_fct + 1;
@@ -342,15 +334,10 @@ auto word_count_checkonly = [](
             ctx.enable_consume();
             my_rank = ctx.net.my_rank();
 
-            zipf_generator<double> zipf(true_seed + my_rank, distinct_words, 1.0);
+            const size_t gen_seed = true_seed + i_outer * ctx.num_workers() + my_rank;
+            zipf_generator<double> zipf(gen_seed, distinct_words, 1.0);
             auto generator = [&zipf](size_t /* index */)
                 { return WordCountPair(zipf.next(), 1); };
-
-            // advance seed for next round
-            ctx.net.Barrier();
-            if (my_rank == 0) true_seed += ctx.num_workers();
-
-            //const size_t num_words = words_per_worker * ctx.num_workers();
 
             if (i_outer == 0)
                 sRLOG << "Running WordCount check-only tests with"
