@@ -201,7 +201,9 @@ public:
                 if (reductions_[i][j] != other.reductions_[i][j]) {
                     sLOG << "table entry mismatch at column" << i << "row" << j
                          << "values" << reductions_[i][j] << other.reductions_[i][j]
-                         << "diff:" << reductions_[i][j] - other.reductions_[i][j];
+                         << "diff:"
+                         << std::min(reductions_[i][j] - other.reductions_[i][j],
+                                     other.reductions_[i][j] - reductions_[i][j]);
                     return false;
                 }
             }
