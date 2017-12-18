@@ -62,7 +62,7 @@ void sort_checkonly(const HashFn& /*hash*/, const std::string& config_name,
     size_t true_seed = seed;
     if (seed == 0) true_seed = std::random_device{}();
 
-    common::Aggregate<double> generate_time, check_time;
+    common::Aggregate<double> generate_time, check_time, sort_time;
     int i_outer_max = (reps - 1)/loop_fct + 1;
     for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
         api::Run([&](Context& ctx) {
@@ -95,6 +95,7 @@ void sort_checkonly(const HashFn& /*hash*/, const std::string& config_name,
                 ctx.net.Barrier();
                 t_generate.Stop();
 
+                // measure checker input processing
                 common::StatsTimerStart t_check;
                 Checker checker;
                 checker.reset(); // checker needs to be reset to initialize
@@ -103,6 +104,21 @@ void sort_checkonly(const HashFn& /*hash*/, const std::string& config_name,
                 }
                 ctx.net.Barrier();
                 t_check.Stop();
+
+                // sort
+                common::StatsTimerStart t_sort;
+                std::sort(input.begin(), input.end());
+                ctx.net.Barrier();
+                t_sort.Stop();
+
+                // measure checker output processing
+                t_check.Start();
+                for (const auto &elem : input) {
+                    checker.add_post(elem);
+                }
+                ctx.net.Barrier();
+                t_check.Stop();
+
                 // dummy to prevent compiler from optimizing everything out
                 checker.check(ctx);
 
@@ -110,6 +126,7 @@ void sort_checkonly(const HashFn& /*hash*/, const std::string& config_name,
                     // add current iteration timers to total
                     generate_time.Add(t_generate.Microseconds() / 1000.0);
                     check_time.Add(t_check.Microseconds() / 1000.0);
+                    sort_time.Add(t_sort.Microseconds() / 1000.0);
 
                     LOG1 << "RESULT benchmark=sort"
                          << " config=" << config_name
@@ -117,6 +134,7 @@ void sort_checkonly(const HashFn& /*hash*/, const std::string& config_name,
                          << " distinct=" << distinct
                          << " gen_time=" << t_generate.Microseconds()
                          << " check_time=" << t_check.Microseconds()
+                         << " sort_time=" << t_sort.Microseconds()
                          << " hashbits=" << Checker::HashBits
                          << " machines=" << ctx.num_hosts()
                          << " workers_per_host=" << ctx.workers_per_host();
@@ -127,7 +145,9 @@ void sort_checkonly(const HashFn& /*hash*/, const std::string& config_name,
                 RLOG << "Sort checkonly, Check: " << check_time.Mean()
                      << "ms (" << check_time.StDev() << "); Generate: "
                      << generate_time.Mean() << "ms (" << generate_time.StDev()
-                     << "); Config: " << config_name << " - CHECKONLY MODE";
+                     << "); Sort: " << sort_time.Mean() << "ms ("
+                     << sort_time.StDev() << ") Config: " << config_name
+                     << " - CHECKONLY MODE";
                 RLOG << "";
             }
         });
