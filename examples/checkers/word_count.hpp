@@ -368,6 +368,8 @@ auto word_count_checkonly = [](
                 }
                 ctx.net.Barrier();
                 t_check.Stop();
+                // dummy to prevent compiler from optimizing everything out
+                checker.check(ctx);
 
                 if (my_rank == 0 && i_inner < 0) {
                     sLOG1 << "Warmup round" << i_inner << "generate took"

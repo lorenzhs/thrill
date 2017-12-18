@@ -15,6 +15,7 @@
 #include <thrill/checkers/driver.hpp>
 #include <thrill/checkers/sort.hpp>
 #include <thrill/common/aggregate.hpp>
+#include <thrill/common/dSFMT.hpp>
 #include <thrill/common/hash.hpp>
 #include <thrill/common/logger.hpp>
 #include <tlx/cmdline_parser.hpp>
@@ -69,10 +70,10 @@ void sort_checkonly(const HashFn& /*hash*/, const std::string& config_name,
             my_rank = ctx.net.my_rank();
             const size_t local_size = size / ctx.num_workers();
 
-            std::default_random_engine gen(true_seed + my_rank);
-            std::uniform_int_distribution<Value> distribution(0, distinct);
-            auto generator = [&distribution, &gen](const size_t&) -> Value
-                { return distribution(gen); };
+            common::dSFMT gen(true_seed + my_rank);
+            //std::uniform_int_distribution<Value> distribution(0, distinct);
+            auto generator = [&gen,&distinct](const size_t&) -> Value
+                { return gen() * distinct; };
 
             // advance seed for next round
             ctx.net.Barrier();
@@ -102,6 +103,8 @@ void sort_checkonly(const HashFn& /*hash*/, const std::string& config_name,
                 }
                 ctx.net.Barrier();
                 t_check.Stop();
+                // dummy to prevent compiler from optimizing everything out
+                checker.check(ctx);
 
                 if (my_rank == 0 && i_inner >= 0) { // ignore warmup
                     // add current iteration timers to total
