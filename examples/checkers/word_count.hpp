@@ -137,6 +137,7 @@ auto word_count = [](
 
                 common::StatsTimerStart t_generate;
                 auto input = Generate(ctx, num_words, generator).Cache().Execute();
+                ctx.net.Barrier();
                 t_generate.Stop();
 
                 common::StatsTimerStart t_reduce;
@@ -258,6 +259,7 @@ auto word_count_unchecked = [](const size_t words_per_worker,
 
                 common::StatsTimerStart t_generate;
                 auto input = Generate(ctx, num_words, generator).Cache().Execute();
+                ctx.net.Barrier();
                 t_generate.Stop();
 
                 common::StatsTimerStart t_reduce;
