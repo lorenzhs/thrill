@@ -229,12 +229,11 @@ auto word_count_unchecked = [](const size_t words_per_worker,
     using Key = uint64_t;
     using Value = uint64_t;
     using WordCountPair = std::pair<Key, Value>;
-    using ReduceFn = checkers::checked_plus<Value>;//std::plus<Value>;
-
-    common::Aggregate<double> generate_time, reduce_time;
+    using ReduceFn = std::plus<Value>; // checkers::checked_plus<Value>;
 
     const size_t true_seed = (seed != 0) ? seed : std::random_device{}();
 
+    common::Aggregate<double> generate_time, reduce_time;
     int i_outer_max = (reps - 1)/loop_fct + 1;
     for (int i_outer = 0; i_outer < i_outer_max; ++i_outer) {
         api::Run([&](Context &ctx) {
