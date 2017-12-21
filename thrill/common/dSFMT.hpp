@@ -443,6 +443,33 @@ public:
         return next();
     }
 
+    //! Generate a uniform integer from [min, max] (i.e., both inclusive)
+    template <typename int_t>
+    TLX_ATTRIBUTE_ALWAYS_INLINE
+    int_t next_int(int_t min, int_t max) {
+        return next() * (max - min + 1) + min;
+    }
+
+    //! Generate `size` uniform integers from [min, max] (i.e., both inclusive)
+    template <typename int_t>
+    void generate_int_block(int_t min, int_t max, std::vector<int_t> &output,
+                            size_t size)
+    {
+        if (size > output.size()) {
+            output.resize(size);
+        }
+        for (size_t i = 0; i < size; ++i) {
+            output[i] = next_int(min, max);
+        }
+    }
+
+    //! Alias for next_int()
+    template <typename int_t>
+    TLX_ATTRIBUTE_ALWAYS_INLINE
+    int_t operator()(int_t min, int_t max) {
+        return next_int(min, max);
+    }
+
 private:
     _dSFMT::dsfmt_t dsfmt_;
     std::vector<double> randblock_;
