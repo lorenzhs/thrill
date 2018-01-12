@@ -86,6 +86,9 @@ set_property(CACHE THRILL_USE_S3 PROPERTY STRINGS AUTO ON OFF)
 option(THRILL_USE_HDFS3
   "Download and build with libhdfs3 for hdfs:// support." OFF)
 
+option(THRILL_USE_PARQUET
+  "Build parquet-cpp as library" OFF)
+
 ################################################################################
 
 # variables to collect compile-time definitions, include dirs, and libraries
@@ -522,6 +525,32 @@ if(THRILL_USE_HDFS3)
   add_dependencies(hdfs3 libhdfs3)
   set(THRILL_LINK_LIBRARIES hdfs3 ${THRILL_LINK_LIBRARIES})
 
+endif()
+
+# try to find parquet-cpp (optional)
+if (THRILL_USE_PARQUET)
+  SET(PARQUET_ROOT "${CMAKE_BINARY_DIR}/extlib/parquet-cpp")
+
+  include(ExternalProject)
+  ExternalProject_Add(parquet-cpp
+    GIT_REPOSITORY https://github.com/apache/parquet-cpp/
+    GIT_TAG master
+    UPDATE_COMMAND ""
+    INSTALL_COMMAND ""
+    PREFIX ${PARQUET_ROOT}
+    CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR> -DPARQUET_BUILD_EXECUTABLES=OFF -DPARQUET_BUILD_TESTS=OFF)
+
+  ExternalProject_Get_Property(parquet-cpp SOURCE_DIR)
+
+  list(APPEND THRILL_DEFINITIONS "THRILL_HAVE_PARQUET=1")
+  set(THRILL_INCLUDE_DIRS "${SOURCE_DIR}/src" ${INCLUDE_DIR} ${THRILL_INCLUDE_DIRS})
+
+  add_library(parquet UNKNOWN IMPORTED)
+  string (TOLOWER ${CMAKE_BUILD_TYPE} PARQUET_BUILD_SUBDIR)
+  set_target_properties(parquet PROPERTIES
+    IMPORTED_LOCATION "${PARQUET_ROOT}/src/parquet-cpp-build/${PARQUET_BUILD_SUBDIR}/libparquet.so")
+  add_dependencies(parquet parquet-cpp)
+  set(THRILL_LINK_LIBRARIES parquet ${THRILL_LINK_LIBRARIES})
 endif()
 
 # try to find Intel TBB (optional)
