@@ -67,11 +67,11 @@ public:
      */
     ParquetNode(Context& ctx,
                 const std::string& filename,
-                size_t column_idx,
+                size_t column_index,
                 size_t batch_size)
         : Super(ctx, "Parquet"),
           filename_(filename),
-          column_idx_(column_idx),
+          column_index_(column_index),
           batch_size_(batch_size)
     { }
 
@@ -157,6 +157,8 @@ auto ReadParquet(Context& ctx, const std::string& filename, int64_t column_idx,
 
     return DIA<ValueType>(node);
 }
+
+} // namespace api
 
 //! imported from api namespace
 using api::ReadParquet;
