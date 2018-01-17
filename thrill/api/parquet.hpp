@@ -121,6 +121,9 @@ public:
 
             int64_t values_read(0), rows_read(0);
             while (value_reader->HasNext()) {
+                // XXX TODO handle null values, ReadBatch apparently doesn't
+                // really do that.  We should use the Parquet arrow interface
+                // instead of the low-level interface.
                 rows_read = value_reader->ReadBatch(
                     batch_size_, nullptr, nullptr, buffer.data(), &values_read);
                 sLOG << "Got" << rows_read << "levels," << values_read
