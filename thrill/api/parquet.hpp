@@ -28,8 +28,8 @@
 namespace thrill {
 namespace api {
 
-#if THRILL_HAVE_PARQUET
 namespace _detail {
+#if THRILL_HAVE_PARQUET
 template <typename T> struct PReader
 { using type = parquet::ByteArrayReader; };
 template<> struct PReader<bool>    { using type = parquet::BoolReader; };
@@ -37,8 +37,11 @@ template<> struct PReader<int32_t> { using type = parquet::Int32Reader; };
 template<> struct PReader<int64_t> { using type = parquet::Int64Reader; };
 template<> struct PReader<float>   { using type = parquet::FloatReader; };
 template<> struct PReader<double>  { using type = parquet::DoubleReader; };
-} // namespace _detail
+#else
+// dummy
+template <typename T> struct PReader { using type = void; };
 #endif // THRILL_HAVE_PARQUET
+} // namespace _detail
 
 /*!
  * A DIANode which reads data from a single column of an Apache Parquet file.
@@ -59,9 +62,7 @@ public:
     static_assert(std::is_convertible<InputType, ValueType>::value,
                   "ParquetNode: InputType is not convertible to ValueType");
 
-#if THRILL_HAVE_PARQUET
     using value_reader_t = typename _detail::PReader<InputType>::type;
-#endif // THRILL_HAVE_PARQUET
 
     /*!
      * Constructor for a ParquetNode. Sets the Context, parents, and parquet
@@ -131,6 +132,9 @@ public:
                 }
             }
         }
+#else
+        tlx::die_with_message("This version of Thrill does not include support \
+ for Apache Parquet. Please recompile with THRILL_USE_PARQUET.");
 #endif // THRILL_HAVE_PARQUET
     }
 private:
