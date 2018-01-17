@@ -100,10 +100,12 @@ public:
         LOG << "ParquetNode::PushData: got " << num_row_groups << " row groups"
             << " and " << num_columns << " columns";
 
-        std::vector<InputType> buffer;
+        std::vector<InputType> buffer(batch_size_);
 
         // Iterate over all the RowGroups in the file
         for (int r = 0; r < num_row_groups; ++r) {
+            LOG << "Reading row group " << r + 1 << " of " << num_row_groups;
+
             // Get the RowGroup Reader
             std::shared_ptr<parquet::RowGroupReader> row_group_reader =
                 parquet_reader->RowGroup(r);
@@ -118,6 +120,9 @@ public:
             while (value_reader->HasNext()) {
                 rows_read = value_reader->ReadBatch(
                     batch_size_, nullptr, nullptr, buffer.data(), &values_read);
+                sLOG << "Got" << rows_read << "levels," << values_read
+                     << "values, requested up to" << batch_size_
+                     << "from row group" << r + 1 << "of" << num_row_groups;
 
                 for (int64_t i = 0; i < values_read; ++i) {
                     this->PushItem(static_cast<ValueType>(buffer[i]));
