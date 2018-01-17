@@ -102,8 +102,10 @@ public:
 
         std::vector<InputType> buffer(batch_size_);
 
-        // Iterate over all the RowGroups in the file
-        for (int r = 0; r < num_row_groups; ++r) {
+        // Read every context_.num_workers()-th row group
+        const auto my_rank = context_.my_rank(),
+            num_workers = context_.num_workers();
+        for (int r = my_rank; r < num_row_groups; r += num_workers) {
             LOG << "Reading row group " << r + 1 << " of " << num_row_groups;
 
             // Get the RowGroup Reader
