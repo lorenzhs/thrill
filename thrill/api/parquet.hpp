@@ -28,6 +28,18 @@
 namespace thrill {
 namespace api {
 
+#if THRILL_HAVE_PARQUET
+namespace _detail {
+template <typename T> struct PReader
+{ using type = parquet::ByteArrayReader; };
+template<> struct PReader<bool>    { using type = parquet::BoolReader; };
+template<> struct PReader<int32_t> { using type = parquet::Int32Reader; };
+template<> struct PReader<int64_t> { using type = parquet::Int64Reader; };
+template<> struct PReader<float>   { using type = parquet::FloatReader; };
+template<> struct PReader<double>  { using type = parquet::DoubleReader; };
+} // namespace _detail
+#endif // THRILL_HAVE_PARQUET
+
 /*!
  * A DIANode which reads data from a single column of an Apache Parquet file.
  *
@@ -39,18 +51,8 @@ namespace api {
 template <typename ValueType, typename InputType = ValueType>
 class ParquetNode final : public SourceNode<ValueType>
 {
-private:
-#if THRILL_HAVE_PARQUET
-    template <typename T> class PReader
-    { using type = parquet::ByteArrayReader; };
-    template<> class PReader<bool>    { using type = parquet::BoolReader; };
-    template<> class PReader<int32_t> { using type = parquet::Int32Reader; };
-    template<> class PReader<int64_t> { using type = parquet::Int64Reader; };
-    template<> class PReader<float>   { using type = parquet::FloatReader; };
-    template<> class PReader<double>  { using type = parquet::DoubleReader; };
-#endif // THRILL_HAVE_PARQUET
-
 public:
+    static constexpr bool debug = true;
     using Super = SourceNode<ValueType>;
     using Super::context_;
 
@@ -58,7 +60,7 @@ public:
                   "ParquetNode: InputType is not convertible to ValueType");
 
 #if THRILL_HAVE_PARQUET
-    using value_reader_t = PReader<InputType>::type;
+    using value_reader_t = typename _detail::PReader<InputType>::type;
 #endif // THRILL_HAVE_PARQUET
 
     /*!
@@ -73,7 +75,10 @@ public:
           filename_(filename),
           column_index_(column_index),
           batch_size_(batch_size)
-    { }
+    {
+        LOG << "Creating ParquetNode(" << filename << ", " << column_index
+            << ", " << batch_size << ")";
+    }
 
     void PushData(bool /* consume */) final {
 #if THRILL_HAVE_PARQUET
@@ -92,6 +97,9 @@ public:
         int num_columns = file_metadata->num_columns();
         // assert(num_columns == 8);
 
+        LOG << "ParquetNode::PushData: got " << num_row_groups << " row groups"
+            << " and " << num_columns << " columns";
+
         std::vector<InputType> buffer;
 
         // Iterate over all the RowGroups in the file
@@ -109,7 +117,7 @@ public:
             int64_t values_read(0), rows_read(0);
             while (value_reader->HasNext()) {
                 rows_read = value_reader->ReadBatch(
-                    batch_size, nullptr, nullptr, buffer.data(), &values_read);
+                    batch_size_, nullptr, nullptr, buffer.data(), &values_read);
 
                 for (int64_t i = 0; i < values_read; ++i) {
                     this->PushItem(static_cast<ValueType>(buffer[i]));
@@ -153,7 +161,8 @@ auto ReadParquet(Context& ctx, const std::string& filename, int64_t column_idx,
     using ParquetNode =
         api::ParquetNode<ValueType, InputType>;
 
-    auto node = tlx::make_counting<ParquetNode>(ctx, filename);
+    auto node = tlx::make_counting<ParquetNode>(ctx, filename, column_idx,
+                                                batch_size);
 
     return DIA<ValueType>(node);
 }
