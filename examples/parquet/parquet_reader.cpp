@@ -32,12 +32,20 @@ int main(int argc, char* argv[]) {
     if (!clp.process(argc, argv))
         return -1;
 
+    api::ReadParquetTable(filename);
+
     return api::Run(
         [filename, column_index](api::Context& ctx) {
+            // Read with low-level interface
             auto num_values = ReadParquet<int32_t>(ctx, filename, column_index)
                 .Size();
             sLOG1 << "Read" << num_values << "values from column"
                   << column_index << "of" << filename;
+
+            // Read with Arrow interface
+            num_values = ReadParquetArrow<int>(ctx, filename)
+                .Size();
+            sLOG1 << "Read" << num_values << "values from" << filename;
         });
 }
 

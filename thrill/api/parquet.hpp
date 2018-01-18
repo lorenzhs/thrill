@@ -19,10 +19,15 @@
 #include <thrill/common/logger.hpp>
 
 #if THRILL_HAVE_PARQUET
+#include <arrow/table.h>
+#include <arrow/io/file.h>
 #include <parquet/api/reader.h>
-#include <parquet/api/writer.h>
+#include <parquet/api/schema.h>
+#include <parquet/arrow/reader.h>
+#include <parquet/file_reader.h>
 #endif // THRILL_HAVE_PARQUET
 
+#include <sstream>
 #include <type_traits>
 
 namespace thrill {
@@ -148,6 +153,81 @@ private:
     //! Number of vaules to read at a time
     size_t batch_size_;
 };
+/*!
+ * A DIANode which reads data from a single column of an Apache Parquet file
+ * into an Apache Arrow Table
+ *
+ * \ingroup api_layer
+ */
+template <typename ValueType>
+class ParquetArrowNode final : public SourceNode<ValueType>
+{
+public:
+    static constexpr bool debug = true;
+    using Super = SourceNode<ValueType>;
+    using Super::context_;
+
+    /*!
+     * Constructor for a ParquetNode. Sets the Context, parents, and parquet
+     * filename.
+     */
+    ParquetArrowNode(Context& ctx,
+                     const std::string& filename,
+                     size_t column_index)
+        : Super(ctx, "Parquet"),
+          filename_(filename)
+    {
+        LOG << "Creating ParquetArrowNode(" << filename << ")";
+    }
+
+    void PushData(bool /* consume */) final {
+#if THRILL_HAVE_PARQUET
+        const auto my_rank = context_.my_rank(),
+            num_workers = context_.num_workers();
+
+        auto reader = parquet::ParquetFileReader::OpenFile(filename_);
+        auto meta = reader->metadata();
+
+        const auto num_row_groups = meta->num_row_groups();
+
+        sLOG << "ParquetArrowNode::PushData: file" << filename_ << "has size"
+             << meta->size() << "with" << meta->num_columns() << "columns,"
+             << meta->num_rows() << "rows, and"
+             << num_row_groups << "row groups";
+
+        if (debug && my_rank == 0) {
+            std::stringstream s;
+            parquet::schema::PrintSchema(meta->schema()->schema_root().get(), s);
+            LOG << "ParquetArrowNode::PushData: schema: " << s.str();
+        }
+
+        parquet::arrow::FileReader filereader(arrow::default_memory_pool(),
+                                              std::move(reader));
+
+        std::shared_ptr<arrow::Table> table;
+
+        // Read every context_.num_workers()-th row group
+        for (int r = my_rank; r < num_row_groups; r += num_workers) {
+            LOG << "Reading row group " << r + 1 << " of " << num_row_groups
+                << " on worker " << my_rank;
+
+            filereader.ReadRowGroup(r, &table);
+
+            sLOG << "Read table with" << table->num_columns() << "columns and"
+                 << table->num_rows() << "rows from row group " << r + 1;
+
+            /* todo emit contents of table */
+        }
+#else
+        tlx::die_with_message("This version of Thrill does not include support \
+ for Apache Parquet. Please recompile with THRILL_USE_PARQUET.");
+#endif // THRILL_HAVE_PARQUET
+    }
+private:
+    //! Input filename
+    std::string filename_;
+};
+
 
 /*!
  * ReadParquet is a Source-DOp, which reads a column from an Apache Parquet file into a DIA
@@ -181,10 +261,49 @@ auto ReadParquet(Context& ctx, const std::string& filename, int64_t column_idx,
     return DIA<ValueType>(node);
 }
 
+template <typename ValueType>
+auto ReadParquetArrow(Context& ctx, const std::string& filename) {
+    using ParquetArrowNode = api::ParquetArrowNode<ValueType>;
+
+    auto node = tlx::make_counting<ParquetArrowNode>(ctx, filename);
+
+    return DIA<ValueType>(node);
+}
+
+
+void ReadParquetTable(const std::string &filename) {
+    static constexpr bool debug = true;
+
+    auto reader = parquet::ParquetFileReader::OpenFile(filename);
+    auto meta = reader->metadata();
+
+    sLOG << "Parquet: file" << filename << "has size" << meta->size()
+         << "with" << meta->num_columns() << "columns," << meta->num_rows()
+         << "rows, and" << meta->num_row_groups() << "row groups";
+
+    if (debug) {
+        std::stringstream s;
+        parquet::schema::PrintSchema(meta->schema()->schema_root().get(), s);
+        LOG << "Schema: " << s.str();
+    }
+
+    parquet::arrow::FileReader filereader(arrow::default_memory_pool(),
+                                          std::move(reader));
+    // filereader.set_num_threads(123);
+
+    std::shared_ptr<arrow::Table> table;
+    filereader.ReadTable(&table);
+
+    sLOG << "Read table with" << table->num_columns() << "columns and"
+         << table->num_rows() << "rows in" << filereader.num_row_groups()
+         << "row group(s)";
+}
+
 } // namespace api
 
 //! imported from api namespace
 using api::ReadParquet;
+using api::ReadParquetArrow;
 
 } // namespace thrill
 
