@@ -11,6 +11,7 @@
  * All rights reserved. Published under the BSD-2 license in the LICENSE file.
  ******************************************************************************/
 
+#include <thrill/api/all_gather.hpp>
 #include <thrill/api/parquet.hpp>
 #include <thrill/api/size.hpp>
 #include <thrill/common/logger.hpp>
@@ -36,16 +37,19 @@ int main(int argc, char* argv[]) {
 
     return api::Run(
         [filename, column_index](api::Context& ctx) {
+            /*
             // Read with low-level interface
             auto num_values = ReadParquet<int32_t>(ctx, filename, column_index)
                 .Size();
             sLOG1 << "Read" << num_values << "values from column"
                   << column_index << "of" << filename;
+            */
 
             // Read with Arrow interface
-            num_values = ReadParquetArrow<int>(ctx, filename)
-                .Size();
-            sLOG1 << "Read" << num_values << "values from" << filename;
+            auto data = ReadParquetArrow<double>(ctx, filename, column_index)
+                .AllGather();
+            sLOG1 << "Read" << data.size() << "values from" << filename;
+            LOG1 << data;
         });
 }
 

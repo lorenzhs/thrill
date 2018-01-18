@@ -42,6 +42,16 @@ template<> struct PReader<int32_t> { using type = parquet::Int32Reader; };
 template<> struct PReader<int64_t> { using type = parquet::Int64Reader; };
 template<> struct PReader<float>   { using type = parquet::FloatReader; };
 template<> struct PReader<double>  { using type = parquet::DoubleReader; };
+
+template <typename T> struct arrow_array_type
+{ using type = arrow::UInt8Array; };
+template<> struct arrow_array_type<bool>    { using type = arrow::UInt8Array; };
+template<> struct arrow_array_type<uint8_t> { using type = arrow::UInt8Array; };
+template<> struct arrow_array_type<int32_t> { using type = arrow::Int32Array; };
+template<> struct arrow_array_type<int64_t> { using type = arrow::Int64Array; };
+template<> struct arrow_array_type<float>   { using type = arrow::FloatArray; };
+template<> struct arrow_array_type<double>  { using type = arrow::DoubleArray; };
+//template<> struct arrow_array_type<std::string>  { using type = arrow::StringArray; };
 #else
 // dummy
 template <typename T> struct PReader { using type = void; };
@@ -173,9 +183,10 @@ public:
      */
     ParquetArrowNode(Context& ctx,
                      const std::string& filename,
-                     size_t column_index)
+                     int column_index)
         : Super(ctx, "Parquet"),
-          filename_(filename)
+          filename_(filename),
+          column_index_(column_index)
     {
         LOG << "Creating ParquetArrowNode(" << filename << ")";
     }
@@ -206,17 +217,33 @@ public:
 
         std::shared_ptr<arrow::Table> table;
 
+        std::vector<int> indices = {column_index_};
+
         // Read every context_.num_workers()-th row group
         for (int r = my_rank; r < num_row_groups; r += num_workers) {
             LOG << "Reading row group " << r + 1 << " of " << num_row_groups
-                << " on worker " << my_rank;
+                << " on worker " << my_rank << " of " << num_workers;
 
-            filereader.ReadRowGroup(r, &table);
+            filereader.ReadRowGroup(r, indices, &table);
 
-            sLOG << "Read table with" << table->num_columns() << "columns and"
+            sLOG << "Got table with" << table->num_columns() << "columns and"
                  << table->num_rows() << "rows from row group " << r + 1;
+            assert(table->num_columns() == 1);
 
-            /* todo emit contents of table */
+            auto chunks = table->column(0)->data();
+            for (int chunk_id = 0; chunk_id < chunks->num_chunks(); ++chunk_id) {
+                std::shared_ptr<arrow::Array> chunk = chunks->chunk(chunk_id);
+                auto values = std::static_pointer_cast<
+                    typename _detail::arrow_array_type<ValueType>::type
+                    >(chunk);
+
+                LOG << "Reading chunk " << chunk_id << " of " << chunks->num_chunks()
+                    << " has " << values->length() << " values";
+
+                for (int64_t i = 0; i < values->length(); ++i) {
+                    this->PushItem(static_cast<ValueType>(values->Value(i)));
+                }
+            }
         }
 #else
         tlx::die_with_message("This version of Thrill does not include support \
@@ -226,6 +253,7 @@ public:
 private:
     //! Input filename
     std::string filename_;
+    int column_index_;
 };
 
 
@@ -262,10 +290,10 @@ auto ReadParquet(Context& ctx, const std::string& filename, int64_t column_idx,
 }
 
 template <typename ValueType>
-auto ReadParquetArrow(Context& ctx, const std::string& filename) {
+auto ReadParquetArrow(Context& ctx, const std::string& filename, int column_index) {
     using ParquetArrowNode = api::ParquetArrowNode<ValueType>;
 
-    auto node = tlx::make_counting<ParquetArrowNode>(ctx, filename);
+    auto node = tlx::make_counting<ParquetArrowNode>(ctx, filename, column_index);
 
     return DIA<ValueType>(node);
 }
