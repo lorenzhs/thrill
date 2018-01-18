@@ -550,7 +550,13 @@ if (THRILL_USE_PARQUET)
   set_target_properties(parquet PROPERTIES
     IMPORTED_LOCATION "${PARQUET_ROOT}/src/parquet-cpp-build/${PARQUET_BUILD_SUBDIR}/libparquet.so")
   add_dependencies(parquet parquet-cpp)
-  set(THRILL_LINK_LIBRARIES parquet ${THRILL_LINK_LIBRARIES})
+
+  add_library(arrow UNKNOWN IMPORTED)
+  set_target_properties(arrow PROPERTIES
+    IMPORTED_LOCATION "${PARQUET_ROOT}/src/parquet-cpp-build/${PARQUET_BUILD_SUBDIR}/libarrow.so")
+  add_dependencies(arrow parquet-cpp)
+
+  set(THRILL_LINK_LIBRARIES parquet arrow ${THRILL_LINK_LIBRARIES})
 endif()
 
 # try to find Intel TBB (optional)
