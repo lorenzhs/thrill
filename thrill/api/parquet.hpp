@@ -5,7 +5,7 @@
  *
  * Part of Project Thrill - http://project-thrill.org
  *
-  * Copyright (C) 2018 Lorenz Hübschle-Schneider <lorenz@4z2.de>
+ * Copyright (C) 2018 Lorenz Hübschle-Schneider <lorenz@4z2.de>
  *
  * All rights reserved. Published under the BSD-2 license in the LICENSE file.
  ******************************************************************************/
@@ -19,8 +19,8 @@
 #include <thrill/common/logger.hpp>
 
 #if THRILL_HAVE_PARQUET
-#include <arrow/table.h>
 #include <arrow/io/file.h>
+#include <arrow/table.h>
 #include <parquet/api/reader.h>
 #include <parquet/api/schema.h>
 #include <parquet/arrow/reader.h>
@@ -90,8 +90,7 @@ public:
         : Super(ctx, "Parquet"),
           filename_(filename),
           column_index_(column_index),
-          batch_size_(batch_size)
-    {
+          batch_size_(batch_size) {
         LOG << "Creating ParquetNode(" << filename << ", " << column_index
             << ", " << batch_size << ")";
     }
@@ -155,6 +154,7 @@ public:
  for Apache Parquet. Please recompile with THRILL_USE_PARQUET.");
 #endif // THRILL_HAVE_PARQUET
     }
+
 private:
     //! Input filename
     std::string filename_;
@@ -186,8 +186,7 @@ public:
                      int column_index)
         : Super(ctx, "Parquet"),
           filename_(filename),
-          column_index_(column_index)
-    {
+          column_index_(column_index) {
         LOG << "Creating ParquetArrowNode(" << filename << ")";
     }
 
@@ -217,7 +216,7 @@ public:
 
         std::shared_ptr<arrow::Table> table;
 
-        std::vector<int> indices = {column_index_};
+        std::vector<int> indices = { column_index_ };
 
         // Read every context_.num_workers()-th row group
         for (int r = my_rank; r < num_row_groups; r += num_workers) {
@@ -250,12 +249,12 @@ public:
  for Apache Parquet. Please recompile with THRILL_USE_PARQUET.");
 #endif // THRILL_HAVE_PARQUET
     }
+
 private:
     //! Input filename
     std::string filename_;
     int column_index_;
 };
-
 
 /*!
  * ReadParquet is a Source-DOp, which reads a column from an Apache Parquet file into a DIA
@@ -278,7 +277,7 @@ private:
  */
 template <typename ValueType, typename InputType = ValueType>
 auto ReadParquet(Context& ctx, const std::string& filename, int64_t column_idx,
-    int64_t batch_size = 128) {
+                 int64_t batch_size = 128) {
 
     using ParquetNode =
         api::ParquetNode<ValueType, InputType>;
@@ -298,8 +297,7 @@ auto ReadParquetArrow(Context& ctx, const std::string& filename, int column_inde
     return DIA<ValueType>(node);
 }
 
-
-void ReadParquetTable(const std::string &filename) {
+void ReadParquetTable(const std::string& filename) {
     static constexpr bool debug = true;
 
     auto reader = parquet::ParquetFileReader::OpenFile(filename);

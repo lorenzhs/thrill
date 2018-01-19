@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
 
             // Read with Arrow interface
             auto data = ReadParquetArrow<double>(ctx, filename, column_index)
-                .AllGather();
+                        .AllGather();
             sLOG1 << "Read" << data.size() << "values from" << filename;
             LOG1 << data;
         });
