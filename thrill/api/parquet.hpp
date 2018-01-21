@@ -227,12 +227,15 @@ public:
             LOG << "Reading row group " << r + 1 << " of " << num_row_groups
                 << " on worker " << my_rank << " of " << num_workers;
 
+            // TODO use future row group reader on parquet::arrow::ColumnReader
+            // https://github.com/xhochy/parquet-cpp/commit/5d06a281c37f8a512b995f9e7a826fcca8c1ed08
             filereader.ReadRowGroup(r, indices, &table);
 
             sLOG << "Got table with" << table->num_columns() << "columns and"
                  << table->num_rows() << "rows from row group " << r + 1;
             assert(table->num_columns() == 1);
 
+            // TODO use future column iterator
             auto chunks = table->column(0)->data();
             for (int chunk_id = 0; chunk_id < chunks->num_chunks(); ++chunk_id) {
                 std::shared_ptr<arrow::Array> chunk = chunks->chunk(chunk_id);
