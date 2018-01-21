@@ -43,6 +43,7 @@ template<> struct PReader<int64_t> { using type = parquet::Int64Reader; };
 template<> struct PReader<float>   { using type = parquet::FloatReader; };
 template<> struct PReader<double>  { using type = parquet::DoubleReader; };
 
+// TODO replace with https://github.com/apache/arrow/pull/1478/files
 template <typename T> struct arrow_array_type
 { using type = arrow::UInt8Array; };
 template<> struct arrow_array_type<bool>    { using type = arrow::UInt8Array; };
@@ -165,11 +166,14 @@ private:
 };
 /*!
  * A DIANode which reads data from a single column of an Apache Parquet file
- * into an Apache Arrow Table
+ * including NULL values (using the Parquet Arrow interface)
  *
+ * \tparam ValueType Output type of the new DIA
+ * \tparam InputType Type of column data, in case conversion is necessary.
+ *                   Must be convertible to ValueType.
  * \ingroup api_layer
  */
-template <typename ValueType>
+template <typename ValueType, typename InputType = ValueType>
 class ParquetArrowNode final : public SourceNode<ValueType>
 {
 public:
@@ -233,7 +237,7 @@ public:
             for (int chunk_id = 0; chunk_id < chunks->num_chunks(); ++chunk_id) {
                 std::shared_ptr<arrow::Array> chunk = chunks->chunk(chunk_id);
                 auto values = std::static_pointer_cast<
-                    typename _detail::arrow_array_type<ValueType>::type
+                    typename _detail::arrow_array_type<InputType>::type
                     >(chunk);
 
                 LOG << "Reading chunk " << chunk_id << " of " << chunks->num_chunks()
@@ -257,7 +261,8 @@ private:
 };
 
 /*!
- * ReadParquet is a Source-DOp, which reads a column from an Apache Parquet file into a DIA
+ * ReadParquet is a Source-DOp, which reads a column from an Apache Parquet file
+ * into a DIA (excluding NULL entries)
  *
  * \tparam ValueType Type of the output DIA's values
  *
@@ -288,6 +293,25 @@ auto ReadParquet(Context& ctx, const std::string& filename, int64_t column_idx,
     return DIA<ValueType>(node);
 }
 
+
+/*!
+ * ReadParquetArrow is a Source-DOp, which reads a column from an Apache Parquet
+ * file into a DIA (including NULL entries)
+ *
+ * \tparam ValueType Type of the output DIA's values
+ *
+ * \tparam InputType Type of data stored in the Parquet column, defaults to
+ * ValueType.  Must be trivially convertible to InputType.  Required e.g. to
+ * read unsigned integers (Parquet only knows signed integer types), etc.
+ *
+ * \param ctx Reference to the Context object
+ *
+ * \param filename Input filename
+ *
+ * \param column_idx Index of column to be read
+ *
+ * \ingroup dia_sources
+ */
 template <typename ValueType>
 auto ReadParquetArrow(Context& ctx, const std::string& filename, int column_index) {
     using ParquetArrowNode = api::ParquetArrowNode<ValueType>;
