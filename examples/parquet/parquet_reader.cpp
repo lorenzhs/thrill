@@ -33,8 +33,6 @@ int main(int argc, char* argv[]) {
     if (!clp.process(argc, argv))
         return -1;
 
-    api::ReadParquetTable(filename);
-
     return api::Run(
         [filename, column_index](api::Context& ctx) {
             /*

@@ -297,34 +297,6 @@ auto ReadParquetArrow(Context& ctx, const std::string& filename, int column_inde
     return DIA<ValueType>(node);
 }
 
-void ReadParquetTable(const std::string& filename) {
-    static constexpr bool debug = true;
-
-    auto reader = parquet::ParquetFileReader::OpenFile(filename);
-    auto meta = reader->metadata();
-
-    sLOG << "Parquet: file" << filename << "has size" << meta->size()
-         << "with" << meta->num_columns() << "columns," << meta->num_rows()
-         << "rows, and" << meta->num_row_groups() << "row groups";
-
-    if (debug) {
-        std::stringstream s;
-        parquet::schema::PrintSchema(meta->schema()->schema_root().get(), s);
-        LOG << "Schema: " << s.str();
-    }
-
-    parquet::arrow::FileReader filereader(arrow::default_memory_pool(),
-                                          std::move(reader));
-    // filereader.set_num_threads(123);
-
-    std::shared_ptr<arrow::Table> table;
-    filereader.ReadTable(&table);
-
-    sLOG << "Read table with" << table->num_columns() << "columns and"
-         << table->num_rows() << "rows in" << filereader.num_row_groups()
-         << "row group(s)";
-}
-
 } // namespace api
 
 //! imported from api namespace
