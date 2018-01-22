@@ -155,7 +155,7 @@ private:
 
     //! maximum connect backoff, after which the program fails. Total waiting
     //! time is about 2 * final_timeout_ (in millisec).
-    const size_t final_timeout_ = 40960;
+    const size_t final_timeout_ = 40960 * 8;
 
     //! Represents a welcome message that is exchanged by Connections during
     //! network initialization.
