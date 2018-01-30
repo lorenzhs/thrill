@@ -29,6 +29,7 @@
 #endif // THRILL_HAVE_PARQUET
 
 #include <sstream>
+#include <tuple>
 #include <type_traits>
 
 namespace thrill {
@@ -363,6 +364,81 @@ private:
     std::vector<int> column_indices_;
 };
 
+template <typename It>
+void advance_all (It& it) {
+    ++it;
+}
+
+template <typename It, typename ... Its>
+void advance_all (It& it, Its& ... rest) {
+    ++it;
+    advance_all(rest...);
+}
+
+
+//! Concatenate tuple types, like a type-only std::tuple_cat
+template<typename...>
+struct tuple_type_concat;
+
+template<>
+struct tuple_type_concat<>
+{
+    using type = std::tuple<>;
+};
+
+template<typename... Types>
+struct tuple_type_concat<std::tuple<Types...>>
+{
+    using type = std::tuple<Types...>;
+};
+
+template<typename... Types1, typename... Types2, typename... Rest>
+struct tuple_type_concat<std::tuple<Types1...>, std::tuple<Types2...>, Rest...>
+{
+    using type = typename tuple_type_concat<
+        std::tuple<Types1..., Types2...>,
+        Rest...>::type;
+};
+
+//! Convert a variadic pack of iterator types to a tuple of their value types
+template <typename ...>
+struct ItToTuple;
+
+template<>
+struct ItToTuple<> { using type = std::tuple<>; };
+
+template <typename It>
+struct ItToTuple<It> {
+    using type = std::tuple<typename std::iterator_traits<It>::value_type>;
+};
+
+template <typename It, typename ... Its>
+struct ItToTuple<It, Its...> {
+    using type = typename tuple_type_concat<
+        std::tuple<typename std::iterator_traits<It>::value_type>,
+        typename ItToTuple<Its...>::type>::type;
+};
+
+//! Zip a variadic pack of iterators into a vector of tuples of their types,
+//! inferring the tuple type automatically
+template <typename It, typename ... Its>
+auto tuplezip_magic (It begin, It end, Its ... iterators) {
+    using tuple_t = typename ItToTuple<It, Its...>::type;
+    std::vector<tuple_t> vec;
+    for(; begin != end; advance_all(begin, iterators...))
+        vec.emplace_back(std::make_tuple(*begin, *(iterators)... ));
+    return vec;
+}
+
+
+//! Zip a variadic pack of iterators into a vector of tuples of their types
+template <typename Tuple, typename It, typename ... Its>
+std::vector<Tuple> tuplezip (It begin, It end, Its ... iterators) {
+    std::vector<Tuple> vec;
+    for(; begin != end; advance_all(begin, iterators...))
+        vec.emplace_back(std::make_tuple(*begin, *(iterators)... ));
+    return vec;
+}
 
 
 /*!

@@ -30,6 +30,18 @@ int main(int argc, char* argv[]) {
     clp.add_param_string("filename", filename, "input filename");
     clp.add_param_int("column", column_index, "column index");
 
+    std::vector<int> v1 { { 1, 2, 3 } };
+    std::vector<double> v2 { { 1.5, 2.5, 3.5 } };
+    std::vector<bool> v3 { { true, false, true } };
+    std::vector<std::tuple<int, double, bool>> res =
+        api::tuplezip<std::tuple<int, double, bool>>(
+            v1.begin(), v1.end(), v2.begin(), v3.begin());
+
+    std::vector<std::tuple<int, double, bool>> res2 =
+        api::tuplezip_magic(v1.begin(), v1.end(), v2.begin(), v3.begin());
+
+    LOG1 << res << res2;
+
     if (!clp.process(argc, argv))
         return -1;
 
