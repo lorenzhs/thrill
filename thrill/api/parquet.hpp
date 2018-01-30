@@ -204,12 +204,12 @@ public:
 
         const auto num_row_groups = meta->num_row_groups();
 
-        sLOG << "ParquetArrowNode::PushData: file" << filename_ << "has size"
-             << meta->size() << "with" << meta->num_columns() << "columns,"
-             << meta->num_rows() << "rows, and"
-             << num_row_groups << "row groups";
-
         if (debug && my_rank == 0) {
+            sLOG << "ParquetArrowNode::PushData: file" << filename_ << "has size"
+                 << meta->size() << "with" << meta->num_columns() << "columns,"
+                 << meta->num_rows() << "rows, and"
+                 << num_row_groups << "row groups";
+
             std::stringstream s;
             parquet::schema::PrintSchema(meta->schema()->schema_root().get(), s);
             LOG << "ParquetArrowNode::PushData: schema: " << s.str();
@@ -232,7 +232,7 @@ public:
             filereader.ReadRowGroup(r, indices, &table);
 
             sLOG << "Got table with" << table->num_columns() << "columns and"
-                 << table->num_rows() << "rows from row group " << r + 1;
+                 << table->num_rows() << "rows from row group" << r + 1;
             assert(table->num_columns() == 1);
 
             // TODO use future column iterator
