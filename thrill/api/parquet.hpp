@@ -20,6 +20,7 @@
 
 #if THRILL_HAVE_PARQUET
 #include <arrow/io/file.h>
+#include <arrow/stl.h>
 #include <arrow/table.h>
 #include <parquet/api/reader.h>
 #include <parquet/api/schema.h>
@@ -164,6 +165,8 @@ private:
     //! Number of vaules to read at a time
     size_t batch_size_;
 };
+
+
 /*!
  * A DIANode which reads data from a single column of an Apache Parquet file
  * including NULL values (using the Parquet Arrow interface)
@@ -263,6 +266,105 @@ private:
     int column_index_;
 };
 
+
+/*!
+ * A DIANode which reads data from a single column of an Apache Parquet file
+ * including NULL values (using the Parquet Arrow interface)
+ *
+ * \tparam TupleType Output type of the new DIA
+ * \ingroup api_layer
+ */
+template <typename TupleType>
+class ParquetTableNode final : public SourceNode<TupleType>
+{
+public:
+    static constexpr bool debug = true;
+    using Super = SourceNode<TupleType>;
+    using Super::context_;
+
+    /*!
+     * Constructor for a ParquetTableNode. Sets the Context, parents,
+     * parquet filename, and column indices.
+     */
+    ParquetTableNode(Context& ctx,
+                     const std::string& filename,
+                     const std::vector<int> &column_indices)
+        : Super(ctx, "Parquet"),
+          filename_(filename),
+          column_indices_(column_indices) {
+        LOG << "Creating ParquetTableNode(" << filename << ", "
+            << column_indices << ")";
+    }
+
+    void PushData(bool /* consume */) final {
+#if THRILL_HAVE_PARQUET
+        const auto my_rank = context_.my_rank(),
+            num_workers = context_.num_workers();
+
+        auto reader = parquet::ParquetFileReader::OpenFile(filename_);
+        auto meta = reader->metadata();
+
+        const auto num_row_groups = meta->num_row_groups();
+
+        if (debug && my_rank == 0) {
+            sLOG << "ParquetTableNode::PushData: file" << filename_ << "has size"
+                 << meta->size() << "with" << meta->num_columns() << "columns,"
+                 << meta->num_rows() << "rows, and"
+                 << num_row_groups << "row groups";
+
+            std::stringstream s;
+            parquet::schema::PrintSchema(meta->schema()->schema_root().get(), s);
+            LOG << "ParquetTableNode::PushData: schema: " << s.str();
+        }
+
+        std::vector<std::string> colnames(column_indices_.size());
+        for (size_t i = 0; i < column_indices_.size(); ++i) {
+            colnames[i] = "column " + std::to_string(column_indices_[i]);
+        }
+        auto schema = arrow::stl::SchemaFromTuple<TupleType>::MakeSchema(colnames);
+
+        parquet::arrow::FileReader filereader(arrow::default_memory_pool(),
+                                              std::move(reader));
+
+        std::shared_ptr<arrow::Table> table;
+
+        // Read every context_.num_workers()-th row group
+        for (int r = my_rank; r < num_row_groups; r += num_workers) {
+            LOG << "Reading row group " << r + 1 << " of " << num_row_groups
+                << " on worker " << my_rank << " of " << num_workers;
+
+            filereader.ReadRowGroup(r, column_indices_, &table);
+
+            sLOG << "Got table with" << table->num_columns() << "columns and"
+                 << table->num_rows() << "rows from row group" << r + 1;
+
+            if (!schema->Equals(*table->schema())) {
+                sLOG << "Schema mismatch between type tuple and file metadata:";
+                sLOG << "Expected" << schema->ToString();
+                sLOG << "Got" << table->schema()->ToString();
+                //tlx::die_with_message(
+                //    "ParquetTableReader: aborting, schema does not match expected schema");
+            }
+            assert(table->num_columns() == column_indices_.size());
+
+            std::vector<std::shared_ptr<arrow::Array>> chunks;
+            // TODO
+
+        }
+#else
+        tlx::die_with_message("This version of Thrill does not include support \
+ for Apache Parquet. Please recompile with THRILL_USE_PARQUET.");
+#endif // THRILL_HAVE_PARQUET
+    }
+
+private:
+    //! Input filename
+    std::string filename_;
+    std::vector<int> column_indices_;
+};
+
+
+
 /*!
  * ReadParquet is a Source-DOp, which reads a column from an Apache Parquet file
  * into a DIA (excluding NULL entries)
@@ -324,11 +426,39 @@ auto ReadParquetArrow(Context& ctx, const std::string& filename, int column_inde
     return DIA<ValueType>(node);
 }
 
+
+/*!
+ * ReadParquetTable is a Source-DOp, which reads a column from an Apache Parquet
+ * file into a DIA (including NULL entries)
+ *
+ * \tparam TupleType Tuple of the types of data stored in the Parquet
+ * columns.  Also the DIA's value type.
+ *
+ * \param ctx Reference to the Context object
+ *
+ * \param filename Input filename
+ *
+ * \param column_indices Indices of columns to be read
+ *
+ * \ingroup dia_sources
+ */
+template <typename TupleType>
+auto ReadParquetTable(Context& ctx, const std::string& filename,
+                      const std::vector<int> column_indices) {
+    using ParquetTableNode = api::ParquetTableNode<TupleType>;
+
+    auto node = tlx::make_counting<ParquetTableNode>(
+        ctx, filename, column_indices);
+
+    return DIA<TupleType>(node);
+}
+
 } // namespace api
 
 //! imported from api namespace
 using api::ReadParquet;
 using api::ReadParquetArrow;
+using api::ReadParquetTable;
 
 } // namespace thrill
 

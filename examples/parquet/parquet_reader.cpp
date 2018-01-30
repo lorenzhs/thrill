@@ -48,6 +48,11 @@ int main(int argc, char* argv[]) {
                         .AllGather();
             sLOG1 << "Read" << data.size() << "values from" << filename;
             LOG1 << data;
+
+            std::vector<int> indices{ { 6, 0 } };
+            auto foo = ReadParquetTable<std::tuple<int64_t, double>>(
+                ctx, filename, indices)
+                .AllGather();
         });
 }
 
