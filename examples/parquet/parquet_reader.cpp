@@ -45,6 +45,7 @@ int main(int argc, char* argv[]) {
     if (!clp.process(argc, argv))
         return -1;
 
+#ifdef THRILL_HAVE_PARQUET
     return api::Run(
         [filename, column_index](api::Context& ctx) {
             /*
@@ -66,6 +67,9 @@ int main(int argc, char* argv[]) {
                 ctx, filename, indices)
                 .AllGather();
         });
+#else
+    tlx::die_with_message("Thrill was compiled without Parquet support");
+#endif
 }
 
 /******************************************************************************/
