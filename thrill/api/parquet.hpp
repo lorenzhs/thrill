@@ -44,17 +44,6 @@ template<> struct PReader<int32_t> { using type = parquet::Int32Reader; };
 template<> struct PReader<int64_t> { using type = parquet::Int64Reader; };
 template<> struct PReader<float>   { using type = parquet::FloatReader; };
 template<> struct PReader<double>  { using type = parquet::DoubleReader; };
-
-// TODO replace with https://github.com/apache/arrow/pull/1478/files
-template <typename T> struct arrow_array_type
-{ using type = arrow::UInt8Array; };
-template<> struct arrow_array_type<bool>    { using type = arrow::UInt8Array; };
-template<> struct arrow_array_type<uint8_t> { using type = arrow::UInt8Array; };
-template<> struct arrow_array_type<int32_t> { using type = arrow::Int32Array; };
-template<> struct arrow_array_type<int64_t> { using type = arrow::Int64Array; };
-template<> struct arrow_array_type<float>   { using type = arrow::FloatArray; };
-template<> struct arrow_array_type<double>  { using type = arrow::DoubleArray; };
-//template<> struct arrow_array_type<std::string>  { using type = arrow::StringArray; };
 #else
 // dummy
 template <typename T> struct PReader { using type = void; };
@@ -185,6 +174,11 @@ public:
     using Super = SourceNode<ValueType>;
     using Super::context_;
 
+#if THRILL_HAVE_PARQUET
+    using ArrowType = typename arrow::stl::ConversionTraits<InputType>::ArrowType;
+    using ArrayType = typename arrow::TypeTraits<ArrowType>::ArrayType;
+#endif // THRILL_HAVE_PARQUET
+
     /*!
      * Constructor for a ParquetNode. Sets the Context, parents, and parquet
      * filename.
@@ -229,15 +223,9 @@ public:
                 << " on worker " << my_rank << " of " << num_workers;
 
             filereader.RowGroup(r)->Column(column_index_)->Read(&array);
+            auto values = std::static_pointer_cast<ArrayType>(array);
 
-            sLOG << "Got array with" << array->length()
-                 << "rows from row group" << r + 1;
-
-            auto values = std::static_pointer_cast<
-                typename _detail::arrow_array_type<InputType>::type
-                >(array);
-
-            sLOG << "Pushing elements of array of length " << values->length();
+            LOG << "Pushing elements of array of length " << values->length();
             for (int64_t i = 0; i < values->length(); ++i) {
                 this->PushItem(static_cast<ValueType>(values->Value(i)));
             }
