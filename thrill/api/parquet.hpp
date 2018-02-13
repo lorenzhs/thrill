@@ -221,38 +221,25 @@ public:
 
         parquet::arrow::FileReader filereader(arrow::default_memory_pool(),
                                               std::move(reader));
-
-        std::shared_ptr<arrow::Table> table;
-
-        std::vector<int> indices = { column_index_ };
+        std::shared_ptr<arrow::Array> array;
 
         // Read every context_.num_workers()-th row group
         for (int r = my_rank; r < num_row_groups; r += num_workers) {
             LOG << "Reading row group " << r + 1 << " of " << num_row_groups
                 << " on worker " << my_rank << " of " << num_workers;
 
-            // TODO use future row group reader on parquet::arrow::ColumnReader
-            // https://github.com/xhochy/parquet-cpp/commit/5d06a281c37f8a512b995f9e7a826fcca8c1ed08
-            filereader.ReadRowGroup(r, indices, &table);
+            filereader.RowGroup(r)->Column(column_index_)->Read(&array);
 
-            sLOG << "Got table with" << table->num_columns() << "columns and"
-                 << table->num_rows() << "rows from row group" << r + 1;
-            assert(table->num_columns() == 1);
+            sLOG << "Got array with" << array->length()
+                 << "rows from row group" << r + 1;
 
-            // TODO use future column iterator
-            auto chunks = table->column(0)->data();
-            for (int chunk_id = 0; chunk_id < chunks->num_chunks(); ++chunk_id) {
-                std::shared_ptr<arrow::Array> chunk = chunks->chunk(chunk_id);
-                auto values = std::static_pointer_cast<
-                    typename _detail::arrow_array_type<InputType>::type
-                    >(chunk);
+            auto values = std::static_pointer_cast<
+                typename _detail::arrow_array_type<InputType>::type
+                >(array);
 
-                LOG << "Reading chunk " << chunk_id << " of " << chunks->num_chunks()
-                    << " has " << values->length() << " values";
-
-                for (int64_t i = 0; i < values->length(); ++i) {
-                    this->PushItem(static_cast<ValueType>(values->Value(i)));
-                }
+            sLOG << "Pushing elements of array of length " << values->length();
+            for (int64_t i = 0; i < values->length(); ++i) {
+                this->PushItem(static_cast<ValueType>(values->Value(i)));
             }
         }
 #else

@@ -97,7 +97,7 @@ endif()
 
 # figure out the version to use
 if ("$ENV{THRILL_PARQUET_VERSION}" STREQUAL "")
-  set(PARQUET_VERSION "c064f827e96b37d29ba7a7b87657a18a94896854")
+  set(PARQUET_VERSION "d5fc8482221c9350dafcce5864e80ad42b853387")
 else()
   set(PARQUET_VERSION "$ENV{THRILL_PARQUET_VERSION}")
 endif()
