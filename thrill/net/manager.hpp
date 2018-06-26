@@ -41,6 +41,10 @@ struct Traffic {
     Traffic(size_t tx, size_t rx) : tx(tx), rx(rx) { }
     //! formatting: print total
     friend std ::ostream& operator << (std::ostream& os, const Traffic& t);
+    //! difference
+    Traffic operator - (const Traffic& b) const {
+        return Traffic{ tx - b.tx, rx - b.rx };
+    }
 };
 
 /*!

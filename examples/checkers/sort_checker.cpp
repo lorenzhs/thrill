@@ -124,8 +124,8 @@ void sort_random(const Manipulator& /*manipulator*/, const HashFn& /*hash*/,
                          << " check_time=" << current_check.Microseconds()
                          << " success=" << success.first
                          << " manipulated=" << success.second
-                         << " traffic_sort=" << traffic_sort.first + traffic_sort.second
-                         << " traffic_check=" << traffic_check.first + traffic_check.second
+                         << " traffic_sort=" << traffic_sort.rx + traffic_sort.tx
+                         << " traffic_check=" << traffic_check.rx + traffic_check.tx
                          << " hashbits=" << Checker::HashBits
                          << " machines=" << ctx.num_hosts()
                          << " workers_per_host=" << ctx.workers_per_host();
@@ -198,7 +198,7 @@ void sort_unchecked(const size_t size, const size_t distinct, const size_t seed,
                          << " size=" << size
                          << " distinct=" << distinct
                          << " run_time=" << current_run.Microseconds()
-                         << " traffic_sort=" << traffic_sort.first + traffic_sort.second
+                         << " traffic_sort=" << traffic_sort.rx + traffic_sort.tx
                          << " machines=" << ctx.num_hosts()
                          << " workers_per_host=" << ctx.workers_per_host();
                 }

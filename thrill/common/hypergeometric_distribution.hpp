@@ -79,8 +79,7 @@ public:
     using real_type = fp_t;
 
     hypergeometric_distribution(size_t seed = 0)
-        : rng(seed != 0 ? seed : std::random_device { }
-              ()) { }
+        : uniform_(seed != 0 ? seed : std::random_device{}()) {}
 
     int_t operator () (int_t good, int_t bad, int_t sample) {
         if (sample < 1) {
@@ -236,8 +235,7 @@ private:
     }
 
     // Data members:
-    std::mt19937 rng;                          // random number generator
-    std::uniform_real_distribution<fp_t> dist; // [0.0...1.0) distribution
+    common::dSFMT uniform_;
 };
 
 using hypergeometric = hypergeometric_distribution<>;

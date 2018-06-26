@@ -36,7 +36,7 @@ class Sampling
 public:
     static constexpr bool debug = false;
 
-    Sampling(RNG& rng) : rng_(rng), hyp_(rng()) { }
+    Sampling(RNG& rng) : rng_(rng), hyp_(rng()), dsfmt_(rng()) {}
 
     template <typename Iterator,
               typename Type = typename std::iterator_traits<Iterator>::value_type>
@@ -125,7 +125,7 @@ private:
             size_t variate, index;
             while (true) {
                 // Take sample
-                variate = dist(rng_); // N * randblock[array_index++];
+                variate = insize * dsfmt_.next(); // N * randblock[array_index++];
                 index = variate >> address_mask;
                 size_t hash_elem = hash_table[index];
 
