@@ -18,17 +18,21 @@
 #include <tlx/math/round_to_power_of_two.hpp>
 
 #include <algorithm>
+#include <map>
 #include <vector>
 
 namespace thrill {
 namespace data {
 
-MixStreamData::MixStreamData(Multiplexer& multiplexer, const StreamId& id,
+MixStreamData::MixStreamData(Multiplexer& multiplexer, size_t send_size_limit,
+                             const StreamId& id,
                              size_t local_worker_id, size_t dia_id)
-    : StreamData(multiplexer, id, local_worker_id, dia_id),
+    : StreamData(multiplexer, send_size_limit, id, local_worker_id, dia_id),
+      seq_(num_workers()),
       queue_(multiplexer_.block_pool_, num_workers(),
-             local_worker_id, dia_id)
-{ }
+             local_worker_id, dia_id) {
+    remaining_closing_blocks_ = num_hosts() * workers_per_host();
+}
 
 MixStreamData::~MixStreamData() {
     LOG << "~MixStreamData() deleted";
@@ -39,9 +43,10 @@ void MixStreamData::set_dia_id(size_t dia_id) {
     queue_.set_dia_id(dia_id);
 }
 
-std::vector<MixStreamData::Writer> MixStreamData::GetWriters() {
+MixStreamData::Writers MixStreamData::GetWriters() {
     size_t hard_ram_limit = multiplexer_.block_pool_.hard_ram_limit();
-    size_t block_size_base = hard_ram_limit / 16 / multiplexer_.num_workers();
+    size_t block_size_base = hard_ram_limit / 4
+                             / multiplexer_.num_workers() / multiplexer_.workers_per_host();
     size_t block_size = tlx::round_down_to_power_of_two(block_size_base);
     if (block_size == 0 || block_size > default_block_size)
         block_size = default_block_size;
@@ -50,11 +55,12 @@ std::vector<MixStreamData::Writer> MixStreamData::GetWriters() {
         std::unique_lock<std::mutex> lock(multiplexer_.mutex_);
         multiplexer_.active_streams_++;
         multiplexer_.max_active_streams_ =
-            std::max(multiplexer_.max_active_streams_,
+            std::max(multiplexer_.max_active_streams_.load(),
                      multiplexer_.active_streams_.load());
     }
 
-    LOG << "MixStreamData::GetWriters()"
+    LOGC(my_worker_rank() == 0 && 1)
+        << "MixStreamData::GetWriters()"
         << " hard_ram_limit=" << hard_ram_limit
         << " block_size_base=" << block_size_base
         << " block_size=" << block_size
@@ -63,7 +69,7 @@ std::vector<MixStreamData::Writer> MixStreamData::GetWriters() {
 
     tx_timespan_.StartEventually();
 
-    std::vector<Writer> result;
+    Writers result(my_worker_rank());
     result.reserve(num_workers());
 
     for (size_t host = 0; host < num_hosts(); ++host) {
@@ -116,7 +122,8 @@ void MixStreamData::Close() {
     // wait for all close packets to arrive.
     for (size_t i = 0; i < num_hosts() * workers_per_host(); ++i) {
         LOG << "MixStreamData::Close() wait for closing block"
-            << " local_worker_id_=" << local_worker_id_;
+            << " local_worker_id_=" << local_worker_id_
+            << " remaining=" << sem_closing_blocks_.value();
         sem_closing_blocks_.wait();
     }
 
@@ -142,7 +149,15 @@ bool MixStreamData::closed() const {
     return closed;
 }
 
-void MixStreamData::OnStreamBlock(size_t from, PinnedBlock&& b) {
+struct MixStreamData::SeqReordering {
+    //! current top sequence number
+    uint32_t                        seq_ = 0;
+
+    //! queue of waiting Blocks, ordered by sequence number
+    std::map<uint32_t, PinnedBlock> waiting_;
+};
+
+void MixStreamData::OnStreamBlock(size_t from, uint32_t seq, PinnedBlock&& b) {
     assert(from < num_workers());
     rx_timespan_.StartEventually();
 
@@ -150,30 +165,63 @@ void MixStreamData::OnStreamBlock(size_t from, PinnedBlock&& b) {
     rx_net_bytes_ += b.size();
     rx_net_blocks_++;
 
-    sLOG << "OnMixStreamBlock" << b;
-
-    sLOG0 << "stream" << id_ << "receive from" << from << ":"
-          << tlx::hexdump(b.ToString());
-
-    queue_.AppendBlock(from, std::move(b).MoveToBlock());
-}
-
-void MixStreamData::OnCloseStream(size_t from) {
-    assert(from < num_workers());
-    queue_.Close(from);
-
-    rx_net_blocks_++;
-
-    sLOG << "OnMixCloseStream stream" << id_
+    sLOG << "MixStreamData::OnStreamBlock" << b
+         << "stream" << id_
          << "from" << from
          << "for worker" << my_worker_rank();
 
-    if (--remaining_closing_blocks_ == 0) {
-        rx_lifetime_.StopEventually();
-        rx_timespan_.StopEventually();
+    if (TLX_UNLIKELY(seq != seq_[from].seq_)) {
+        // sequence mismatch: put into queue
+        die_unless(seq >= seq_[from].seq_);
+
+        seq_[from].waiting_.insert(
+            std::make_pair(seq, std::move(b)));
+
+        return;
     }
 
-    sem_closing_blocks_.signal();
+    OnStreamBlockOrdered(from, std::move(b));
+
+    // try to process additional queued blocks
+    while (!seq_[from].waiting_.empty() &&
+           seq_[from].waiting_.begin()->first == seq_[from].seq_)
+    {
+        sLOG << "MixStreamData::OnStreamBlock"
+             << "processing delayed block with seq"
+             << seq_[from].waiting_.begin()->first;
+
+        OnStreamBlockOrdered(
+            from, std::move(seq_[from].waiting_.begin()->second));
+
+        seq_[from].waiting_.erase(
+            seq_[from].waiting_.begin());
+    }
+}
+
+void MixStreamData::OnStreamBlockOrdered(size_t from, PinnedBlock&& b) {
+    // sequence number matches
+    if (b.IsValid()) {
+        queue_.AppendBlock(from, std::move(b).MoveToBlock());
+    }
+    else {
+        sLOG << "MixStreamData::OnCloseStream"
+             << "stream" << id_
+             << "from" << from
+             << "for worker" << my_worker_rank()
+             << "remaining_closing_blocks_" << remaining_closing_blocks_;
+
+        queue_.Close(from);
+
+        die_unless(remaining_closing_blocks_ > 0);
+        if (--remaining_closing_blocks_ == 0) {
+            rx_lifetime_.StopEventually();
+            rx_timespan_.StopEventually();
+        }
+
+        sem_closing_blocks_.signal();
+    }
+
+    seq_[from].seq_++;
 }
 
 /******************************************************************************/
@@ -198,7 +246,7 @@ const StreamData& MixStream::data() const {
     return *ptr_;
 }
 
-std::vector<MixStream::Writer> MixStream::GetWriters() {
+MixStream::Writers MixStream::GetWriters() {
     return ptr_->GetWriters();
 }
 

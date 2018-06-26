@@ -6,6 +6,7 @@
 # Part of Project Thrill - http://project-thrill.org
 #
 # Copyright (C) 2015-2016 Timo Bingmann <tb@panthema.net>
+# Copyright (C) 2017 Tim Zeitz <dev.tim.zeitz@gmail.com>
 #
 # All rights reserved. Published under the BSD-2 license in the LICENSE file.
 ################################################################################
@@ -211,6 +212,8 @@ elseif(MSVC)
   list(APPEND THRILL_DEFINITIONS "_SCL_SECURE_NO_WARNINGS")
   # windef.h bizzarly defines min and max as macros, unless this is defined.
   list(APPEND THRILL_DEFINITIONS "NOMINMAX")
+  # a necessary bizzare define, otherwise <cmath> does not declare M_PI
+  list(APPEND THRILL_DEFINITIONS "_USE_MATH_DEFINES")
 endif()
 
 if(THRILL_USE_IWYU)
@@ -406,6 +409,11 @@ set(THRILL_LINK_LIBRARIES ${CMAKE_DL_LIBS} ${THRILL_LINK_LIBRARIES})
 
 add_subdirectory(extlib/tlx)
 set(THRILL_LINK_LIBRARIES tlx ${THRILL_LINK_LIBRARIES})
+
+# use foxxll
+
+add_subdirectory(extlib/foxxll)
+set(THRILL_LINK_LIBRARIES foxxll ${THRILL_LINK_LIBRARIES})
 
 # try to find jemalloc (optional)
 

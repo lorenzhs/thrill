@@ -116,10 +116,10 @@ public:
     using MakeTableItem = ReduceMakeTableItem<Value, TableItem, VolatileKey>;
 
     using Table = typename ReduceTableSelect<
-              ReduceConfig::table_impl_,
-              TableItem, Key, Value,
-              KeyExtractor, ReduceFunction, Emitter, Manipulator,
-              VolatileKey, ReduceConfig, IndexFunction, KeyEqualFunction>::type;
+        ReduceConfig::table_impl_,
+        TableItem, Key, Value,
+        KeyExtractor, ReduceFunction, Emitter, Manipulator,
+        VolatileKey, ReduceConfig, IndexFunction, KeyEqualFunction>::type;
 
     /*!
      * A data structure which takes an arbitrary value and extracts a key using
@@ -160,9 +160,19 @@ public:
         table_.Initialize(limit_memory_bytes);
     }
 
+    void InitializeSkip() {
+        table_.InitializeSkip();
+    }
+
     bool Insert(const Value& v) {
         // for VolatileKey this makes std::pair and extracts the key
         return table_.Insert(MakeTableItem::Make(v, table_.key_extractor()));
+    }
+
+    void InsertSkip(const Value& v) {
+        TableItem t = MakeTableItem::Make(v, table_.key_extractor());
+        typename IndexFunction::Result h = table_.calculate_index(t);
+        emit_.Emit(h.partition_id, t);
     }
 
     //! Flush all partitions

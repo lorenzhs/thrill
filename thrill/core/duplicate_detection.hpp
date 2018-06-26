@@ -49,16 +49,16 @@ class DuplicateDetection
 
 private:
     using GolombBitStreamWriter =
-              core::GolombBitStreamWriter<data::CatStream::Writer>;
+        core::GolombBitStreamWriter<data::CatStream::Writer>;
 
     using GolombBitStreamReader =
-              core::GolombBitStreamReader<data::CatStream::Reader>;
+        core::GolombBitStreamReader<data::CatStream::Reader>;
 
     using GolumbDeltaWriter =
-              core::DeltaStreamWriter<GolombBitStreamWriter, size_t, /* offset */ 1>;
+        core::DeltaStreamWriter<GolombBitStreamWriter, size_t, /* offset */ 1>;
 
     using GolumbDeltaReader =
-              core::DeltaStreamReader<GolombBitStreamReader, size_t, /* offset */ 1>;
+        core::DeltaStreamReader<GolombBitStreamReader, size_t, /* offset */ 1>;
 
     /*!
      * Sends all hashes in the range
@@ -77,8 +77,7 @@ private:
                             size_t num_workers,
                             size_t max_hash) {
 
-        std::vector<data::CatStream::Writer> writers =
-            stream_pointer->GetWriters();
+        data::CatStream::Writers writers = stream_pointer->GetWriters();
 
         size_t prev_hash = size_t(-1);
 
@@ -203,7 +202,7 @@ public:
 
         data::CatStreamPtr duplicates_stream = context.GetNewCatStream(dia_id);
 
-        std::vector<data::CatStream::Writer> duplicates_writers =
+        data::CatStream::Writers duplicates_writers =
             duplicates_stream->GetWriters();
 
         std::vector<GolombBitStreamWriter> duplicates_gbsw;
@@ -260,7 +259,7 @@ public:
         // close duplicate delta writers
         duplicates_dw.clear();
         duplicates_gbsw.clear();
-        duplicates_writers.clear();
+        duplicates_writers.Close();
 
         // read inbound duplicate hash bits into non_duplicates hash table
         assert(non_duplicates.size() == 0);

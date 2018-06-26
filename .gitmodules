@@ -13,6 +13,9 @@
 [submodule "extlib/tlx"]
 	path = extlib/tlx
 	url = https://github.com/tlx/tlx.git
+[submodule "extlib/foxxll"]
+	path = extlib/foxxll
+	url = https://github.com/stxxl/foxxll.git
 [submodule "extlib/highwayhash/highwayhash"]
 	path = extlib/highwayhash/highwayhash
 	url = https://github.com/google/highwayhash

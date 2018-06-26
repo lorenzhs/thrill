@@ -35,7 +35,7 @@ struct Record {
     bool operator < (const Record& b) const {
         return std::lexicographical_compare(key, key + 10, b.key, b.key + 10);
     }
-    friend std::ostream& operator << (std::ostream& os, const Record& c) {
+    friend std ::ostream& operator << (std::ostream& os, const Record& c) {
         return os << tlx::hexdump(c.key, 10);
     }
 } TLX_ATTRIBUTE_PACKED;
@@ -51,7 +51,7 @@ struct RecordSigned {
     bool operator < (const RecordSigned& b) const {
         return std::lexicographical_compare(key, key + 10, b.key, b.key + 10);
     }
-    friend std::ostream& operator << (std::ostream& os, const RecordSigned& c) {
+    friend std ::ostream& operator << (std::ostream& os, const RecordSigned& c) {
         return os << tlx::hexdump(c.key, 10);
     }
 } TLX_ATTRIBUTE_PACKED;
@@ -152,6 +152,9 @@ int main(int argc, char* argv[]) {
     return api::Run(
         [&](api::Context& ctx) {
             ctx.enable_consume();
+
+            common::StatsTimerStart timer;
+
             if (generate_only) {
                 die_unequal(input.size(), 1u);
                 // parse first argument like "100mib" size
@@ -195,6 +198,16 @@ int main(int argc, char* argv[]) {
                     else
                         r.Size();
                 }
+            }
+
+            ctx.net.Barrier();
+            if (ctx.my_rank() == 0) {
+                auto traffic = ctx.net_manager().Traffic();
+                LOG1 << "RESULT"
+                     << " benchmark=terasort"
+                     << " time=" << timer
+                     << " traffic=" << traffic.total()
+                     << " hosts=" << ctx.num_hosts();
             }
         });
 }

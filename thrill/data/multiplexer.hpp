@@ -69,9 +69,9 @@ class Multiplexer
     static constexpr bool debug = false;
 
 public:
-    Multiplexer(mem::Manager& mem_manager,
-                BlockPool& block_pool,
-                size_t workers_per_host, net::Group& group);
+    Multiplexer(mem::Manager& mem_manager, BlockPool& block_pool,
+                net::DispatcherThread& dispatcher, net::Group& group,
+                size_t workers_per_host);
 
     //! non-copyable: delete copy-constructor
     Multiplexer(const Multiplexer&) = delete;
@@ -149,7 +149,7 @@ private:
 
     //! dispatcher used for all communication by data::Multiplexer, the thread
     //! never leaves the data components!
-    net::DispatcherThread dispatcher_;
+    net::DispatcherThread& dispatcher_;
 
     // Holds NetConnections for outgoing Streams
     net::Group& group_;
@@ -163,11 +163,17 @@ private:
     //! closed
     bool closed_ = false;
 
+    //! number of parallel recv requests
+    size_t num_parallel_async_;
+
+    //! Calculated send queue size limit for StreamData semaphores
+    size_t send_size_limit_;
+
     //! number of active Cat/MixStreams
     std::atomic<size_t> active_streams_ { 0 };
 
     //! maximu number of active Cat/MixStreams
-    size_t max_active_streams_ = 0;
+    std::atomic<size_t> max_active_streams_ { 0 };
 
     //! friends for access to network components
     friend class CatStreamData;
@@ -203,20 +209,21 @@ private:
 
     //! expects the next MultiplexerHeader from a socket and passes to
     //! OnMultiplexerHeader
-    void AsyncReadMultiplexerHeader(Connection& s);
+    void AsyncReadMultiplexerHeader(size_t peer, Connection& s);
 
     //! parses MultiplexerHeader and decides whether to receive Block or close
     //! Stream
-    void OnMultiplexerHeader(Connection& s, net::Buffer&& buffer);
+    void OnMultiplexerHeader(
+        size_t peer, uint32_t seq, Connection& s, net::Buffer&& buffer);
 
     //! Receives and dispatches a Block to a CatStreamData
     void OnCatStreamBlock(
-        Connection& s, const StreamMultiplexerHeader& header,
+        size_t peer, Connection& s, const StreamMultiplexerHeader& header,
         const CatStreamDataPtr& stream, PinnedByteBlockPtr&& bytes);
 
     //! Receives and dispatches a Block to a MixStream
     void OnMixStreamBlock(
-        Connection& s, const StreamMultiplexerHeader& header,
+        size_t peer, Connection& s, const StreamMultiplexerHeader& header,
         const MixStreamDataPtr& stream, PinnedByteBlockPtr&& bytes);
 };
 

@@ -7,6 +7,7 @@
  * Part of Project Thrill - http://project-thrill.org
  *
  * Copyright (C) 2015 Huyen Chau Nguyen <hello@chau-nguyen.de>
+ * Copyright (C) 2017 Tim Zeitz <dev.tim.zeitz@gmail.com>
  *
  * All rights reserved. Published under the BSD-2 license in the LICENSE file.
  ******************************************************************************/
@@ -46,7 +47,7 @@ class GroupToIndexNode final : public DOpNode<ValueType>
     using Key = typename common::FunctionTraits<KeyExtractor>::result_type;
     using ValueOut = ValueType;
     using ValueIn =
-              typename common::FunctionTraits<KeyExtractor>::template arg_plain<0>;
+        typename common::FunctionTraits<KeyExtractor>::template arg_plain<0>;
 
     class ValueComparator
     {
@@ -98,14 +99,13 @@ public:
         assert(k < result_size_);
         const size_t recipient = common::CalculatePartition(
             result_size_, context_.num_workers(), k);
-        assert(recipient < emitter_.size());
-        emitter_[recipient].Put(v);
+        assert(recipient < emitters_.size());
+        emitters_[recipient].Put(v);
     }
 
     void StopPreOp(size_t /* id */) final {
         // data has been pushed during pre-op -> close emitters
-        for (size_t i = 0; i < emitter_.size(); i++)
-            emitter_[i].Close();
+        emitters_.Close();
     }
 
     void Execute() override {
@@ -179,7 +179,7 @@ private:
     size_t totalsize_ = 0;
 
     data::CatStreamPtr stream_ { context_.GetNewCatStream(this) };
-    std::vector<data::CatStream::Writer> emitter_ { stream_->GetWriters() };
+    data::CatStream::Writers emitters_ { stream_->GetWriters() };
     std::vector<data::File> files_;
 
     void RunUserFunc(data::File& f, bool consume) {
@@ -264,7 +264,7 @@ auto DIA<ValueType, Stack>::GroupToIndex(
     const ValueOut& neutral_element) const {
 
     using DOpResult
-              = ValueOut;
+        = ValueOut;
 
     static_assert(
         std::is_same<
@@ -274,7 +274,7 @@ auto DIA<ValueType, Stack>::GroupToIndex(
         "KeyExtractor has the wrong input type");
 
     using GroupToIndexNode
-              = GroupToIndexNode<DOpResult, KeyExtractor, GroupFunction>;
+        = GroupToIndexNode<DOpResult, KeyExtractor, GroupFunction>;
 
     auto node = tlx::make_counting<GroupToIndexNode>(
         *this, key_extractor, groupby_function, result_size, neutral_element);

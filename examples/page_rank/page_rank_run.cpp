@@ -78,7 +78,7 @@ static void RunPageRankEdgePerLine(
 
     auto links = input.template GroupToIndex<OutgoingLinks>(
         [](const PagePageLink& p) { return p.src; },
-        [all = std::vector < PageId > ()](auto& r, const PageId&) mutable {
+        [all = std::vector<PageId> ()](auto& r, const PageId&) mutable {
             all.clear();
             while (r.HasNext()) {
                 all.push_back(r.Next().tgt);
@@ -150,7 +150,7 @@ static void RunJoinPageRankEdgePerLine(
 
     auto links = input.GroupByKey<LinkedPage>(
         [](const PagePageLink& p) { return p.src; },
-        [all = std::vector < PageId > ()](auto& r, const PageId& pid) mutable {
+        [all = std::vector<PageId> ()](auto& r, const PageId& pid) mutable {
             all.clear();
             while (r.HasNext()) {
                 all.push_back(r.Next().tgt);
@@ -177,22 +177,21 @@ static void RunJoinPageRankEdgePerLine(
     timer.Stop();
 
     if (ctx.my_rank() == 0) {
-        auto traffic = ctx.net_manager().Traffic();
         if (UseLocationDetection) {
             LOG1 << "RESULT benchmark=pagerank_gen detection=ON"
-                 << " time=" << timer.Milliseconds()
                  << " pages=" << num_pages
                  << " iterations=" << iterations
-                 << " traffic= " << traffic.first + traffic.second
-                 << " machines=" << ctx.num_hosts();
+                 << " time=" << timer
+                 << " traffic= " << ctx.net_manager().Traffic()
+                 << " hosts=" << ctx.num_hosts();
         }
         else {
             LOG1 << "RESULT benchmark=pagerank_gen detection=OFF"
-                 << " time=" << timer.Milliseconds()
                  << " pages=" << num_pages
                  << " iterations=" << iterations
-                 << " traffic=" << traffic.first + traffic.second
-                 << " machines=" << ctx.num_hosts();
+                 << " time=" << timer
+                 << " traffic=" << ctx.net_manager().Traffic()
+                 << " hosts=" << ctx.num_hosts();
         }
     }
 }
@@ -247,8 +246,8 @@ static void RunPageRankGenerated(
              << " pages=" << num_pages
              << " edges=" << number_edges
              << " iterations=" << iterations
-             << " time=" << timer.Milliseconds()
-             << " machines=" << ctx.num_hosts();
+             << " time=" << timer
+             << " hosts=" << ctx.num_hosts();
     }
 }
 
@@ -292,20 +291,19 @@ static void RunPageRankJoinGenerated(
     timer.Stop();
 
     if (ctx.my_rank() == 0) {
-        auto traffic = ctx.net_manager().Traffic();
         if (UseLocationDetection) {
             LOG1 << "RESULT benchmark=pagerank_gen detection=ON"
-                 << " time=" << timer.Milliseconds()
                  << " pages=" << num_pages
-                 << " traffic= " << traffic.first + traffic.second
-                 << " machines=" << ctx.num_hosts();
+                 << " time=" << timer
+                 << " traffic= " << ctx.net_manager().Traffic()
+                 << " hosts=" << ctx.num_hosts();
         }
         else {
             LOG1 << "RESULT benchmark=pagerank_gen detection=OFF"
-                 << " time=" << timer.Milliseconds()
                  << " pages=" << num_pages
-                 << " traffic=" << traffic.first + traffic.second
-                 << " machines=" << ctx.num_hosts();
+                 << " time=" << timer
+                 << " traffic=" << ctx.net_manager().Traffic()
+                 << " hosts=" << ctx.num_hosts();
         }
     }
 }

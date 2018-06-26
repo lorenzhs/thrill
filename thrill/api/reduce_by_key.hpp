@@ -73,8 +73,8 @@ private:
     using Key = typename common::FunctionTraits<KeyExtractor>::result_type;
 
     using TableItem =
-              typename std::conditional<
-                  VolatileKey, std::pair<Key, ValueType>, ValueType>::type;
+        typename std::conditional<
+            VolatileKey, std::pair<Key, ValueType>, ValueType>::type;
 
     using HashIndexFunction = core::ReduceByHash<Key, KeyHashFunction>;
 
@@ -214,9 +214,12 @@ public:
         // Flush hash table before the postOp
         pre_phase_.FlushAll();
         pre_phase_.CloseAll();
-        // waiting for the additional thread to finish the reduce
-        if (use_post_thread_) thread_.join();
-        use_mix_stream_ ? mix_stream_.reset() : cat_stream_.reset();
+        if (use_post_thread_) {
+            // waiting for the additional thread to finish the reduce
+            thread_.join();
+            // deallocate stream if already processed
+            use_mix_stream_ ? mix_stream_.reset() : cat_stream_.reset();
+        }
     }
 
     void Execute() final { }
@@ -231,6 +234,9 @@ public:
             // not final reduced, and no additional thread, perform post reduce
             post_phase_.Initialize(DIABase::mem_limit_);
             ProcessChannel();
+
+            // deallocate stream if already processed
+            use_mix_stream_ ? mix_stream_.reset() : cat_stream_.reset();
 
             reduced_ = true;
         }
@@ -269,7 +275,7 @@ private:
     data::MixStreamPtr mix_stream_;
     data::CatStreamPtr cat_stream_;
 
-    std::vector<data::Stream::Writer> emitters_;
+    data::Stream::Writers emitters_;
     //! handle to additional thread for post phase
     std::thread thread_;
 
@@ -383,7 +389,7 @@ auto DIA<ValueType, Stack>::ReduceByKey(
     assert(IsValid());
 
     using DOpResult
-              = typename common::FunctionTraits<ReduceFunction>::result_type;
+        = typename common::FunctionTraits<ReduceFunction>::result_type;
 
     static_assert(
         std::is_convertible<
@@ -413,9 +419,9 @@ auto DIA<ValueType, Stack>::ReduceByKey(
         "KeyExtractor has the wrong input type");
 
     using ReduceNode = api::ReduceNode<
-              DOpResult, KeyExtractor, ReduceFunction, ReduceConfig,
-              KeyHashFunction, KeyEqualFunction, CheckingDriver,
-              VolatileKeyValue, DuplicateDetectionValue>;
+        DOpResult, KeyExtractor, ReduceFunction, ReduceConfig,
+        KeyHashFunction, KeyEqualFunction, CheckingDriver,
+        VolatileKeyValue, DuplicateDetectionValue>;
 
     auto node = tlx::make_counting<ReduceNode>(
         *this, "ReduceByKey",
@@ -486,7 +492,7 @@ auto DIA<ValueType, Stack>::ReducePair(
     assert(IsValid());
 
     using DOpResult
-              = typename common::FunctionTraits<ReduceFunction>::result_type;
+        = typename common::FunctionTraits<ReduceFunction>::result_type;
 
     static_assert(tlx::is_std_pair<ValueType>::value,
                   "ValueType is not a pair");
@@ -519,10 +525,10 @@ auto DIA<ValueType, Stack>::ReducePair(
         };
 
     using ReduceNode = api::ReduceNode<
-              ValueType,
-              decltype(key_extractor), decltype(reduce_pair_function),
-              ReduceConfig, KeyHashFunction, KeyEqualFunction,
-              CheckingDriver, /* VolatileKey */ false, DuplicateDetectionValue>;
+        ValueType,
+        decltype(key_extractor), decltype(reduce_pair_function),
+        ReduceConfig, KeyHashFunction, KeyEqualFunction,
+        CheckingDriver, /* VolatileKey */ false, DuplicateDetectionValue>;
 
     auto node = tlx::make_counting<ReduceNode>(
         *this, "ReducePair",

@@ -15,16 +15,13 @@
 #include <thrill/api/collapse.hpp>
 #include <thrill/api/dia.hpp>
 #include <thrill/api/generate.hpp>
-#include <thrill/api/max.hpp>
-#include <thrill/api/merge.hpp>
 #include <thrill/api/prefixsum.hpp>
 #include <thrill/api/print.hpp>
+#include <thrill/api/reduce_to_index.hpp>
 #include <thrill/api/size.hpp>
 #include <thrill/api/sort.hpp>
-#include <thrill/api/sum.hpp>
 #include <thrill/api/union.hpp>
 #include <thrill/api/window.hpp>
-#include <thrill/api/zip.hpp>
 #include <thrill/common/logger.hpp>
 #include <thrill/common/uint_types.hpp>
 
@@ -56,7 +53,7 @@ struct IndexKMer {
         return chars < b.chars;
     }
 
-    friend std::ostream& operator << (std::ostream& os, const IndexKMer& iom) {
+    friend std ::ostream& operator << (std::ostream& os, const IndexKMer& iom) {
         return os << "[i=" << iom.index << ",c=" << iom.chars << ']';
     }
 } TLX_ATTRIBUTE_PACKED;
@@ -67,7 +64,7 @@ struct IndexRank {
     Index index;
     Index rank;
 
-    friend std::ostream& operator << (std::ostream& os, const IndexRank& ri) {
+    friend std ::ostream& operator << (std::ostream& os, const IndexRank& ri) {
         return os << "(i=" << ri.index << ",r=" << ri.rank << ')';
     }
 } TLX_ATTRIBUTE_PACKED;
@@ -92,7 +89,7 @@ struct IndexRankRank {
         return std::tie(rank1, rank2, b.index) < std::tie(b.rank1, b.rank2, index);
     }
 
-    friend std::ostream& operator << (std::ostream& os, const IndexRankRank& rri) {
+    friend std ::ostream& operator << (std::ostream& os, const IndexRankRank& rri) {
         return os << "(i=" << rri.index << ",r1=" << rri.rank1 << ",r2=" << rri.rank2 << ")";
     }
 } TLX_ATTRIBUTE_PACKED;
@@ -105,7 +102,7 @@ struct Index3Rank {
     Index rank2;
     Index rank3;
 
-    friend std::ostream& operator << (std::ostream& os, const Index3Rank& irrr) {
+    friend std ::ostream& operator << (std::ostream& os, const Index3Rank& irrr) {
         return os << "(i=" << irrr.index << ",r1=" << irrr.rank1
                   << ",r2=" << irrr.rank2 << ",r3=" << irrr.rank3 << ")";
     }
@@ -124,7 +121,7 @@ struct CharCharIndex {
         return std::tie(ch[0], ch[1]) < std::tie(b.ch[0], b.ch[1]);
     }
 
-    friend std::ostream& operator << (std::ostream& os, const CharCharIndex& cci) {
+    friend std ::ostream& operator << (std::ostream& os, const CharCharIndex& cci) {
         return os << "[ch0=" << cci.ch[0] << ",ch1=" << cci.ch[1]
                   << ",index=" << cci.index << ']';
     }
@@ -135,6 +132,18 @@ enum class Status : uint8_t {
     UNIQUE = 1,
     FULLY_DISCARDED = 2
 };
+
+std::ostream& operator << (std::ostream& os, const Status& s) {
+    switch (s) {
+    case Status::UNDECIDED:
+        return os << 'N';
+    case Status::UNIQUE:
+        return os << 'U';
+    case Status::FULLY_DISCARDED:
+        return os << 'D';
+    }
+    return os << '?';
+}
 
 //! A triple (index, rank, status)
 template <typename Index>
@@ -156,9 +165,9 @@ struct IndexRankStatus {
         return rank < b.rank || (rank == b.rank && index > b.index);
     }
 
-    friend std::ostream& operator << (std::ostream& os, const IndexRankStatus& irs) {
+    friend std ::ostream& operator << (std::ostream& os, const IndexRankStatus& irs) {
         return os << "(index=" << irs.index << ",rank=" << irs.rank << ",status="
-                  << static_cast<uint8_t>(irs.status) << ")";
+                  << irs.status << ")";
     }
 } TLX_ATTRIBUTE_PACKED;
 
@@ -170,52 +179,75 @@ struct IndexRankRankStatus {
     Index  rank2;
     Status status;
 
-    friend std::ostream& operator << (std::ostream& os, const IndexRankRankStatus& irrs) {
+    friend std ::ostream& operator << (std::ostream& os, const IndexRankRankStatus& irrs) {
         return os << "(index=" << irrs.index
                   << ",rank1=" << irrs.rank1 << ",rank2=" << irrs.rank2
-                  << ",status=" << static_cast<uint8_t>(irrs.status) << ")";
+                  << ",status=" << irrs.status << ")";
     }
 } TLX_ATTRIBUTE_PACKED;
 
+//! take input and pack it into an array of Index characters
 template <typename Index, typename InputDIA>
-DIA<Index> PrefixDoublingDiscardingDementiev(const InputDIA& input_dia, size_t input_size, bool packed) {
-    if (input_dia.ctx().my_rank() == 0)
-        LOG1 << "Running PrefixDoublingDiscardingDementiev";
+DIA<IndexRank<Index> > PrefixDoublingPack(
+    const InputDIA& input_dia, size_t input_size, bool packed, size_t& iteration) {
 
     using Char = typename InputDIA::ValueType;
     using IndexRank = suffix_sorting::IndexRank<Index>;
     using CharCharIndex = suffix_sorting::CharCharIndex<Char, Index>;
-    using IndexRankStatus = suffix_sorting::IndexRankStatus<Index>;
-    using IndexRankRank = suffix_sorting::IndexRankRank<Index>;
-    using Index3Rank = suffix_sorting::Index3Rank<Index>;
-    using IndexRankRankStatus = suffix_sorting::IndexRankRankStatus<Index>;
 
-    size_t iteration = 1;
+    if (packed && sizeof(Char) == 1) {
 
-    DIA<IndexRank> names;
+        // make histogram of characters
+        std::vector<size_t> alpha_map(256);
 
-    if (packed) {
-        enum { input_bit_size = sizeof(Char) << 3 };
-        enum { k_fitting = sizeof(Index) / sizeof(Char) };
+        input_dia.Keep()
+        .Map([&alpha_map](const Char& c) { alpha_map[c]++; return c; })
+        .Size();
 
-        iteration = 0;
-        size_t tmp = k_fitting;
-        while (tmp >>= 1) ++iteration;
+        alpha_map = input_dia.ctx().net.AllReduce(
+            alpha_map, common::ComponentSum<std::vector<size_t> >());
 
+        // determine alphabet size and map to names, keeping zero reserved
+        size_t alphabet_size = 1;
+        for (size_t i = 0; i < 256; ++i) {
+            if (alpha_map[i] != 0) {
+                alpha_map[i] = alphabet_size;
+                alphabet_size++;
+            }
+        }
+
+        // calculate number of characters fit into the bits of an Index, and the
+        // next iteration
+        size_t input_bit_size = tlx::integer_log2_ceil(alphabet_size);
+        size_t k_fitting = 8 * sizeof(Index) / input_bit_size;
+        iteration = tlx::integer_log2_floor(k_fitting);
+
+        if (input_dia.ctx().my_rank() == 0) {
+            LOG1 << "Packing:"
+                 << " alphabet_size=" << alphabet_size - 1
+                 << " input_bit_size=" << input_bit_size
+                 << " k_fitting=" << k_fitting
+                 << " next_iteration=" << iteration;
+        }
+
+        // pack and sort character groups
         auto chars_sorted =
             input_dia
             .template FlatWindow<IndexRank>(
                 k_fitting,
-                [input_size](size_t index, const RingBuffer<Char>& rb, auto emit) {
-                    size_t result = rb[0];
+                [=, alpha_map = std::move(alpha_map)](
+                    size_t index, const RingBuffer<Char>& rb, auto emit) {
+
+                    size_t result = alpha_map[rb[0]];
                     for (size_t i = 1; i < k_fitting; ++i)
-                        result = (result << input_bit_size) | rb[i];
+                        result = (result << input_bit_size) | alpha_map[rb[i]];
                     emit(IndexRank { Index(index), Index(result) });
+
                     if (index + k_fitting == input_size) {
                         for (size_t i = 1; i < k_fitting; ++i) {
-                            result = rb[i];
+                            result = alpha_map[rb[i]];
                             for (size_t j = i + 1; j < k_fitting; ++j)
-                                result = (result << input_bit_size) | rb[j];
+                                result = (result << input_bit_size) | alpha_map[rb[j]];
                             result <<= i * input_bit_size;
                             emit(IndexRank { Index(index + i), Index(result) });
                         }
@@ -228,57 +260,379 @@ DIA<Index> PrefixDoublingDiscardingDementiev(const InputDIA& input_dia, size_t i
         if (debug_print)
             chars_sorted.Keep().Print("chars_sorted packed");
 
-        names =
-            chars_sorted
-            .template FlatWindow<IndexRank>(
-                2,
-                [](size_t index, const RingBuffer<IndexRank>& rb, auto emit) {
-                    if (index == 0)
-                        emit(IndexRank { rb[0].index, Index(1) });
-                    emit(IndexRank {
-                             rb[1].index, Index(rb[0].rank == rb[1].rank ? 0 : index + 2)
-                         });
-                })
-            .PrefixSum([](const IndexRank a, const IndexRank b) {
-                           return IndexRank { b.index, std::max(a.rank, b.rank) };
-                       });
+        return chars_sorted.template FlatWindow<IndexRank>(
+            2,
+            [](size_t index, const RingBuffer<IndexRank>& rb, auto emit) {
+                if (index == 0)
+                    emit(IndexRank { rb[0].index, Index(1) });
+                emit(IndexRank {
+                         rb[1].index, Index(rb[0].rank == rb[1].rank ? 0 : index + 2)
+                     });
+            });
     }
     else {
+        iteration = 1;
+
+        // sorts pairs of characters to generate first iteration of lexnames
+
         auto chars_sorted =
             input_dia
             .template FlatWindow<CharCharIndex>(
                 2,
                 [](size_t index, const RingBuffer<Char>& rb, auto emit) {
+                    // emit CharCharIndex for each character pair
                     emit(CharCharIndex {
                              { rb[0], rb[1] }, Index(index)
                          });
                 },
                 [=](size_t index, const RingBuffer<Char>& rb, auto emit) {
                     if (index + 1 == input_size) {
-                        // emit CharCharIndex for last suffix
+                        // emit CharCharIndex for last suffix position
                         emit(CharCharIndex {
                                  { rb[0], std::numeric_limits<Char>::lowest() },
                                  Index(index)
                              });
                     }
                 })
+            // sort character pairs
             .Sort();
 
+        if (debug_print)
+            chars_sorted.Keep().Print("chars_sorted");
+
+        return chars_sorted.template FlatWindow<IndexRank>(
+            2,
+            [](size_t index, const RingBuffer<CharCharIndex>& rb, auto emit) {
+                if (index == 0) {
+                        // emit rank 1 for smallest character pair
+                    emit(IndexRank { rb[0].index, Index(1) });
+                }
+                // emit next rank if character pair is unequal, else 0 which
+                // will become the previous rank in the subsequent max().
+                emit(IndexRank {
+                         rb[1].index, Index(rb[0] == rb[1] ? 0 : index + 2)
+                     });
+            });
+    }
+}
+
+template <typename Index, typename InputDIA>
+DIA<Index> PrefixDoublingSorting(
+    const InputDIA& input_dia, size_t input_size, bool packed) {
+
+    if (input_dia.ctx().my_rank() == 0)
+        LOG1 << "Running PrefixDoublingSorting";
+
+    using IndexRank = suffix_sorting::IndexRank<Index>;
+    using IndexRankRank = suffix_sorting::IndexRankRank<Index>;
+
+    size_t iteration;
+
+    DIA<IndexRank> names = PrefixDoublingPack<Index>(
+        input_dia, input_size, packed, iteration);
+
+    if (debug_print)
+        names.Keep().Print("names");
+
+    // count number of duplicate character pairs, these are 0 indicators
+    auto number_duplicates =
+        names
+        .Filter([](const IndexRank& ir) {
+                    return ir.rank == Index(0);
+                })
+        .SizeFuture();
+
+    // construct lexnames array by maxing ranks = filling in zeros with names.
+    names =
+        names
+        .PrefixSum(
+            [](const IndexRank& a, const IndexRank& b) {
+                return IndexRank { b.index, std::max(a.rank, b.rank) };
+            });
+
+    if (number_duplicates.get() == 0) {
+        if (input_dia.context().my_rank() == 0)
+            sLOG1 << "Finished before doubling in loop";
+
+        // suffix array already known, as character pairs are unique
+        auto sa =
+            names
+            .Map([](const IndexRank& ir) {
+                     return ir.index;
+                 });
+
+        return sa.Collapse();
+    }
+
+    if (debug_print)
+        names.Keep().Print("names before loop");
+
+    auto last_number_duplicates = number_duplicates.get();
+
+    while (true) {
+        // reorder names such that 2^k+i and 2^(k+1)+i are adjacent
+        auto names_sorted =
+            names
+            .Sort([iteration](const IndexRank& a, const IndexRank& b) {
+                      Index mod_mask = (Index(1) << iteration) - 1;
+                      Index div_mask = ~mod_mask;
+
+                      if ((a.index & mod_mask) == (b.index & mod_mask))
+                          return (a.index & div_mask) < (b.index & div_mask);
+                      else
+                          return (a.index & mod_mask) < (b.index & mod_mask);
+                  });
+
+        if (debug_print)
+            names_sorted.Keep().Print("names_sorted");
+
+        size_t next_index = size_t(1) << iteration++;
+
+        if (input_dia.context().my_rank() == 0) {
+            sLOG1 << "next_index" << next_index;
+        }
+
+        auto triple =
+            names_sorted
+            .template FlatWindow<IndexRankRank>(
+                2,
+                [=](size_t /* index */, const RingBuffer<IndexRank>& rb, auto emit) {
+                    emit(IndexRankRank {
+                             rb[0].index, rb[0].rank,
+                             // check if at boundary between 2^k+i range, emit 0
+                             // if crossing boundary
+                             (rb[0].index + Index(next_index) == rb[1].index)
+                             ? rb[1].rank : Index(0)
+                         });
+                },
+                [=](size_t index, const RingBuffer<IndexRank>& rb, auto emit) {
+                    if (index + 1 == input_size)
+                        emit(IndexRankRank { rb[0].index, rb[0].rank, Index(0) });
+                });
+
+        if (debug_print)
+            triple.Keep().Print("triple");
+
+        auto triple_sorted = triple.Sort();
+
+        if (debug_print)
+            triple_sorted.Keep().Print("triple_sorted");
+
         names =
-            chars_sorted
+            triple_sorted
             .template FlatWindow<IndexRank>(
                 2,
-                [](size_t index, const RingBuffer<CharCharIndex>& rb, auto emit) {
+                [](size_t index, const RingBuffer<IndexRankRank>& rb, auto emit) {
                     if (index == 0)
                         emit(IndexRank { rb[0].index, Index(1) });
+
                     emit(IndexRank {
-                             rb[1].index, Index(rb[0] == rb[1] ? 0 : index + 2)
+                             rb[1].index,
+                             (rb[0] == rb[1] && rb[0].rank2 != Index(0))
+                             ? Index(0) : Index(index + 2)
                          });
-                })
-            .PrefixSum([](const IndexRank a, const IndexRank b) {
+                });
+
+        if (debug_print)
+            names.Keep().Print("names indicator");
+
+        number_duplicates =
+            names
+            .Filter([](const IndexRank& ir) {
+                        return ir.rank == Index(0);
+                    })
+            .SizeFuture();
+
+        names =
+            names
+            .PrefixSum([](const IndexRank& a, const IndexRank& b) {
                            return IndexRank { b.index, std::max(a.rank, b.rank) };
                        });
+
+        if (input_dia.context().my_rank() == 0) {
+            sLOG1 << "iteration" << iteration - 1
+                  << "duplicates" << number_duplicates.get();
+        }
+
+        if (number_duplicates.get() > last_number_duplicates) {
+            sLOG1 << "number_duplicates" << number_duplicates.get()
+                  << "last_number_duplicates" << last_number_duplicates;
+
+            auto sa =
+                names
+                .Map([](const IndexRank& ir) {
+                         return ir.index;
+                     });
+
+            return sa.Collapse();
+        }
+
+        last_number_duplicates = number_duplicates.get();
+
+        if (number_duplicates.get() == 0) {
+            auto sa =
+                names
+                .Map([](const IndexRank& ir) {
+                         return ir.index;
+                     });
+
+            return sa.Collapse();
+        }
+
+        if (debug_print)
+            names.Keep().Print("names");
     }
+}
+
+template <typename Index, typename InputDIA>
+DIA<Index> PrefixDoublingWindow(
+    const InputDIA& input_dia, size_t input_size, bool packed) {
+
+    if (input_dia.ctx().my_rank() == 0)
+        LOG1 << "Running PrefixDoublingWindow";
+
+    using IndexRank = suffix_sorting::IndexRank<Index>;
+    using IndexRankRank = suffix_sorting::IndexRankRank<Index>;
+
+    size_t iteration;
+
+    DIA<IndexRank> names = PrefixDoublingPack<Index>(
+        input_dia, input_size, packed, iteration);
+
+    auto number_duplicates =
+        names
+        .Filter([](const IndexRank& ir) {
+                    return ir.rank == Index(0);
+                })
+        .SizeFuture();
+
+    names =
+        names
+        .PrefixSum([](const IndexRank& a, const IndexRank& b) {
+                       return IndexRank { b.index, std::max(a.rank, b.rank) };
+                   });
+
+    // The first rank is always 0 and all other duplicates have "rank" 0
+    // before we compute the correct new rank.
+    if (number_duplicates.get() == 0) {
+        if (input_dia.context().my_rank() == 0)
+            sLOG1 << "Finished before doubling in loop.";
+
+        auto sa =
+            names
+            .Map([](const IndexRank& ir) {
+                     return ir.index;
+                 });
+        return sa.Collapse();
+    }
+
+    if (debug_print)
+        names.Keep().Print("names");
+
+    while (true) {
+        auto isa =
+            names
+            // .Sort([](const IndexRank& a, const IndexRank& b) {
+            //           return a.index < b.index;
+            //       });
+            .ReduceToIndex(
+                SkipPreReducePhaseTag,
+                [](const IndexRank& a) { return static_cast<size_t>(a.index); },
+                [](const IndexRank&, const IndexRank& b) { return b; },
+                input_size);
+
+        if (debug_print)
+            isa.Keep().Print("isa");
+
+        size_t shift_by = (size_t(1) << (iteration - 1)) + 1;
+
+        auto triple_sorted =
+            isa
+            .template FlatWindow<IndexRankRank>(
+                shift_by,
+                [](size_t /*index*/, const RingBuffer<IndexRank>& rb, auto emit) {
+                    emit(IndexRankRank { rb[0].index, rb.front().rank, rb.back().rank });
+                },
+                [](size_t /*index*/, const RingBuffer<IndexRank>& rb, auto emit) {
+                    emit(IndexRankRank { rb[0].index, rb[0].rank, Index(0) });
+                })
+            .Sort();
+
+        if (debug_print)
+            triple_sorted.Keep().Print("triple_sorted");
+
+        names =
+            triple_sorted
+            .template FlatWindow<IndexRank>(
+                2,
+                [](size_t index, const RingBuffer<IndexRankRank>& rb, auto emit) {
+                    if (index == 0) emit(IndexRank { rb[0].index, Index(1) });
+                    emit(IndexRank { rb[1].index,
+                                     Index(rb[0] == rb[1] ? 0 : index + 2) });
+                });
+
+        if (debug_print)
+            names.Keep().Print("names");
+
+        number_duplicates =
+            names
+            .Filter([](const IndexRank& ir) {
+                        return ir.rank == Index(0);
+                    })
+            .SizeFuture();
+
+        names =
+            names
+            .PrefixSum([](const IndexRank& a, const IndexRank& b) {
+                           return IndexRank { b.index, std::max(a.rank, b.rank) };
+                       });
+
+        if (input_dia.context().my_rank() == 0) {
+            sLOG1 << "iteration" << iteration
+                  << "shift_by" << shift_by
+                  << "duplicates" << number_duplicates.get();
+        }
+        ++iteration;
+
+        if (number_duplicates.get() == 0) {
+            auto sa =
+                names
+                .Map([](const IndexRank& ir) {
+                         return ir.index;
+                     });
+            return sa.Collapse();
+        }
+
+        if (debug_print)
+            names.Keep().Print("names");
+    }
+}
+
+template <typename Index, typename InputDIA>
+DIA<Index> PrefixDoublingDiscarding(
+    const InputDIA& input_dia, size_t input_size, bool packed) {
+
+    if (input_dia.ctx().my_rank() == 0)
+        LOG1 << "Running PrefixDoublingDiscarding";
+
+    using IndexRank = suffix_sorting::IndexRank<Index>;
+    using IndexRankStatus = suffix_sorting::IndexRankStatus<Index>;
+    using IndexRankRank = suffix_sorting::IndexRankRank<Index>;
+    using Index3Rank = suffix_sorting::Index3Rank<Index>;
+    using IndexRankRankStatus = suffix_sorting::IndexRankRankStatus<Index>;
+
+    size_t iteration;
+
+    DIA<IndexRank> names = PrefixDoublingPack<Index>(
+        input_dia, input_size, packed, iteration);
+
+    names =
+        names.PrefixSum([](const IndexRank a, const IndexRank b) {
+                            return IndexRank { b.index, std::max(a.rank, b.rank) };
+                        });
+
+    if (debug_print)
+        names.Keep().Print("names");
 
     auto names_unique =
         names
@@ -301,6 +655,9 @@ DIA<Index> PrefixDoublingDiscardingDementiev(const InputDIA& input_dia, size_t i
                 }
             });
 
+    if (debug_print)
+        names_unique.Keep().Print("names_unique");
+
     auto names_unique_sorted =
         names_unique
         .Sort([iteration](const IndexRankStatus& a, const IndexRankStatus& b) {
@@ -313,9 +670,6 @@ DIA<Index> PrefixDoublingDiscardingDementiev(const InputDIA& input_dia, size_t i
                       return (a.index & mod_mask) < (b.index & mod_mask);
               });
 
-    if (debug_print)
-        names_unique_sorted.Keep().Print("names_unique_sorted");
-
     std::vector<DIA<IndexRank> > fully_discarded;
 
     while (true) {
@@ -324,7 +678,7 @@ DIA<Index> PrefixDoublingDiscardingDementiev(const InputDIA& input_dia, size_t i
         size_t names_size = names_unique_sorted.Keep().Size();
 
         if (debug_print)
-            names_unique_sorted.Keep().Print("names_unique_sorted begin of loop");
+            names_unique_sorted.Keep().Print("names_unique_sorted");
 
         auto discarded_names =
             names_unique_sorted.Keep()
@@ -370,6 +724,9 @@ DIA<Index> PrefixDoublingDiscardingDementiev(const InputDIA& input_dia, size_t i
                             emit(IndexRankRankStatus { rb[1].index, rb[1].rank, Index(0), Status::UNDECIDED });
                     }
                 });
+
+        if (debug_print)
+            discarded_names.Keep().Print("discarded_names");
 
         auto new_decided =
             discarded_names.Keep()
@@ -452,6 +809,9 @@ DIA<Index> PrefixDoublingDiscardingDementiev(const InputDIA& input_dia, size_t i
                      return IndexRank { ir.index, ir.rank3 + (ir.rank2 - ir.rank1) };
                  });
 
+        if (debug_print)
+            new_ranks.Keep().Print("new_ranks");
+
         names_unique =
             new_ranks
             .template FlatWindow<IndexRankStatus>(
@@ -477,6 +837,9 @@ DIA<Index> PrefixDoublingDiscardingDementiev(const InputDIA& input_dia, size_t i
                     }
                 });
 
+        if (debug_print)
+            names_unique.Keep().Print("names_unique");
+
         names_unique_sorted =
             names_unique
             .Union(partial_discarded)
@@ -492,467 +855,36 @@ DIA<Index> PrefixDoublingDiscardingDementiev(const InputDIA& input_dia, size_t i
     }
 }
 
-template <typename Index, typename InputDIA>
-DIA<Index> PrefixDoublingDementiev(const InputDIA& input_dia, size_t input_size, bool packed) {
-    if (input_dia.ctx().my_rank() == 0)
-        LOG1 << "Running PrefixDoublingDementiev";
-
-    using Char = typename InputDIA::ValueType;
-    using IndexRank = suffix_sorting::IndexRank<Index>;
-    using IndexRankRank = suffix_sorting::IndexRankRank<Index>;
-    using CharCharIndex = suffix_sorting::CharCharIndex<Char, Index>;
-
-    size_t iteration;
-
-    DIA<IndexRank> names;
-
-    if (packed) {
-        enum { input_bit_size = sizeof(Char) << 3 };
-        enum { k_fitting = sizeof(Index) / sizeof(Char) };
-
-        iteration = 0;
-        size_t tmp = k_fitting;
-        while (tmp >>= 1) ++iteration;
-
-        auto chars_sorted =
-            input_dia
-            .template FlatWindow<IndexRank>(
-                k_fitting,
-                [input_size](size_t index, const RingBuffer<Char>& rb, auto emit) {
-                    size_t result = rb[0];
-                    for (size_t i = 1; i < k_fitting; ++i)
-                        result = (result << input_bit_size) | rb[i];
-                    emit(IndexRank { Index(index), Index(result) });
-                    if (index + k_fitting == input_size) {
-                        for (size_t i = 1; i < k_fitting; ++i) {
-                            result = rb[i];
-                            for (size_t j = i + 1; j < k_fitting; ++j)
-                                result = (result << input_bit_size) | rb[j];
-                            result <<= i * input_bit_size;
-                            emit(IndexRank { Index(index + i), Index(result) });
-                        }
-                    }
-                })
-            .Sort([](const IndexRank& a, const IndexRank& b) {
-                      return a.rank < b.rank;
-                  });
-
-        if (debug_print)
-            chars_sorted.Keep().Print("chars_sorted packed");
-
-        names =
-            chars_sorted
-            .template FlatWindow<IndexRank>(
-                2,
-                [](size_t index, const RingBuffer<IndexRank>& rb, auto emit) {
-                    if (index == 0)
-                        emit(IndexRank { rb[0].index, Index(1) });
-                    emit(IndexRank {
-                             rb[1].index, Index(rb[0].rank == rb[1].rank ? 0 : index + 2)
-                         });
-                });
-    }
-    else {
-        iteration = 1;
-
-        auto chars_sorted =
-            input_dia
-            .template FlatWindow<CharCharIndex>(
-                2,
-                [](size_t index, const RingBuffer<Char>& rb, auto emit) {
-                    emit(CharCharIndex {
-                             { rb[0], rb[1] }, Index(index)
-                         });
-                },
-                [=](size_t index, const RingBuffer<Char>& rb, auto emit) {
-                    if (index + 1 == input_size) {
-                        // emit CharCharIndex for last suffix position
-                        emit(CharCharIndex {
-                                 { rb[0], std::numeric_limits<Char>::lowest() },
-                                 Index(index)
-                             });
-                    }
-                })
-            .Sort();
-
-        if (debug_print)
-            chars_sorted.Keep().Print("chars_sorted");
-
-        names =
-            chars_sorted
-            .template FlatWindow<IndexRank>(
-                2,
-                [](size_t index, const RingBuffer<CharCharIndex>& rb, auto emit) {
-                    if (index == 0)
-                        emit(IndexRank { rb[0].index, Index(1) });
-                    emit(IndexRank {
-                             rb[1].index, Index(rb[0] == rb[1] ? 0 : index + 2)
-                         });
-                });
-    }
-
-    auto number_duplicates =
-        names.Keep()
-        .Filter([](const IndexRank& ir) {
-                    return ir.rank == Index(0);
-                })
-        .Size();
-
-    if (number_duplicates == 0) {
-        if (input_dia.context().my_rank() == 0)
-            sLOG1 << "Finished before doubling in loop";
-
-        auto sa =
-            names
-            .Map([](const IndexRank& ir) {
-                     return ir.index;
-                 });
-
-        return sa.Collapse();
-    }
-
-    names =
-        names
-        .PrefixSum(
-            [](const IndexRank& a, const IndexRank& b) {
-                return IndexRank { b.index, std::max(a.rank, b.rank) };
-            });
-
-    if (debug_print)
-        names.Keep().Print("names before loop");
-
-    auto last_number_duplicates = number_duplicates;
-
-    while (true) {
-        auto names_sorted =
-            names
-            .Sort([iteration](const IndexRank& a, const IndexRank& b) {
-                      Index mod_mask = (Index(1) << iteration) - 1;
-                      Index div_mask = ~mod_mask;
-
-                      if ((a.index & mod_mask) == (b.index & mod_mask))
-                          return (a.index & div_mask) < (b.index & div_mask);
-                      else
-                          return (a.index & mod_mask) < (b.index & mod_mask);
-                  });
-
-        if (debug_print)
-            names_sorted.Keep().Print("names_sorted");
-
-        size_t next_index = size_t(1) << iteration++;
-
-        if (input_dia.context().my_rank() == 0) {
-            sLOG1 << "next_index" << next_index;
-        }
-
-        auto triple =
-            names_sorted
-            .template FlatWindow<IndexRankRank>(
-                2,
-                [=](size_t /* index */, const RingBuffer<IndexRank>& rb, auto emit) {
-                    emit(IndexRankRank {
-                             rb[0].index, rb[0].rank,
-                             (rb[0].index + Index(next_index) == rb[1].index)
-                             ? rb[1].rank : Index(0)
-                         });
-                },
-                [=](size_t index, const RingBuffer<IndexRank>& rb, auto emit) {
-                    if (index + 1 == input_size)
-                        emit(IndexRankRank { rb[0].index, rb[0].rank, Index(0) });
-                });
-
-        if (debug_print)
-            triple.Keep().Print("triple");
-
-        auto triple_sorted = triple.Sort();
-
-        if (debug_print)
-            triple_sorted.Keep().Print("triple_sorted");
-
-        names =
-            triple_sorted
-            .template FlatWindow<IndexRank>(
-                2,
-                [](size_t index, const RingBuffer<IndexRankRank>& rb, auto emit) {
-                    if (index == 0)
-                        emit(IndexRank { rb[0].index, Index(1) });
-
-                    emit(IndexRank {
-                             rb[1].index,
-                             (rb[0] == rb[1] && rb[0].rank2 != Index(0))
-                             ? Index(0) : Index(1)
-                         });
-                });
-
-        if (debug_print)
-            names.Keep().Print("names indicator");
-
-        number_duplicates =
-            names.Keep()
-            .Filter([](const IndexRank& ir) {
-                        return ir.rank == Index(0);
-                    })
-            .Size();
-
-        if (input_dia.context().my_rank() == 0) {
-            sLOG1 << "iteration" << iteration - 1
-                  << "duplicates" << number_duplicates;
-        }
-
-        if (number_duplicates > last_number_duplicates) {
-            sLOG1 << "number_duplicates" << number_duplicates
-                  << "last_number_duplicates" << last_number_duplicates;
-
-            auto sa =
-                names
-                .Map([](const IndexRank& ir) {
-                         return ir.index;
-                     });
-
-            return sa.Collapse();
-        }
-
-        last_number_duplicates = number_duplicates;
-
-        if (number_duplicates == 0) {
-            auto sa =
-                names
-                .Map([](const IndexRank& ir) {
-                         return ir.index;
-                     });
-
-            return sa.Collapse();
-        }
-
-        names =
-            names
-            .PrefixSum([](const IndexRank& a, const IndexRank& b) {
-                           return IndexRank { b.index, a.rank + b.rank };
-                       });
-
-        if (debug_print)
-            names.Keep().Print("names");
-    }
-}
-
-template <typename Index, typename InputDIA>
-DIA<Index> PrefixDoubling(const InputDIA& input_dia, size_t input_size, bool packed) {
-    if (input_dia.ctx().my_rank() == 0)
-        LOG1 << "Running PrefixDoubling";
-
-    using Char = typename InputDIA::ValueType;
-    using IndexRank = suffix_sorting::IndexRank<Index>;
-    using IndexRankRank = suffix_sorting::IndexRankRank<Index>;
-    using CharCharIndex = suffix_sorting::CharCharIndex<Char, Index>;
-
-    size_t iteration = 0;
-
-    DIA<IndexRank> rebucket;
-
-    if (packed) {
-        enum { input_bit_size = sizeof(Char) << 3 };
-        enum { k_fitting = sizeof(Index) / sizeof(Char) };
-
-        iteration = 0;
-        size_t tmp = k_fitting;
-        while (tmp >>= 1) ++iteration;
-        --iteration;
-
-        auto chars_sorted =
-            input_dia
-            .template FlatWindow<IndexRank>(
-                k_fitting,
-                [input_size](size_t index, const RingBuffer<Char>& rb, auto emit) {
-                    size_t result = rb[0];
-                    for (size_t i = 1; i < k_fitting; ++i)
-                        result = (result << input_bit_size) | rb[i];
-                    emit(IndexRank { Index(index), Index(result) });
-                    if (index + k_fitting == input_size) {
-                        for (size_t i = 1; i < k_fitting; ++i) {
-                            result = rb[i];
-                            for (size_t j = i + 1; j < k_fitting; ++j)
-                                result = (result << input_bit_size) | rb[j];
-                            result <<= i * input_bit_size;
-                            emit(IndexRank { Index(index + i), Index(result) });
-                        }
-                    }
-                })
-            .Sort([](const IndexRank& a, const IndexRank& b) {
-                      return a.rank < b.rank;
-                  });
-
-        if (debug_print)
-            chars_sorted.Keep().Print("chars_sorted packed");
-
-        rebucket =
-            chars_sorted
-            .template FlatWindow<IndexRank>(
-                2,
-                [](size_t index, const RingBuffer<IndexRank>& rb, auto emit) {
-                    if (index == 0)
-                        emit(IndexRank { rb[0].index, Index(0) });
-                    emit(IndexRank { rb[1].index,
-                                     Index(rb[0].rank == rb[1].rank ? 0 : index + 1) });
-                });
-    }
-    else {
-        // Create initial tuples (i,T[i],T[i+1]), sort by (T[i],T[i+1])
-        auto chars_sorted =
-            input_dia
-            .template FlatWindow<CharCharIndex>(
-                2,
-                [](size_t index, const RingBuffer<Char>& rb, auto emit) {
-                    emit(CharCharIndex {
-                             { rb[0], rb[1] }, Index(index)
-                         });
-                },
-                [=](size_t index, const RingBuffer<Char>& rb, auto emit) {
-                    if (index + 1 == input_size) {
-                        // emit CharCharIndex for last suffix position
-                        emit(CharCharIndex {
-                                 { rb[0], std::numeric_limits<Char>::lowest() },
-                                 Index(index)
-                             });
-                    }
-                })
-            .Sort();
-
-        if (debug_print)
-            chars_sorted.Keep().Print("chars_sorted");
-
-        // calculate updated names by labeling first unequal pair (T[i],T[i+1])
-        // with a new name, and later will perform a prefix sum.
-        rebucket =
-            chars_sorted.Keep()
-            .template FlatWindow<IndexRank>(
-                2,
-                [](size_t index, const RingBuffer<CharCharIndex>& rb, auto emit) {
-                    if (index == 0) emit(IndexRank { rb[0].index, Index(0) });
-                    emit(IndexRank { rb[1].index,
-                                     Index(rb[0] == rb[1] ? 0 : index + 1) });
-                });
-    }
-
-    auto number_duplicates =
-        rebucket.Keep()
-        .Filter([](const IndexRank& ir) {
-                    return ir.rank == Index(0);
-                })
-        .Size();
-
-    // The first rank is always 0 and all other duplicates have "rank" 0
-    // before we compute the correct new rank.
-    if (number_duplicates == 1) {
-        if (input_dia.context().my_rank() == 0)
-            sLOG1 << "Finished before doubling in loop.";
-
-        auto sa =
-            rebucket
-            .Map([](const IndexRank& ir) {
-                     return ir.index;
-                 });
-        return sa.Collapse();
-    }
-
-    rebucket =
-        rebucket
-        .PrefixSum([](const IndexRank& a, const IndexRank& b) {
-                       return IndexRank { b.index, std::max<Index>(a.rank, b.rank) };
-                   });
-
-    if (debug_print)
-        rebucket.Keep().Print("rebucket");
-
-    // size_t iteration = 0;
-    while (true) {
-        auto isa =
-            rebucket
-            .Sort([](const IndexRank& a, const IndexRank& b) {
-                      return a.index < b.index;
-                  });
-
-        if (debug_print)
-            isa.Keep().Print("isa");
-
-        size_t shift_by = (1 << iteration++) + 1;
-
-        auto triple_sorted =
-            isa
-            .template FlatWindow<IndexRankRank>(
-                shift_by,
-                [](size_t /*index*/, const RingBuffer<IndexRank>& rb, auto emit) {
-                    emit(IndexRankRank { rb[0].index, rb.front().rank, rb.back().rank });
-                },
-                [](size_t /*index*/, const RingBuffer<IndexRank>& rb, auto emit) {
-                    emit(IndexRankRank { rb[0].index, rb[0].rank, Index(0) });
-                })
-            .Sort();
-
-        if (debug_print)
-            triple_sorted.Keep().Print("triple_sorted");
-
-        rebucket =
-            triple_sorted
-            .template FlatWindow<IndexRank>(
-                2,
-                [](size_t index, const RingBuffer<IndexRankRank>& rb, auto emit) {
-                    if (index == 0) emit(IndexRank { rb[0].index, Index(0) });
-                    emit(IndexRank { rb[1].index,
-                                     Index(rb[0] == rb[1] ? 0 : index + 1) });
-                });
-
-        if (debug_print)
-            rebucket.Keep().Print("rebucket");
-
-        number_duplicates =
-            rebucket.Keep()
-            .Filter([](const IndexRank& ir) {
-                        return ir.rank == Index(0);
-                    })
-            .Size();
-
-        if (input_dia.context().my_rank() == 0) {
-            sLOG1 << "iteration" << iteration
-                  << "duplicates" << number_duplicates - 1;
-        }
-
-        if (number_duplicates == 1) {
-            auto sa =
-                rebucket
-                .Map([](const IndexRank& ir) {
-                         return ir.index;
-                     });
-            return sa.Collapse();
-        }
-
-        rebucket =
-            rebucket
-            .PrefixSum([](const IndexRank& a, const IndexRank& b) {
-                           return IndexRank { b.index, std::max<Index>(a.rank, b.rank) };
-                       });
-
-        if (debug_print)
-            rebucket.Keep().Print("rebucket");
-    }
-}
-
-template DIA<uint32_t> PrefixDoubling<uint32_t>(
+template DIA<uint32_t> PrefixDoublingWindow<uint32_t>(
     const DIA<uint8_t>& input_dia, size_t input_size, bool packed);
 
-template DIA<common::uint40> PrefixDoubling<common::uint40>(
+template DIA<uint32_t> PrefixDoublingSorting<uint32_t>(
     const DIA<uint8_t>& input_dia, size_t input_size, bool packed);
 
-template DIA<uint32_t> PrefixDoublingDementiev<uint32_t>(
+template DIA<uint32_t> PrefixDoublingDiscarding<uint32_t>(
     const DIA<uint8_t>& input_dia, size_t input_size, bool packed);
 
-template DIA<common::uint40> PrefixDoublingDementiev<common::uint40>(
+#if !THRILL_ON_TRAVIS
+
+template DIA<common::uint40> PrefixDoublingWindow<common::uint40>(
     const DIA<uint8_t>& input_dia, size_t input_size, bool packed);
 
-template DIA<uint32_t> PrefixDoublingDiscardingDementiev<uint32_t>(
+template DIA<common::uint40> PrefixDoublingSorting<common::uint40>(
     const DIA<uint8_t>& input_dia, size_t input_size, bool packed);
 
-template DIA<common::uint40> PrefixDoublingDiscardingDementiev<common::uint40>(
+template DIA<common::uint40> PrefixDoublingDiscarding<common::uint40>(
     const DIA<uint8_t>& input_dia, size_t input_size, bool packed);
+
+template DIA<uint64_t> PrefixDoublingWindow<uint64_t>(
+    const DIA<uint8_t>& input_dia, size_t input_size, bool packed);
+
+template DIA<uint64_t> PrefixDoublingSorting<uint64_t>(
+    const DIA<uint8_t>& input_dia, size_t input_size, bool packed);
+
+template DIA<uint64_t> PrefixDoublingDiscarding<uint64_t>(
+    const DIA<uint8_t>& input_dia, size_t input_size, bool packed);
+
+#endif
 
 } // namespace suffix_sorting
 } // namespace examples

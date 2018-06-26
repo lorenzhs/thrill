@@ -73,12 +73,13 @@ TEST(StreamSet, TestLoopbacks) {
     auto groups = net::mock::Group::ConstructLoopbackMesh(hosts);
     net::Group* group = groups[0].get();
     mem::Manager mem_manager(nullptr, "Benchmark");
+    net::DispatcherThread disp(group->ConstructDispatcher(), 0);
     data::BlockPool block_pool(workers_per_host);
-    data::Multiplexer multiplexer(mem_manager, block_pool, workers_per_host, *group);
+    data::Multiplexer multiplexer(mem_manager, block_pool, disp, *group, workers_per_host);
 
     auto producer =
         [workers_per_host](data::CatStreamDataPtr stream, size_t my_id) {
-            common::NameThisThread("worker " + mem::to_string(my_id));
+            common::NameThisThread("worker " + std::to_string(my_id));
             // send data between workers
             auto writers = stream->GetWriters();
             for (size_t j = 0; j < workers_per_host; j++) {
@@ -89,7 +90,7 @@ TEST(StreamSet, TestLoopbacks) {
         };
     auto consumer =
         [workers_per_host](data::CatStreamDataPtr stream, size_t my_id) {
-            common::NameThisThread("worker " + mem::to_string(my_id));
+            common::NameThisThread("worker " + std::to_string(my_id));
             // check data on each worker
             auto readers = stream->GetReaders();
             for (size_t j = 0; j < workers_per_host; j++) {
@@ -114,6 +115,8 @@ TEST(StreamSet, TestLoopbacks) {
     stream0->Close();
     stream1->Close();
     stream2->Close();
+    // stop DispatcherThread before Multiplexer
+    disp.Terminate();
 }
 
 /******************************************************************************/
@@ -126,8 +129,9 @@ struct Multiplexer : public ::testing::Test {
     static void FunctionSelect(
         net::Group* group, WorkerThread f1, WorkerThread f2, WorkerThread f3) {
         mem::Manager mem_manager(nullptr, "MultiplexerTest");
+        net::DispatcherThread disp(group->ConstructDispatcher(), 0);
         data::BlockPool block_pool;
-        data::Multiplexer multiplexer(mem_manager, block_pool, 1, *group);
+        data::Multiplexer multiplexer(mem_manager, block_pool, disp, *group, 1);
         switch (group->my_host_rank()) {
         case 0:
             common::NameThisThread("t0");
@@ -142,6 +146,8 @@ struct Multiplexer : public ::testing::Test {
             if (f3) f3(multiplexer);
             break;
         }
+        // stop DispatcherThread before Multiplexer
+        disp.Terminate();
     }
 
     static void Execute(WorkerThread f1 = nullptr,
@@ -166,7 +172,7 @@ struct Multiplexer : public ::testing::Test {
 // open a Stream via data::Multiplexer, and send a short message to all workers,
 // receive and check the message.
 void TalkAllToAllViaCatStream(net::Group* net) {
-    common::NameThisThread("chmp" + mem::to_string(net->my_host_rank()));
+    common::NameThisThread("chmp" + std::to_string(net->my_host_rank()));
 
     unsigned char send_buffer[123];
     for (size_t i = 0; i != sizeof(send_buffer); ++i)
@@ -181,8 +187,9 @@ void TalkAllToAllViaCatStream(net::Group* net) {
 
     mem::Manager mem_manager(nullptr, "Benchmark");
     data::BlockPool block_pool(num_workers_per_host);
+    net::DispatcherThread disp(net->ConstructDispatcher(), 0);
     data::Multiplexer multiplexer(
-        mem_manager, block_pool, num_workers_per_host, *net);
+        mem_manager, block_pool, disp, *net, num_workers_per_host);
 
     auto thread_func =
         [&](size_t my_local_worker_id) {
@@ -259,6 +266,8 @@ void TalkAllToAllViaCatStream(net::Group* net) {
             /*----------------------------------------------------------------*/
             // check Stream statistics
 
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
             ASSERT_EQ(2 * total_workers, stream->tx_items());
             ASSERT_EQ(2 * total_workers, stream->rx_items());
 
@@ -279,6 +288,9 @@ void TalkAllToAllViaCatStream(net::Group* net) {
     std::thread t0 = std::thread(thread_func, 0);
     std::thread t1 = std::thread(thread_func, 1);
     t0.join(), t1.join();
+
+    // stop DispatcherThread before Multiplexer
+    disp.Terminate();
 }
 
 TEST_F(Multiplexer, TalkAllToAllViaCatStreamForManyNetSizes) {
@@ -505,7 +517,7 @@ TEST_F(Multiplexer, ReadCompleteMixStreamManyTimes) {
 // open a Stream via data::Multiplexer, and send a short message to all workers,
 // receive and check the message.
 void TalkAllToAllViaMixStream(net::Group* net) {
-    common::NameThisThread("chmp" + mem::to_string(net->my_host_rank()));
+    common::NameThisThread("chmp" + std::to_string(net->my_host_rank()));
 
     char send_buffer[123];
     for (size_t i = 0; i != sizeof(send_buffer); ++i)
@@ -522,8 +534,9 @@ void TalkAllToAllViaMixStream(net::Group* net) {
 
     mem::Manager mem_manager(nullptr, "Benchmark");
     data::BlockPool block_pool(num_workers_per_host);
+    net::DispatcherThread disp(net->ConstructDispatcher(), 0);
     data::Multiplexer multiplexer(
-        mem_manager, block_pool, num_workers_per_host, *net);
+        mem_manager, block_pool, disp, *net, num_workers_per_host);
 
     auto thread_func =
         [&](size_t my_local_worker_id) {
@@ -611,6 +624,9 @@ void TalkAllToAllViaMixStream(net::Group* net) {
     std::thread t0 = std::thread(thread_func, 0);
     std::thread t1 = std::thread(thread_func, 1);
     t0.join(), t1.join();
+
+    // stop DispatcherThread before Multiplexer
+    disp.Terminate();
 }
 
 TEST_F(Multiplexer, TalkAllToAllViaMixStreamForManyNetSizes) {

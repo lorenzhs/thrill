@@ -3,7 +3,7 @@
  *
  * Part of Project Thrill - http://project-thrill.org
  *
- * Copyright (C) 2016 Timo Bingmann <tb@panthema.net>
+ * Copyright (C) 2016-2017 Timo Bingmann <tb@panthema.net>
  * Copyright (C) 2016 Florian Kurpicz <florian.kurpicz@tu-dortmund.de>
  *
  * All rights reserved. Published under the BSD-2 license in the LICENSE file.
@@ -99,14 +99,14 @@ public:
             }
 
             // share prng in Generate (just random numbers anyway)
-            std::default_random_engine prng(
-                std::random_device { } () + ctx.my_rank());
+            std::mt19937 prng(
+                std::random_device { } () + 4096 * ctx.my_rank());
 
             DIA<uint8_t> input_dia =
                 Generate(
                     ctx, sizelimit_,
-                    [&prng](size_t index) {
-                        return static_cast<uint8_t>(prng() + index);
+                    [&prng](size_t /* index */) {
+                        return static_cast<uint8_t>(prng());
                     })
                 // the random input _must_ be cached, otherwise it will be
                 // regenerated ... and contain new numbers.
@@ -120,14 +120,15 @@ public:
             }
 
             // share prng in Generate (just random digits anyway)
-            std::default_random_engine prng(
-                std::random_device { } () + ctx.my_rank());
+            std::mt19937 prng(
+                std::random_device { } () + 4096 * ctx.my_rank());
 
             DIA<uint8_t> input_dia =
                 Generate(
                     ctx, sizelimit_,
-                    [&prng](size_t index) {
-                        return static_cast<uint8_t>('0' + (prng() + index) % 10);
+                    [&prng](size_t /* index */) {
+                        return static_cast<uint8_t>(
+                            '0' + ((prng() >> 6) % 10));
                     })
                 // the random input _must_ be cached, otherwise it will be
                 // regenerated ... and contain new numbers.
@@ -141,14 +142,15 @@ public:
             }
 
             // share prng in Generate (just random digits anyway)
-            std::default_random_engine prng(
-                std::random_device { } () + ctx.my_rank());
+            std::mt19937 prng(
+                std::random_device { } () + 4096 * ctx.my_rank());
 
             DIA<uint8_t> input_dia =
                 Generate(
                     ctx, sizelimit_,
-                    [&prng](size_t index) {
-                        return static_cast<uint8_t>('0' + (prng() + index) % 2);
+                    [&prng](size_t /* index */) {
+                        return static_cast<uint8_t>(
+                            '0' + ((prng() >> 6) % 2));
                     })
                 // the random input _must_ be cached, otherwise it will be
                 // regenerated ... and contain new numbers.
@@ -171,11 +173,15 @@ public:
 
         if (sa_index_bytes_ == 4)
             return StartInput<uint32_t>(input_dia, input_size);
-        // else if (sa_index_bytes_ == 5)
-        //     return StartInput<common::uint40>(input_dia, input_size);
+#if !THRILL_ON_TRAVIS
+        else if (sa_index_bytes_ == 5)
+            return StartInput<common::uint40>(input_dia, input_size);
+        else if (sa_index_bytes_ == 8)
+            return StartInput<uint64_t>(input_dia, input_size);
+#endif
         else
             die("Unsupported index byte size: " << sa_index_bytes_ <<
-                ". Byte size has to be 4,5,6 or 8");
+                ". Byte size has to be 4, 5, or 8");
     }
 
     template <typename Index, typename InputDIA>
@@ -187,43 +193,59 @@ public:
         common::StatsTimerStart timer;
 
         DIA<Index> suffix_array;
-        if (algorithm_ == "dc3") {
+        if (algorithm_ == "none") {
+            suffix_array = Generate(
+                input_dia.ctx(), 0, [](size_t index) { return Index(index); });
+        }
+        else if (algorithm_ == "dc3") {
             suffix_array = DC3<Index>(input_dia.Keep(), input_size, 256);
         }
         else if (algorithm_ == "dc7") {
             suffix_array = DC7<Index>(input_dia.Keep(), input_size, 256);
         }
-        else if (algorithm_ == "de") {
-            suffix_array = PrefixDoublingDementiev<Index>(input_dia.Keep(), input_size, pack_input_);
+        else if (algorithm_ == "pdw") {
+            suffix_array = PrefixDoublingWindow<Index>(
+                input_dia.Keep(), input_size, pack_input_);
+        }
+        else if (algorithm_ == "pds") {
+            suffix_array = PrefixDoublingSorting<Index>(
+                input_dia.Keep(), input_size, pack_input_);
         }
         else if (algorithm_ == "dis") {
-            suffix_array = PrefixDoublingDiscardingDementiev<Index>(input_dia.Keep(), input_size, pack_input_);
+            suffix_array = PrefixDoublingDiscarding<Index>(
+                input_dia.Keep(), input_size, pack_input_);
         }
         else if (algorithm_ == "q") {
-            suffix_array = PrefixQuadrupling<Index>(input_dia.Keep(), input_size, pack_input_);
+            suffix_array = PrefixQuadrupling<Index>(
+                input_dia.Keep(), input_size, pack_input_);
         }
         else if (algorithm_ == "qd") {
-            suffix_array = PrefixQuadruplingDiscarding<Index>(input_dia.Keep(), input_size, pack_input_);
+            suffix_array = PrefixQuadruplingDiscarding<Index>(
+                input_dia.Keep(), input_size, pack_input_);
         }
         else {
-            suffix_array = PrefixDoubling<Index>(input_dia.Keep(), input_size, pack_input_);
+            die("Unknown algorithm \"" << algorithm_ << "\"");
         }
 
         suffix_array.Execute();
         timer.Stop();
 
-        if (input_dia.context().my_rank() == 0) {
-            std::cerr << "RESULT"
-                      << " algo=" << algorithm_
-                      << " time=" << timer
-                      << (getenv("RESULT") ? getenv("RESULT") : "")
-                      << std::endl;
-        }
-
+        bool check_result = false;
         if (check_flag_) {
             if (input_dia.context().my_rank() == 0)
                 LOG1 << "checking suffix array...";
             die_unless(CheckSA(input_dia.Keep(), suffix_array.Keep()));
+            check_result = true;
+        }
+
+        if (input_dia.context().my_rank() == 0) {
+            std::cerr << "RESULT"
+                      << " algo=" << algorithm_
+                      << " hosts=" << input_dia.context().num_hosts()
+                      << " check_result=" << check_result
+                      << " time=" << timer
+                      << (getenv("RESULT") ? getenv("RESULT") : "")
+                      << std::endl;
         }
 
         if (text_output_flag_) {
@@ -287,13 +309,14 @@ int main(int argc, char* argv[]) {
     cp.add_string('a', "algorithm", ss.algorithm_,
                   "The algorithm which is used to construct the suffix array. "
                   "Available are: "
-                  "[fl]ick (default), [de]mentiev, dementiev with [dis]carding, "
+                  "[pdw]indow (default), [pds]orting, "
+                  "prefix doubling with [dis]carding, "
                   "[q]uadrupling, [qd] quadrupling with carding, "
-                  "[dc3], and [dc7]");
+                  "[dc3], and [dc7], or [none] for skipping.");
 
     cp.add_size_t('b', "bytes", ss.sa_index_bytes_,
                   "Suffix array bytes per index: "
-                  "4 (32-bit) (default), 5 (40-bit), 6 (48-bit), 8 (64-bit)");
+                  "4 (32-bit) (default), 5 (40-bit), 8 (64-bit)");
 
     cp.add_string('B', "bwt", ss.output_bwt_,
                   "Compute the Burrows–Wheeler transform in addition to the "

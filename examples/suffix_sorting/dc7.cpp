@@ -62,7 +62,7 @@ struct Chars {
                           b.ch[4], b.ch[5], b.ch[6]);
     }
 
-    friend std::ostream& operator << (std::ostream& os, const Chars& chars) {
+    friend std ::ostream& operator << (std::ostream& os, const Chars& chars) {
         return os << '[' << chars.ch[0] << ',' << chars.ch[1]
                   << ',' << chars.ch[2] << ',' << chars.ch[3]
                   << ',' << chars.ch[4] << ',' << chars.ch[5]
@@ -92,7 +92,7 @@ struct IndexChars {
 
     const AlphabetType& at_radix(size_t depth) const { return chars.ch[depth]; }
 
-    friend std::ostream& operator << (std::ostream& os, const IndexChars& tc) {
+    friend std ::ostream& operator << (std::ostream& os, const IndexChars& tc) {
         return os << '[' << tc.index << '|' << tc.chars << ']';
     }
 } TLX_ATTRIBUTE_PACKED;
@@ -103,7 +103,7 @@ struct IndexRank {
     Index index;
     Index rank;
 
-    friend std::ostream& operator << (std::ostream& os, const IndexRank& tr) {
+    friend std ::ostream& operator << (std::ostream& os, const IndexRank& tr) {
         return os << '(' << tr.index << '|' << tr.rank << ')';
     }
 } TLX_ATTRIBUTE_PACKED;
@@ -112,15 +112,11 @@ struct IndexRank {
 template <typename Index, typename AlphabetType>
 struct StringFragmentMod0 {
     Index        index;
-    AlphabetType t[3];
     Index        r0, r1, r3;
+    AlphabetType t[3];
 
-    AlphabetType at_radix(size_t depth) const { return t[depth]; }
-    Index        sort_rank() const { return r0; }
-    const Index  * ranks() const { return &r0; }
-
-    friend std::ostream& operator << (std::ostream& os,
-                                      const StringFragmentMod0& sf) {
+    friend std ::ostream& operator << (std::ostream& os,
+                                       const StringFragmentMod0& sf) {
         return os << "i=" << sf.index
                   << " t0=" << sf.t[0] << " t1=" << sf.t[1] << " t2=" << sf.t[2]
                   << " r0=" << sf.r0 << " r1=" << sf.r1 << " r3=" << sf.r3;
@@ -131,15 +127,11 @@ struct StringFragmentMod0 {
 template <typename Index, typename AlphabetType>
 struct StringFragmentMod1 {
     Index        index;
-    AlphabetType t[6];
     Index        r0, r2, r6;
+    AlphabetType t[6];
 
-    AlphabetType at_radix(size_t depth) const { return t[depth]; }
-    Index        sort_rank() const { return r0; }
-    const Index  * ranks() const { return &r0; }
-
-    friend std::ostream& operator << (std::ostream& os,
-                                      const StringFragmentMod1& sf) {
+    friend std ::ostream& operator << (std::ostream& os,
+                                       const StringFragmentMod1& sf) {
         return os << "i=" << sf.index
                   << " t0=" << sf.t[0] << " t1=" << sf.t[1] << " t2=" << sf.t[2]
                   << " t3=" << sf.t[3] << " t4=" << sf.t[4] << " t5=" << sf.t[5]
@@ -151,15 +143,11 @@ struct StringFragmentMod1 {
 template <typename Index, typename AlphabetType>
 struct StringFragmentMod2 {
     Index        index;
-    AlphabetType t[6];
     Index        r1, r5, r6;
+    AlphabetType t[6];
 
-    AlphabetType at_radix(size_t depth) const { return t[depth]; }
-    Index        sort_rank() const { return r1; }
-    const Index  * ranks() const { return &r1; }
-
-    friend std::ostream& operator << (std::ostream& os,
-                                      const StringFragmentMod2& sf) {
+    friend std ::ostream& operator << (std::ostream& os,
+                                       const StringFragmentMod2& sf) {
         return os << "i=" << sf.index
                   << " t0=" << sf.t[0] << " t1=" << sf.t[1] << " t2=" << sf.t[2]
                   << " t3=" << sf.t[3] << " t4=" << sf.t[4] << " t5=" << sf.t[5]
@@ -170,17 +158,12 @@ struct StringFragmentMod2 {
 //! fragments at string positions i = 3 mod 7.
 template <typename Index, typename AlphabetType>
 struct StringFragmentMod3 {
-
     Index        index;
-    AlphabetType t[5];
     Index        r0, r4, r5;
+    AlphabetType t[5];
 
-    AlphabetType at_radix(size_t depth) const { return t[depth]; }
-    Index        sort_rank() const { return r0; }
-    const Index  * ranks() const { return &r0; }
-
-    friend std::ostream& operator << (std::ostream& os,
-                                      const StringFragmentMod3& sf) {
+    friend std ::ostream& operator << (std::ostream& os,
+                                       const StringFragmentMod3& sf) {
         return os << "i=" << sf.index
                   << " t0=" << sf.t[0] << " t1=" << sf.t[1] << " t2=" << sf.t[2]
                   << " t3=" << sf.t[3] << " t4=" << sf.t[4]
@@ -192,15 +175,11 @@ struct StringFragmentMod3 {
 template <typename Index, typename AlphabetType>
 struct StringFragmentMod4 {
     Index        index;
-    AlphabetType t[6];
     Index        r3, r4, r6;
+    AlphabetType t[6];
 
-    AlphabetType at_radix(size_t depth) const { return t[depth]; }
-    Index        sort_rank() const { return r3; }
-    const Index  * ranks() const { return &r3; }
-
-    friend std::ostream& operator << (std::ostream& os,
-                                      const StringFragmentMod4& sf) {
+    friend std ::ostream& operator << (std::ostream& os,
+                                       const StringFragmentMod4& sf) {
         return os << "i=" << sf.index
                   << " t0=" << sf.t[0] << " t1=" << sf.t[1] << " t2=" << sf.t[2]
                   << " t3=" << sf.t[3] << " t4=" << sf.t[4] << " t5=" << sf.t[5]
@@ -212,15 +191,11 @@ struct StringFragmentMod4 {
 template <typename Index, typename AlphabetType>
 struct StringFragmentMod5 {
     Index        index;
-    AlphabetType t[5];
     Index        r2, r3, r5;
+    AlphabetType t[5];
 
-    AlphabetType at_radix(size_t depth) const { return t[depth]; }
-    Index        sort_rank() const { return r2; }
-    const Index  * ranks() const { return &r2; }
-
-    friend std::ostream& operator << (std::ostream& os,
-                                      const StringFragmentMod5& sf) {
+    friend std ::ostream& operator << (std::ostream& os,
+                                       const StringFragmentMod5& sf) {
         return os << "i=" << sf.index
                   << " t0=" << sf.t[0] << " t1=" << sf.t[1] << " t2=" << sf.t[2]
                   << " t3=" << sf.t[3] << " t4=" << sf.t[4]
@@ -232,15 +207,11 @@ struct StringFragmentMod5 {
 template <typename Index, typename AlphabetType>
 struct StringFragmentMod6 {
     Index        index;
-    AlphabetType t[4];
     Index        r1, r2, r4;
+    AlphabetType t[4];
 
-    AlphabetType at_radix(size_t depth) const { return t[depth]; }
-    Index        sort_rank() const { return r1; }
-    const Index  * ranks() const { return &r1; }
-
-    friend std::ostream& operator << (std::ostream& os,
-                                      const StringFragmentMod6& sf) {
+    friend std ::ostream& operator << (std::ostream& os,
+                                       const StringFragmentMod6& sf) {
         return os << "i=" << sf.index
                   << " t0=" << sf.t[0] << " t1=" << sf.t[1] << " t2=" << sf.t[2]
                   << " t3=" << sf.t[3]
@@ -254,7 +225,8 @@ struct StringFragment {
 
     struct Common {
         Index        index;
-        AlphabetType t[6];
+        Index        ranks[3];
+        AlphabetType text[6];
     } TLX_ATTRIBUTE_PACKED;
 
     union {
@@ -299,8 +271,8 @@ struct StringFragment {
     explicit StringFragment(
         const StringFragmentMod6<Index, AlphabetType>& _mod6) : mod6(_mod6) { }
 
-    friend std::ostream& operator << (std::ostream& os,
-                                      const StringFragment& tc) {
+    friend std ::ostream& operator << (std::ostream& os,
+                                       const StringFragment& tc) {
         os << '[' << std::to_string(tc.index) << '|';
         if (tc.index % 7 == 0)
             return os << "0|" << tc.mod0 << ']';
@@ -319,22 +291,8 @@ struct StringFragment {
         abort();
     }
 
-    const Index * ranks(size_t imod7) const {
-        switch (imod7) {
-        case 0: return mod0.ranks();
-        case 1: return mod1.ranks();
-        case 2: return mod2.ranks();
-        case 3: return mod3.ranks();
-        case 4: return mod4.ranks();
-        case 5: return mod5.ranks();
-        case 6: return mod6.ranks();
-        }
-        abort();
-    }
-
-    const Index * ranks() const {
-        return ranks(index % 7);
-    }
+    AlphabetType at_radix(size_t depth) const { return common.text[depth]; }
+    Index        sort_rank() const { return common.ranks[0]; }
 } TLX_ATTRIBUTE_PACKED;
 
 static constexpr size_t fragment_comparator_params[7][7][3] =
@@ -380,11 +338,11 @@ struct FragmentComparator {
 
         for (size_t d = 0; d < params[0]; ++d)
         {
-            if (a.common.t[d] == b.common.t[d]) continue;
-            return (a.common.t[d] < b.common.t[d]);
+            if (a.common.text[d] == b.common.text[d]) continue;
+            return (a.common.text[d] < b.common.text[d]);
         }
 
-        return (a.ranks(ai)[params[1]] < b.ranks(bi)[params[2]]);
+        return a.common.ranks[params[1]] < b.common.ranks[params[2]];
     }
 };
 
@@ -395,8 +353,8 @@ struct CharsRanks013 {
     Index       rank1;
     Index       rank3;
 
-    friend std::ostream& operator << (std::ostream& os,
-                                      const CharsRanks013& c) {
+    friend std ::ostream& operator << (std::ostream& os,
+                                       const CharsRanks013& c) {
         return os << "(ch=" << c.chars
                   << " r0=" << c.rank0 << " r1=" << c.rank1
                   << " r3=" << c.rank3 << ")";
@@ -756,13 +714,13 @@ DC7Recursive(const InputDIA& input_dia, size_t input_size, size_t K) {
         .Map([](const IndexCR013Pair& ip) {
                  return StringFragmentMod0 {
                      ip.index,
+                     ip.cr0.rank0, ip.cr0.rank1, ip.cr0.rank3,
                      { ip.cr0.chars.ch[0], ip.cr0.chars.ch[1],
-                       ip.cr0.chars.ch[2] },
-                     ip.cr0.rank0, ip.cr0.rank1, ip.cr0.rank3
+                       ip.cr0.chars.ch[2] }
                  };
              })
         .Filter([input_size](const StringFragmentMod0& mod0) {
-                    return mod0.index < input_size;
+                    return mod0.index < Index(input_size);
                 });
 
     auto fragments_mod1 =
@@ -770,14 +728,14 @@ DC7Recursive(const InputDIA& input_dia, size_t input_size, size_t K) {
         .Map([](const IndexCR013Pair& ip) {
                  return StringFragmentMod1 {
                      ip.index + Index(1),
+                     ip.cr0.rank1, ip.cr0.rank3, ip.cr1.rank0,
                      { ip.cr0.chars.ch[1], ip.cr0.chars.ch[2],
                        ip.cr0.chars.ch[3], ip.cr0.chars.ch[4],
-                       ip.cr0.chars.ch[5], ip.cr0.chars.ch[6] },
-                     ip.cr0.rank1, ip.cr0.rank3, ip.cr1.rank0
+                       ip.cr0.chars.ch[5], ip.cr0.chars.ch[6] }
                  };
              })
         .Filter([input_size](const StringFragmentMod1& mod1) {
-                    return mod1.index < input_size;
+                    return mod1.index < Index(input_size);
                 });
 
     auto fragments_mod2 =
@@ -785,14 +743,14 @@ DC7Recursive(const InputDIA& input_dia, size_t input_size, size_t K) {
         .Map([](const IndexCR013Pair& ip) {
                  return StringFragmentMod2 {
                      ip.index + Index(2),
+                     ip.cr0.rank3, ip.cr1.rank0, ip.cr1.rank1,
                      { ip.cr0.chars.ch[2], ip.cr0.chars.ch[3],
                        ip.cr0.chars.ch[4], ip.cr0.chars.ch[5],
-                       ip.cr0.chars.ch[6], ip.cr1.chars.ch[0] },
-                     ip.cr0.rank3, ip.cr1.rank0, ip.cr1.rank1
+                       ip.cr0.chars.ch[6], ip.cr1.chars.ch[0] }
                  };
              })
         .Filter([input_size](const StringFragmentMod2& mod2) {
-                    return mod2.index < input_size;
+                    return mod2.index < Index(input_size);
                 });
 
     auto fragments_mod3 =
@@ -800,14 +758,14 @@ DC7Recursive(const InputDIA& input_dia, size_t input_size, size_t K) {
         .Map([](const IndexCR013Pair& ip) {
                  return StringFragmentMod3 {
                      ip.index + Index(3),
+                     ip.cr0.rank3, ip.cr1.rank0, ip.cr1.rank1,
                      { ip.cr0.chars.ch[3], ip.cr0.chars.ch[4],
                        ip.cr0.chars.ch[5], ip.cr0.chars.ch[6],
-                       ip.cr1.chars.ch[0] },
-                     ip.cr0.rank3, ip.cr1.rank0, ip.cr1.rank1
+                       ip.cr1.chars.ch[0] }
                  };
              })
         .Filter([input_size](const StringFragmentMod3& mod3) {
-                    return mod3.index < input_size;
+                    return mod3.index < Index(input_size);
                 });
 
     auto fragments_mod4 =
@@ -815,14 +773,14 @@ DC7Recursive(const InputDIA& input_dia, size_t input_size, size_t K) {
         .Map([](const IndexCR013Pair& ip) {
                  return StringFragmentMod4 {
                      ip.index + Index(4),
+                     ip.cr1.rank0, ip.cr1.rank1, ip.cr1.rank3,
                      { ip.cr0.chars.ch[4], ip.cr0.chars.ch[5],
                        ip.cr0.chars.ch[6], ip.cr1.chars.ch[0],
-                       ip.cr1.chars.ch[1], ip.cr1.chars.ch[2] },
-                     ip.cr1.rank0, ip.cr1.rank1, ip.cr1.rank3
+                       ip.cr1.chars.ch[1], ip.cr1.chars.ch[2] }
                  };
              })
         .Filter([input_size](const StringFragmentMod4& mod4) {
-                    return mod4.index < input_size;
+                    return mod4.index < Index(input_size);
                 });
 
     auto fragments_mod5 =
@@ -830,14 +788,14 @@ DC7Recursive(const InputDIA& input_dia, size_t input_size, size_t K) {
         .Map([](const IndexCR013Pair& ip) {
                  return StringFragmentMod5 {
                      ip.index + Index(5),
+                     ip.cr1.rank0, ip.cr1.rank1, ip.cr1.rank3,
                      { ip.cr0.chars.ch[5], ip.cr0.chars.ch[6],
                        ip.cr1.chars.ch[0], ip.cr1.chars.ch[1],
-                       ip.cr1.chars.ch[2] },
-                     ip.cr1.rank0, ip.cr1.rank1, ip.cr1.rank3
+                       ip.cr1.chars.ch[2] }
                  };
              })
         .Filter([input_size](const StringFragmentMod5& mod5) {
-                    return mod5.index < input_size;
+                    return mod5.index < Index(input_size);
                 });
 
     auto fragments_mod6 =
@@ -845,13 +803,13 @@ DC7Recursive(const InputDIA& input_dia, size_t input_size, size_t K) {
         .Map([](const IndexCR013Pair& ip) {
                  return StringFragmentMod6 {
                      ip.index + Index(6),
+                     ip.cr1.rank0, ip.cr1.rank1, ip.cr1.rank3,
                      { ip.cr0.chars.ch[6], ip.cr1.chars.ch[0],
-                       ip.cr1.chars.ch[1], ip.cr1.chars.ch[2] },
-                     ip.cr1.rank0, ip.cr1.rank1, ip.cr1.rank3
+                       ip.cr1.chars.ch[1], ip.cr1.chars.ch[2] }
                  };
              })
         .Filter([input_size](const StringFragmentMod6& mod6) {
-                    return mod6.index < input_size;
+                    return mod6.index < Index(input_size);
                 });
 
     if (debug_print) {
@@ -928,7 +886,7 @@ DC7Recursive(const InputDIA& input_dia, size_t input_size, size_t K) {
             for (const Index& index : vec) {
                 std::cout << std::setw(5) << p << std::setw(5) << index << " =";
                 for (Index i = index;
-                     i < index + Index(64) && i < input_size; ++i) {
+                     i < index + Index(64) && i < Index(input_size); ++i) {
                     std::cout << ' ' << uint64_t(input_vec[i]);
                 }
                 std::cout << '\n';
@@ -957,8 +915,15 @@ DIA<Index> DC7(const InputDIA& input_dia, size_t input_size, size_t K) {
 template DIA<uint32_t> DC7<uint32_t>(
     const DIA<uint8_t>& input_dia, size_t input_size, size_t K);
 
-// template DIA<common::uint40> DC7<common::uint40>(
-//     const DIA<uint8_t>& input_dia, size_t input_size, size_t K);
+#if !THRILL_ON_TRAVIS
+
+template DIA<common::uint40> DC7<common::uint40>(
+    const DIA<uint8_t>& input_dia, size_t input_size, size_t K);
+
+template DIA<uint64_t> DC7<uint64_t>(
+    const DIA<uint8_t>& input_dia, size_t input_size, size_t K);
+
+#endif
 
 } // namespace suffix_sorting
 } // namespace examples

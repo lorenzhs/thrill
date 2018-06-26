@@ -31,7 +31,7 @@ namespace data {
 class PinnedBlock;
 class PinRequest;
 using PinRequestPtr =
-          tlx::CountingPtr<PinRequest, mem::GPoolDeleter<PinRequest> >;
+    tlx::CountingPtr<PinRequest, mem::GPoolDeleter<PinRequest> >;
 
 /*!
  * Block combines a reference to a read-only \ref ByteBlock and book-keeping
@@ -108,7 +108,7 @@ public:
     //! Returns typecode_verify_
     bool typecode_verify() const { return typecode_verify_; }
 
-    friend std::ostream& operator << (std::ostream& os, const Block& b);
+    friend std ::ostream& operator << (std::ostream& os, const Block& b);
 
     //! Creates a pinned copy of this Block. If the underlying data::ByteBlock
     //! is already pinned, the Future is directly filled with a copy if this
@@ -312,7 +312,7 @@ public:
     PinnedBlock PinWait() const = delete;
 
     //! make ostreamable for debugging
-    friend std::ostream& operator << (std::ostream& os, const PinnedBlock& b);
+    friend std ::ostream& operator << (std::ostream& os, const PinnedBlock& b);
 
 private:
     //! protected construction from an unpinned block AFTER the pin was taken,
@@ -341,7 +341,7 @@ public:
 
 private:
     //! calls BlockPool::OnReadComplete used to tlx::delegate
-    void OnComplete(io::Request* req, bool success);
+    void OnComplete(foxxll::request* req, bool success);
 
     PinRequest(BlockPool* block_pool, PinnedBlock&& block, bool ready = true)
         : block_pool_(block_pool), block_(std::move(block)), ready_(ready) { }
@@ -352,7 +352,7 @@ private:
     //! partially initialized for the read!
     PinnedBlock block_;
     //! running read request
-    io::RequestPtr req_;
+    foxxll::request_ptr req_;
 
     //! indication that the PinnedBlocks ready
     std::atomic<bool> ready_;

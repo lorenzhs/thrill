@@ -172,11 +172,11 @@ void by_delete(T* value) {
 
 //! string without malloc tracking
 using by_string = std::basic_string<
-          char, std::char_traits<char>, BypassAllocator<char> >;
+    char, std::char_traits<char>, BypassAllocator<char> >;
 
 //! stringbuf without malloc tracking
 using by_stringbuf = std::basic_stringbuf<
-          char, std::char_traits<char>, BypassAllocator<char> >;
+    char, std::char_traits<char>, BypassAllocator<char> >;
 
 //! vector without malloc tracking
 template <typename T>
@@ -206,12 +206,15 @@ static inline by_string to_string(unsigned long val) {
     return common::str_snprintf<by_string>(4 * sizeof(long), "%lu", val);
 }
 
-#if defined(_MSC_VER)
 //! convert to string
-static inline by_string to_string(size_t val) {
-    return common::str_snprintf<by_string>(4 * sizeof(long), "%zu", val);
+static inline by_string to_string(long long val) {
+    return common::str_snprintf<by_string>(4 * sizeof(long long), "%lld", val);
 }
-#endif
+
+//! convert to string
+static inline by_string to_string(unsigned long long val) {
+    return common::str_snprintf<by_string>(4 * sizeof(long long), "%llu", val);
+}
 
 } // namespace mem
 } // namespace thrill

@@ -12,7 +12,7 @@
 #ifndef THRILL_CORE_MULTIWAY_MERGE_HEADER
 #define THRILL_CORE_MULTIWAY_MERGE_HEADER
 
-#include <tlx/loser_tree.hpp>
+#include <tlx/container/loser_tree.hpp>
 
 #include <algorithm>
 #include <functional>
@@ -29,7 +29,7 @@ public:
     using Reader = typename std::iterator_traits<ReaderIterator>::value_type;
 
     using LoserTreeType = tlx::LoserTree<
-              /* stable */ false, ValueType, Comparator>;
+        /* stable */ false, ValueType, Comparator>;
 
     MultiwayMergeTree(ReaderIterator readers_begin, ReaderIterator readers_end,
                       const Comparator& comp)

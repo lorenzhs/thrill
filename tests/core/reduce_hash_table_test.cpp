@@ -86,9 +86,9 @@ void TestAddMyStructModulo(Context& ctx) {
     Manipulator manipulator;
 
     using Table = HashTable<
-              MyStruct, size_t, MyStruct,
-              decltype(key_ex), decltype(red_fn), Collector,
-              Manipulator, /* VolatileKey */ false, MyReduceConfig>;
+        MyStruct, size_t, MyStruct,
+        decltype(key_ex), decltype(red_fn), Collector,
+        Manipulator, /* VolatileKey */ false, MyReduceConfig>;
 
     Table table(ctx, 0, key_ex, red_fn, collector, manipulator,
                 /* num_partitions */ 13,

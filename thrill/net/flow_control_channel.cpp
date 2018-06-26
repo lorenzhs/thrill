@@ -49,16 +49,26 @@ FlowControlChannel::~FlowControlChannel() {
 
 void FlowControlChannel::Barrier() {
     RunTimer run_timer(timer_barrier_);
-    if (enable_stats) ++count_barrier_;
+    if (enable_stats || debug) ++count_barrier_;
+
+    LOG << "FCC::Barrier() ENTER count=" << count_barrier_;
 
     barrier_.Await(
         [&]() {
             RunTimer net_timer(timer_communication_);
 
+            LOG << "FCC::Barrier() COMMUNICATE BEGIN"
+                << " count=" << count_barrier_;
+
             // Global all reduce
             size_t i = 0;
             group_.AllReduce(i);
+
+            LOG << "FCC::Barrier() COMMUNICATE END"
+                << " count=" << count_barrier_;
         });
+
+    LOG << "FCC::Barrier() EXIT count=" << count_barrier_;
 }
 
 void FlowControlChannel::LocalBarrier() {
@@ -68,31 +78,37 @@ void FlowControlChannel::LocalBarrier() {
 /******************************************************************************/
 // template instantiations
 
-template size_t FlowControlChannel::PrefixSum(
-    const size_t&, const size_t&, const std::plus<size_t>&, bool);
+template size_t FlowControlChannel::PrefixSumBase(
+    const size_t&, const std::plus<size_t>&, const size_t&, bool);
 
-template std::array<size_t, 2> FlowControlChannel::PrefixSum(
-    const std::array<size_t, 2>&, const std::array<size_t, 2>&,
-    const common::ComponentSum<std::array<size_t, 2> >&, bool);
-template std::array<size_t, 3> FlowControlChannel::PrefixSum(
-    const std::array<size_t, 3>&, const std::array<size_t, 3>&,
-    const common::ComponentSum<std::array<size_t, 3> >&, bool);
-template std::array<size_t, 4> FlowControlChannel::PrefixSum(
-    const std::array<size_t, 4>&, const std::array<size_t, 4>&,
-    const common::ComponentSum<std::array<size_t, 4> >&, bool);
+template std::array<size_t, 2> FlowControlChannel::PrefixSumBase(
+    const std::array<size_t, 2>&,
+    const common::ComponentSum<std::array<size_t, 2> >&,
+    const std::array<size_t, 2>&, bool);
+template std::array<size_t, 3> FlowControlChannel::PrefixSumBase(
+    const std::array<size_t, 3>&,
+    const common::ComponentSum<std::array<size_t, 3> >&,
+    const std::array<size_t, 3>&, bool);
+template std::array<size_t, 4> FlowControlChannel::PrefixSumBase(
+    const std::array<size_t, 4>&,
+    const common::ComponentSum<std::array<size_t, 4> >&,
+    const std::array<size_t, 4>&, bool);
 
 template size_t FlowControlChannel::ExPrefixSumTotal(
-    size_t&, const size_t&, const std::plus<size_t>&);
+    size_t&, const std::plus<size_t>&, const size_t&);
 
 template std::array<size_t, 2> FlowControlChannel::ExPrefixSumTotal(
-    std::array<size_t, 2>&, const std::array<size_t, 2>&,
-    const common::ComponentSum<std::array<size_t, 2> >&);
+    std::array<size_t, 2>&,
+    const common::ComponentSum<std::array<size_t, 2> >&,
+    const std::array<size_t, 2>&);
 template std::array<size_t, 3> FlowControlChannel::ExPrefixSumTotal(
-    std::array<size_t, 3>&, const std::array<size_t, 3>&,
-    const common::ComponentSum<std::array<size_t, 3> >&);
+    std::array<size_t, 3>&,
+    const common::ComponentSum<std::array<size_t, 3> >&,
+    const std::array<size_t, 3>&);
 template std::array<size_t, 4> FlowControlChannel::ExPrefixSumTotal(
-    std::array<size_t, 4>&, const std::array<size_t, 4>&,
-    const common::ComponentSum<std::array<size_t, 4> >&);
+    std::array<size_t, 4>&,
+    const common::ComponentSum<std::array<size_t, 4> >&,
+    const std::array<size_t, 4>&);
 
 template size_t FlowControlChannel::Broadcast(const size_t&, size_t);
 

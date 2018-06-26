@@ -4,6 +4,7 @@
  * Part of Project Thrill - http://project-thrill.org
  *
  * Copyright (C) 2016 Timo Bingmann <tb@panthema.net>
+ * Copyright (C) 2017 Tim Zeitz <dev.tim.zeitz@gmail.com>
  *
  * All rights reserved. Published under the BSD-2 license in the LICENSE file.
  ******************************************************************************/
@@ -26,7 +27,7 @@ struct MyStruct {
 
     bool operator < (const MyStruct& b) const { return key < b.key; }
 
-    friend std::ostream& operator << (std::ostream& os, const MyStruct& c) {
+    friend std ::ostream& operator << (std::ostream& os, const MyStruct& c) {
         return os << '(' << c.key << ',' << c.value << ')';
     }
 };
@@ -60,10 +61,10 @@ static void TestAddMyStructByHash(Context& ctx) {
     checkers::ReduceManipulatorDummy manipulator;
 
     using Phase = core::ReduceByHashPostPhase<
-              MyStruct, size_t, MyStruct,
-              decltype(key_ex), decltype(red_fn), decltype(emit_fn),
-              decltype(manipulator), /* VolatileKey */ false,
-              core::DefaultReduceConfigSelect<table_impl> >;
+        MyStruct, size_t, MyStruct,
+        decltype(key_ex), decltype(red_fn), decltype(emit_fn),
+        decltype(manipulator), /* VolatileKey */ false,
+        core::DefaultReduceConfigSelect<table_impl> >;
 
     Phase phase(ctx, 0, key_ex, red_fn, emit_fn, manipulator);
     phase.Initialize(/* limit_memory_bytes */ 64 * 1024);
@@ -172,9 +173,9 @@ static void TestAddMyStructByIndex(Context& ctx) {
                    };
 
     using Phase = core::ReduceByIndexPostPhase<
-              MyStruct, size_t, MyStruct,
-              decltype(key_ex), decltype(red_fn), decltype(emit_fn),
-              false, core::DefaultReduceConfigSelect<table_impl> >;
+        MyStruct, size_t, MyStruct,
+        decltype(key_ex), decltype(red_fn), decltype(emit_fn), false,
+        core::DefaultReduceConfigSelect<table_impl> >;
 
     Phase phase(ctx, 0, key_ex, red_fn, emit_fn,
                 typename Phase::ReduceConfig(),
@@ -252,9 +253,9 @@ static void TestAddMyStructByIndexWithHoles(Context& ctx) {
                    };
 
     using Phase = core::ReduceByIndexPostPhase<
-              MyStruct, size_t, MyStruct,
-              decltype(key_ex), decltype(red_fn), decltype(emit_fn),
-              false, core::DefaultReduceConfigSelect<table_impl> >;
+        MyStruct, size_t, MyStruct,
+        decltype(key_ex), decltype(red_fn), decltype(emit_fn), false,
+        core::DefaultReduceConfigSelect<table_impl> >;
 
     Phase phase(ctx, 0, key_ex, red_fn, emit_fn,
                 typename Phase::ReduceConfig(),

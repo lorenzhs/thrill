@@ -53,7 +53,7 @@ private:
     using Key = typename common::FunctionTraits<KeyExtractor>::result_type;
     using ValueOut = ValueType;
     using ValueIn =
-              typename common::FunctionTraits<KeyExtractor>::template arg_plain<0>;
+        typename common::FunctionTraits<KeyExtractor>::template arg_plain<0>;
 
     struct ValueComparator {
     public:
@@ -138,7 +138,7 @@ public:
     }
 
     void StartPreOp(size_t /* id */) final {
-        emitter_ = stream_->GetWriters();
+        emitters_ = stream_->GetWriters();
         pre_writer_ = pre_file_.GetWriter();
         if (UseLocationDetection)
             location_detection_.Initialize(DIABase::mem_limit_);
@@ -152,8 +152,8 @@ public:
             location_detection_.Insert(HashCount { hash, 1 });
         }
         else {
-            const size_t recipient = hash % emitter_.size();
-            emitter_[recipient].Put(v);
+            const size_t recipient = hash % emitters_.size();
+            emitters_[recipient].Put(v);
         }
     }
 
@@ -191,12 +191,11 @@ public:
 
                 size_t hr = hash_function_(key) % max_hash;
                 auto target_processor = target_processors.find(hr);
-                emitter_[target_processor->second].Put(in);
+                emitters_[target_processor->second].Put(in);
             }
         }
         // data has been pushed during pre-op -> close emitters
-        for (size_t i = 0; i < emitter_.size(); i++)
-            emitter_[i].Close();
+        emitters_.Close();
 
         MainOp();
     }
@@ -217,10 +216,10 @@ public:
             size_t merge_degree, prefetch;
 
             // merge batches of files if necessary
-            while (files_.size() > MaxMergeDegreePrefetch().first)
+            while (std::tie(merge_degree, prefetch) =
+                       context_.block_pool().MaxMergeDegreePrefetch(files_.size()),
+                   files_.size() > merge_degree)
             {
-                std::tie(merge_degree, prefetch) = MaxMergeDegreePrefetch();
-
                 sLOG1 << "Partial multi-way-merge of"
                       << merge_degree << "files with prefetch" << prefetch;
 
@@ -228,8 +227,10 @@ public:
                 std::vector<data::File::ConsumeReader> seq;
                 seq.reserve(merge_degree);
 
-                for (size_t t = 0; t < merge_degree; ++t)
-                    seq.emplace_back(files_[t].GetConsumeReader(0));
+                for (size_t t = 0; t < merge_degree; ++t) {
+                    seq.emplace_back(
+                        files_[t].GetConsumeReader(/* prefetch */ 0));
+                }
 
                 StartPrefetch(seq, prefetch);
 
@@ -255,8 +256,12 @@ public:
             std::vector<data::File::Reader> seq;
             seq.reserve(num_runs);
 
-            for (size_t t = 0; t < num_runs; ++t)
-                seq.emplace_back(files_[t].GetReader(consume));
+            for (size_t t = 0; t < num_runs; ++t) {
+                seq.emplace_back(
+                    files_[t].GetReader(consume, /* prefetch */ 0));
+            }
+
+            StartPrefetch(seq, prefetch);
 
             LOG << "start multiwaymerge for real";
             auto puller = core::make_multiway_merge_tree<ValueIn>(
@@ -281,7 +286,7 @@ public:
         timer.Stop();
         LOG << "RESULT"
             << " name=multiwaymerge"
-            << " time=" << timer.Milliseconds()
+            << " time=" << timer
             << " multiwaymerge=" << (num_runs > 1);
     }
 
@@ -295,7 +300,8 @@ private:
     core::LocationDetection<HashCount> location_detection_;
 
     data::CatStreamPtr stream_ { context_.GetNewCatStream(this) };
-    std::vector<data::Stream::Writer> emitter_;
+    data::CatStream::Writers emitters_;
+
     std::deque<data::File> files_;
     data::File sorted_elems_ { context_.GetFile(this) };
     size_t totalsize_ = 0;
@@ -367,24 +373,6 @@ private:
             << " time=" << timer
             << " number_files=" << files_.size();
     }
-
-    //! calculate maximum merging degree from available memory and the number of
-    //! files. additionally calculate the prefetch size of each File.
-    std::pair<size_t, size_t> MaxMergeDegreePrefetch() {
-        size_t avail_blocks = DIABase::mem_limit_ / data::default_block_size;
-        if (files_.size() >= avail_blocks) {
-            // more files than blocks available -> partial merge of avail_blocks
-            // Files with prefetch = 0, which is one read Block per File.
-            return std::make_pair(avail_blocks, 0u);
-        }
-        else {
-            // less files than available Blocks -> split blocks equally among
-            // Files.
-            return std::make_pair(
-                files_.size(),
-                std::min<size_t>(16u, (avail_blocks / files_.size()) - 1));
-        }
-    }
 };
 
 /******************************************************************************/
@@ -406,8 +394,8 @@ auto DIA<ValueType, Stack>::GroupByKey(
         "KeyExtractor has the wrong input type");
 
     using GroupByNode = api::GroupByNode<
-              ValueOut, KeyExtractor, GroupFunction, HashFunction,
-              LocationDetectionValue>;
+        ValueOut, KeyExtractor, GroupFunction, HashFunction,
+        LocationDetectionValue>;
 
     auto node = tlx::make_counting<GroupByNode>(
         *this, key_extractor, groupby_function, hash_function);

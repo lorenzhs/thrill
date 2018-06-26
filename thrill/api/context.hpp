@@ -31,6 +31,7 @@
 #include <cassert>
 #include <functional>
 #include <numeric>
+#include <random>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -89,8 +90,12 @@ public:
 #ifndef SWIG
     //! constructor from existing net Groups. Used by the construction methods.
     HostContext(size_t local_host_id, const MemoryConfig& mem_config,
+                std::unique_ptr<net::DispatcherThread> dispatcher,
                 std::array<net::GroupPtr, net::Manager::kGroupCount>&& groups,
                 size_t workers_per_host);
+
+    //! destructor
+    ~HostContext();
 
     //! Construct a number of mock hosts running in this process.
     static std::vector<std::unique_ptr<HostContext> >
@@ -164,6 +169,9 @@ private:
     //! host-global memory manager for internal memory only
     mem::Manager mem_manager_ { nullptr, "HostContext" };
 
+    //! main host network dispatcher thread backend
+    std::unique_ptr<net::DispatcherThread> dispatcher_;
+
     //! net manager constructs communication groups to other hosts.
     net::Manager net_manager_;
 
@@ -194,8 +202,8 @@ private:
 
     //! data multiplexer transmits large amounts of data asynchronously.
     data::Multiplexer data_multiplexer_ {
-        mem_manager_, block_pool_, workers_per_host_,
-        net_manager_.GetDataGroup()
+        mem_manager_, block_pool_,
+        *dispatcher_, net_manager_.GetDataGroup(), workers_per_host_
     };
 };
 
@@ -210,20 +218,7 @@ private:
 class Context
 {
 public:
-    Context(HostContext& host_context, size_t local_worker_id)
-        : local_host_id_(host_context.local_host_id()),
-          local_worker_id_(local_worker_id),
-          workers_per_host_(host_context.workers_per_host()),
-          mem_limit_(host_context.worker_mem_limit()),
-          mem_config_(host_context.mem_config()),
-          mem_manager_(host_context.mem_manager()),
-          net_manager_(host_context.net_manager()),
-          flow_manager_(host_context.flow_manager()),
-          block_pool_(host_context.block_pool()),
-          multiplexer_(host_context.data_multiplexer()),
-          base_logger_(&host_context.base_logger_) {
-        assert(local_worker_id < workers_per_host());
-    }
+    Context(HostContext& host_context, size_t local_worker_id);
 
     //! method used to launch a job's main procedure. it wraps it in log output.
     void Launch(const std::function<void(Context&)>& job_startpoint);
@@ -271,7 +266,7 @@ public:
 
 #ifndef SWIG
     //! Outputs the context as [host id]:[local worker id] to an std::ostream
-    friend std::ostream& operator << (std::ostream& os, const Context& ctx) {
+    friend std ::ostream& operator << (std::ostream& os, const Context& ctx) {
         return os << ctx.host_rank() << ":" << ctx.local_worker_id();
     }
 #endif
@@ -428,6 +423,15 @@ private:
 
     //! the number of valid DIA ids. 0 is reserved for invalid.
     size_t last_dia_id_ = 0;
+
+public:
+    //! \name Shared Objects
+    //! \{
+
+    //! a random generator
+    std::default_random_engine rng_;
+
+    //! \}
 
 public:
     //! \name Network Subsystem

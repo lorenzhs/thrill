@@ -59,8 +59,7 @@ public:
     using Callback = AsyncCallback;
 
     //! constructor
-    explicit SelectDispatcher(mem::Manager& mem_manager)
-        : net::Dispatcher(mem_manager) {
+    explicit SelectDispatcher() : net::Dispatcher() {
         // allocate self-pipe
         common::MakePipe(self_pipe_);
 
@@ -77,6 +76,15 @@ public:
                                & SelectDispatcher::SelfPipeCallback>(this));
     }
 
+    //! non-copyable: delete copy-constructor
+    SelectDispatcher(const SelectDispatcher&) = delete;
+    //! non-copyable: delete assignment operator
+    SelectDispatcher& operator = (const SelectDispatcher&) = delete;
+    //! move-constructor: default
+    SelectDispatcher(SelectDispatcher&&) = default;
+    //! move-assignment operator: default
+    SelectDispatcher& operator = (SelectDispatcher&&) = default;
+
     ~SelectDispatcher() {
         ::close(self_pipe_[0]);
         ::close(self_pipe_[1]);
@@ -87,7 +95,7 @@ public:
         assert(fd >= 0);
         assert(fd <= 32000); // this is an arbitrary limit to catch errors.
         if (static_cast<size_t>(fd) >= watch_.size())
-            watch_.resize(fd + 1, Watch(mem_manager_));
+            watch_.resize(fd + 1);
     }
 
     //! Register a buffered read callback and a default exception callback.
@@ -178,21 +186,18 @@ private:
     //! callback vectors per watched file descriptor
     struct Watch {
         //! boolean check whether any callbacks are registered
-        bool                 active = false;
+        bool     active = false;
         //! queue of callbacks for fd.
-        mem::deque<Callback> read_cb, write_cb;
+        std::deque<Callback, mem::GPoolAllocator<Callback> >
+                 read_cb, write_cb;
         //! only one exception callback for the fd.
-        Callback             except_cb;
-
-        explicit Watch(mem::Manager& mem_manager)
-            : read_cb(mem::Allocator<Callback>(mem_manager)),
-              write_cb(mem::Allocator<Callback>(mem_manager)) { }
+        Callback except_cb;
     };
 
     //! handlers for all registered file descriptors. the fd integer range
     //! should be small enough, otherwise a more complicated data structure is
     //! needed.
-    mem::vector<Watch> watch_ { mem::Allocator<Watch>(mem_manager_) };
+    std::vector<Watch> watch_;
 
     //! Default exception handler
     static bool DefaultExceptionCallback() {

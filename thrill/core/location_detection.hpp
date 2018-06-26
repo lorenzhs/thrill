@@ -6,6 +6,7 @@
  * Part of Project Thrill - http://project-thrill.org
  *
  * Copyright (C) 2016 Alexander Noe <aleexnoe@gmail.com>
+ * Copyright (C) 2017 Tim Zeitz <dev.tim.zeitz@gmail.com>
  *
  * All rights reserved. Published under the BSD-2 license in the LICENSE file.
  ******************************************************************************/
@@ -72,16 +73,16 @@ private:
     static constexpr bool debug = false;
 
     using GolombBitStreamWriter =
-              core::GolombBitStreamWriter<data::CatStream::Writer>;
+        core::GolombBitStreamWriter<data::CatStream::Writer>;
 
     using GolombBitStreamReader =
-              core::GolombBitStreamReader<data::CatStream::Reader>;
+        core::GolombBitStreamReader<data::CatStream::Reader>;
 
     using GolumbDeltaWriter =
-              core::DeltaStreamWriter<GolombBitStreamWriter, size_t, /* offset */ 1>;
+        core::DeltaStreamWriter<GolombBitStreamWriter, size_t, /* offset */ 1>;
 
     using GolumbDeltaReader =
-              core::DeltaStreamReader<GolombBitStreamReader, size_t, /* offset */ 1>;
+        core::DeltaStreamReader<GolombBitStreamReader, size_t, /* offset */ 1>;
 
     using CounterType = typename HashCount::CounterType;
 
@@ -120,8 +121,7 @@ private:
                               size_t num_workers,
                               size_t max_hash) {
 
-        std::vector<data::CatStream::Writer> writers =
-            stream_pointer->GetWriters();
+        data::CatStream::Writers writers = stream_pointer->GetWriters();
 
         for (size_t i = 0, j = 0; i < num_workers; ++i) {
             common::Range range_i =
@@ -155,11 +155,11 @@ public:
     using Emitter = ToVectorEmitter<HashCount>;
 
     using Table = typename ReduceTableSelect<
-              ReduceConfig::table_impl_,
-              HashCount, typename HashCount::HashType, HashCount,
-              ExtractHash, std::plus<HashCount>, Emitter,
-              checkers::ReduceManipulatorDummy,
-              /* VolatileKey */ false, ReduceConfig>::type;
+        ReduceConfig::table_impl_,
+        HashCount, typename HashCount::HashType, HashCount,
+        ExtractHash, std::plus<HashCount>, Emitter,
+        checkers::ReduceManipulatorDummy,
+        /* VolatileKey */ false, ReduceConfig>::type;
 
     LocationDetection(Context& ctx, size_t dia_id,
                       const ReduceConfig& config = ReduceConfig())
@@ -264,7 +264,7 @@ public:
 
         data::CatStreamPtr location_stream = context_.GetNewCatStream(dia_id_);
 
-        std::vector<data::CatStream::Writer> location_writers =
+        data::CatStream::Writers location_writers =
             location_stream->GetWriters();
 
         std::vector<GolombBitStreamWriter> location_gbsw;
@@ -329,7 +329,7 @@ public:
         // close target-worker writers
         location_dw.clear();
         location_gbsw.clear();
-        location_writers.clear();
+        location_writers.Close();
 
         // read location notifications and store them in the unordered_map
 

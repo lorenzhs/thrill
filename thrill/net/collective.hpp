@@ -21,6 +21,7 @@
 #include <thrill/common/functional.hpp>
 #include <thrill/net/group.hpp>
 #include <tlx/math/ffs.hpp>
+#include <tlx/math/integer_log2.hpp>
 #include <tlx/math/is_power_of_two.hpp>
 #include <tlx/math/round_to_power_of_two.hpp>
 
@@ -47,10 +48,15 @@ namespace net {
  * \param inclusive Inclusive prefix sum if true (default)
  */
 template <typename T, typename BinarySumOp>
-void Group::PrefixSumDoubling(T& value, BinarySumOp sum_op, bool inclusive) {
+void Group::PrefixSumDoubling(T& value, BinarySumOp sum_op,
+                              const T& initial, bool inclusive) {
     static constexpr bool debug = false;
 
     bool first = true;
+
+    if (my_host_rank() == 0)
+        value = sum_op(initial, value);
+
     // Use a copy, in case of exclusive, we have to forward
     // something that's not our result.
     T to_forward = value;
@@ -86,7 +92,7 @@ void Group::PrefixSumDoubling(T& value, BinarySumOp sum_op, bool inclusive) {
 
     // set worker 0's value for exclusive prefixsums
     if (!inclusive && my_host_rank() == 0)
-        value = T();
+        value = initial;
 }
 
 /*!
@@ -144,18 +150,19 @@ void Group::PrefixSumHypercube(T& value, BinarySumOp sum_op) {
 
 //! select prefixsum implementation (often due to total number of processors)
 template <typename T, typename BinarySumOp>
-void Group::PrefixSumSelect(T& value, BinarySumOp sum_op, bool inclusive) {
-    return PrefixSumDoubling(value, sum_op, inclusive);
+void Group::PrefixSumSelect(T& value, BinarySumOp sum_op,
+                            const T& initial, bool inclusive) {
+    return PrefixSumDoubling(value, sum_op, initial, inclusive);
 }
 
 template <typename T, typename BinarySumOp>
-void Group::PrefixSum(T& value, BinarySumOp sum_op) {
-    return PrefixSumSelect(value, sum_op, true);
+void Group::PrefixSum(T& value, BinarySumOp sum_op, const T& initial) {
+    return PrefixSumSelect(value, sum_op, initial, true);
 }
 
 template <typename T, typename BinarySumOp>
-void Group::ExPrefixSum(T& value, BinarySumOp sum_op) {
-    return PrefixSumSelect(value, sum_op, false);
+void Group::ExPrefixSum(T& value, BinarySumOp sum_op, const T& initial) {
+    return PrefixSumSelect(value, sum_op, initial, false);
 }
 
 /******************************************************************************/
@@ -243,6 +250,63 @@ void Group::BroadcastSelect(T& value, size_t origin) {
 template <typename T>
 void Group::Broadcast(T& value, size_t origin) {
     return BroadcastSelect(value, origin);
+}
+
+/******************************************************************************/
+// AllGather Algorithms
+
+template <typename T>
+void Group::AllGatherRecursiveDoublingPowerOfTwo(T* values, size_t n) {
+    size_t num_hosts = this->num_hosts();
+    size_t my_rank = my_host_rank();
+    size_t d = tlx::integer_log2_ceil(num_hosts);
+
+    for (size_t j = 0; j < d; ++j) {
+        size_t peer = my_rank ^ (0x1 << j);
+        // index of first element to be sent
+        size_t snd_pos = (~((0x1 << j) - 1) & my_rank) * n;
+        // index of first element to be received
+        size_t rcv_pos = (~((0x1 << j) - 1) & peer) * n;
+        // number of elements to be sent/received
+        size_t ins_n = (0x1 << j) * n;
+
+        connection(peer).SendReceive(values + snd_pos, values + rcv_pos, ins_n);
+    }
+}
+
+template <typename T>
+void Group::AllGatherBruck(T* values, size_t n) {
+    size_t num_hosts = this->num_hosts();
+    size_t my_rank = my_host_rank();
+    size_t size = num_hosts * n;
+    std::vector<T> temp(size);
+
+    for (size_t i = 0; i < n; ++i) {
+        temp[i] = values[i];
+    }
+
+    for (size_t j = 0; (0x1U << j) < num_hosts; ++j) {
+        size_t snd_peer = (my_rank + num_hosts - (0x1 << j)) % num_hosts;
+        size_t rcv_peer = (my_rank + (0x1 << j)) % num_hosts;
+        // position for received data
+        size_t ins_pos = (0x1 << j) * n;
+        // number of elements to be sent/received
+        size_t ins_n = std::min((0x1 << j) * n, size - ins_pos);
+
+        if ((0x1 << j) & my_rank) {
+            connection(rcv_peer).ReceiveN(temp.data() + ins_pos, ins_n);
+            connection(snd_peer).SendN(temp.data(), ins_n);
+        }
+        else {
+            connection(snd_peer).SendN(temp.data(), ins_n);
+            connection(rcv_peer).ReceiveN(temp.data() + ins_pos, ins_n);
+        }
+    }
+
+    // local reorder: shift whole array by my_rank*n to the right
+    for (size_t i = 0; i < size; ++i) {
+        values[i] = temp[(i + size - my_rank * n) % size];
+    }
 }
 
 /******************************************************************************/
@@ -365,7 +429,7 @@ void Group::AllReduceHypercube(T& value, BinarySumOp sum_op) {
             // hypercube always comes first.
             T recv_data;
             if (my_host_rank() & d) {
-                connection(peer).SendReceive(value, &recv_data);
+                connection(peer).SendReceive(&value, &recv_data);
                 value = sum_op(recv_data, value);
             }
             else {
@@ -400,7 +464,7 @@ template <typename T, typename BinarySumOp>
 T Group::SendReceiveReduce(size_t peer, const T& value, BinarySumOp sum_op) {
     T recv_data;
     if (my_host_rank() > peer) {
-        connection(peer).SendReceive(value, &recv_data);
+        connection(peer).SendReceive(&value, &recv_data);
         return sum_op(recv_data, value);
     }
     else {

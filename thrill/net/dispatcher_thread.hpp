@@ -38,16 +38,20 @@ using AsyncCallback = tlx::delegate<bool(), mem::GPoolAllocator<char> >;
 
 //! Signature of async read callbacks.
 using AsyncReadCallback = tlx::delegate<
-          void(Connection& c, Buffer&& buffer), mem::GPoolAllocator<char> >;
+    void(Connection& c, Buffer && buffer), mem::GPoolAllocator<char> >;
 
 //! Signature of async read ByteBlock callbacks.
 using AsyncReadByteBlockCallback = tlx::delegate<
-          void(Connection& c, data::PinnedByteBlockPtr&& block),
-          mem::GPoolAllocator<char> >;
+    void(Connection& c, data::PinnedByteBlockPtr && block),
+    mem::GPoolAllocator<char> >;
 
 //! Signature of async write callbacks.
 using AsyncWriteCallback = tlx::delegate<
-          void(Connection&), mem::GPoolAllocator<char> >;
+    void(Connection&), mem::GPoolAllocator<char> >;
+
+//! Signature of generic dispatcher callback.
+using AsyncDispatcherThreadCallback = tlx::delegate<
+    void(class Dispatcher&), mem::GPoolAllocator<char> >;
 
 /*!
  * DispatcherThread contains a net::Dispatcher object and an associated thread
@@ -62,13 +66,8 @@ public:
     using Job = tlx::delegate<void(), mem::GPoolAllocator<char> >;
 
     DispatcherThread(
-        mem::Manager& mem_manager,
-        std::unique_ptr<class Dispatcher>&& dispatcher,
-        const mem::by_string& thread_name);
-
-    DispatcherThread(
-        mem::Manager& mem_manager,
-        class Group& group, const mem::by_string& thread_name);
+        std::unique_ptr<class Dispatcher> dispatcher,
+        size_t host_rank);
 
     ~DispatcherThread();
 
@@ -80,8 +79,8 @@ public:
     //! Terminate the dispatcher thread (if now already done).
     void Terminate();
 
-    // *** note that callbacks are passed by value, because they must be copied
-    // *** into the closured by the methods. -tb
+    //! Run generic callback in dispatcher thread to enqueue stuff.
+    void RunInThread(const AsyncDispatcherThreadCallback& cb);
 
     //! \name Timeout Callbacks
     //! \{
@@ -109,36 +108,37 @@ public:
     //! \{
 
     //! asynchronously read n bytes and deliver them to the callback
-    void AsyncRead(Connection& c, size_t size,
+    void AsyncRead(Connection& c, uint32_t seq, size_t size,
                    const AsyncReadCallback& done_cb);
 
     //! asynchronously read the full ByteBlock and deliver it to the callback
-    void AsyncRead(Connection& c, size_t size, data::PinnedByteBlockPtr&& block,
+    void AsyncRead(Connection& c, uint32_t seq, size_t size,
+                   data::PinnedByteBlockPtr&& block,
                    const AsyncReadByteBlockCallback& done_cb);
 
     //! asynchronously write byte and block and callback when delivered. The
     //! block is reference counted by the async writer.
-    void AsyncWrite(Connection& c, Buffer&& buffer,
+    void AsyncWrite(Connection& c, uint32_t seq, Buffer&& buffer,
                     const AsyncWriteCallback& done_cb = AsyncWriteCallback());
 
     //! asynchronously write TWO buffers and callback when delivered. The
     //! buffer2 are MOVED into the async writer. This is most useful to write a
     //! header and a payload Buffers that are hereby guaranteed to be written in
     //! order.
-    void AsyncWrite(Connection& c,
+    void AsyncWrite(Connection& c, uint32_t seq,
                     Buffer&& buffer, data::PinnedBlock&& block,
                     const AsyncWriteCallback& done_cb = AsyncWriteCallback());
 
     //! asynchronously write buffer and callback when delivered. COPIES the data
     //! into a Buffer!
     void AsyncWriteCopy(
-        Connection& c, const void* buffer, size_t size,
+        Connection& c, uint32_t seq, const void* buffer, size_t size,
         const AsyncWriteCallback& done_cb = AsyncWriteCallback());
 
     //! asynchronously write buffer and callback when delivered. COPIES the data
     //! into a Buffer!
     void AsyncWriteCopy(
-        Connection& c, const std::string& str,
+        Connection& c, uint32_t seq, const std::string& str,
         const AsyncWriteCallback& done_cb = AsyncWriteCallback());
 
     //! \}
@@ -154,13 +154,8 @@ private:
     void WakeUpThread();
 
 private:
-    //! common memory stats, should become a HostContext member.
-    mem::Manager mem_manager_;
-
     //! Queue of jobs to be run by dispatching thread at its discretion.
-    common::ConcurrentQueue<Job, mem::Allocator<Job> > jobqueue_ {
-        mem::Allocator<Job>(mem_manager_)
-    };
+    common::ConcurrentQueue<Job, mem::GPoolAllocator<Job> > jobqueue_;
 
     //! thread of dispatcher
     std::thread thread_;
@@ -174,8 +169,8 @@ private:
     //! whether to call Interrupt() in WakeUpThread()
     std::atomic<bool> busy_ { false };
 
-    //! thread name for logging
-    mem::by_string name_;
+    //! for thread name for logging
+    size_t host_rank_;
 };
 
 //! \}

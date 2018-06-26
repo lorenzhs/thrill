@@ -194,9 +194,6 @@ private:
     //! Whether the parent stack is empty
     const std::array<bool, kNumInputs> parent_stack_empty_;
 
-    //! Random generator for pivot selection.
-    std::default_random_engine rng_ { std::random_device { } () };
-
     //! Files for intermediate storage
     data::FilePtr files_[kNumInputs];
 
@@ -350,7 +347,7 @@ private:
             size_t pivot_idx = left[s][mp];
 
             if (width[s][mp] > 0) {
-                pivot_idx = left[s][mp] + (rng_() % width[s][mp]);
+                pivot_idx = left[s][mp] + (context_.rng_() % width[s][mp]);
                 assert(pivot_idx < files_[mp]->num_items());
                 stats_.file_op_timer_.Start();
                 pivot_elem = files_[mp]->template GetItemAt<ValueType>(pivot_idx);
@@ -681,10 +678,10 @@ auto Merge(const Comparator& comparator,
     using ValueType = typename FirstDIA::ValueType;
 
     using CompareResult =
-              typename common::FunctionTraits<Comparator>::result_type;
+        typename common::FunctionTraits<Comparator>::result_type;
 
     using MergeNode = api::MergeNode<
-              ValueType, Comparator, 1 + sizeof ... (DIAs)>;
+        ValueType, Comparator, 1 + sizeof ... (DIAs)>;
 
     // Assert comparator types.
     static_assert(

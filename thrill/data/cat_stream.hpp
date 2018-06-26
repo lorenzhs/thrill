@@ -69,8 +69,8 @@ public:
     using Handle = CatStream;
 
     //! Creates a new stream instance
-    CatStreamData(Multiplexer& multiplexer, const StreamId& id,
-                  size_t local_worker_id, size_t dia_id);
+    CatStreamData(Multiplexer& multiplexer, size_t send_size_limit,
+                  const StreamId& id, size_t local_worker_id, size_t dia_id);
 
     //! non-copyable: delete copy-constructor
     CatStreamData(const CatStreamData&) = delete;
@@ -87,7 +87,7 @@ public:
 
     //! Creates BlockWriters for each worker. BlockWriter can only be opened
     //! once, otherwise the block sequence is incorrectly interleaved!
-    std::vector<Writer> GetWriters() final;
+    Writers GetWriters() final;
 
     //! Creates a BlockReader for each worker. The BlockReaders are attached to
     //! the BlockQueues in the Stream and wait for further Blocks to arrive or
@@ -115,6 +115,11 @@ public:
 private:
     bool is_closed_ = false;
 
+    struct SeqReordering;
+
+    //! Block Sequence numbers
+    std::vector<SeqReordering> seq_;
+
     //! BlockQueues to store incoming Blocks with no attached destination.
     std::vector<BlockQueue> queues_;
 
@@ -123,11 +128,9 @@ private:
 
     //! called from Multiplexer when there is a new Block on a
     //! Stream.
-    void OnStreamBlock(size_t from, PinnedBlock&& b);
+    void OnStreamBlock(size_t from, uint32_t seq, PinnedBlock&& b);
 
-    //! called from Multiplexer when a CatStream closed notification was
-    //! received.
-    void OnCloseStream(size_t from);
+    void OnStreamBlockOrdered(size_t from, PinnedBlock&& b);
 
     //! Returns the loopback queue for the worker of this stream.
     BlockQueue * loopback_queue(size_t from_worker_id);
@@ -166,7 +169,7 @@ public:
 
     //! Creates BlockWriters for each worker. BlockWriter can only be opened
     //! once, otherwise the block sequence is incorrectly interleaved!
-    std::vector<Writer> GetWriters() final;
+    Writers GetWriters() final;
 
     //! Creates a BlockReader for each worker. The BlockReaders are attached to
     //! the BlockQueues in the Stream and wait for further Blocks to arrive or

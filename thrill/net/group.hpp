@@ -77,10 +77,14 @@ public:
     //! Close
     virtual void Close() = 0;
 
-    //! Construct a network dispatcher object for this group, matching its
-    //! internal implementation.
-    virtual std::unique_ptr<class Dispatcher> ConstructDispatcher(
-        mem::Manager& mem_manager) const = 0;
+    //! Number of parallel sends or recvs requests supported by net backend, or
+    //! zero if asyncs are processed sequentially as with TCP.
+    virtual size_t num_parallel_async() const;
+
+    //! Construct a network dispatcher object for the network backend used by
+    //! this group, matching its internal implementation. A dispatcher may be
+    //! shared between groups of the same type.
+    virtual std::unique_ptr<class Dispatcher> ConstructDispatcher() const = 0;
 
     //! Number of of 1-factor iterations
     size_t OneFactorSize() const {
@@ -127,11 +131,13 @@ public:
 
     //! Calculate inclusive prefix sum
     template <typename T, typename BinarySumOp = std::plus<T> >
-    void PrefixSum(T& value, BinarySumOp sum_op = BinarySumOp());
+    void PrefixSum(T& value, BinarySumOp sum_op = BinarySumOp(),
+                   const T& initial = T());
 
     //! Calculate exclusive prefix sum
     template <typename T, typename BinarySumOp = std::plus<T> >
-    void ExPrefixSum(T& value, BinarySumOp sum_op = BinarySumOp());
+    void ExPrefixSum(T& value, BinarySumOp sum_op = BinarySumOp(),
+                     const T& initial = T());
 
     //! Broadcast a value from the worker "origin"
     template <typename T>
@@ -153,11 +159,11 @@ public:
 
     template <typename T, typename BinarySumOp = std::plus<T> >
     void PrefixSumSelect(T& value, BinarySumOp sum_op = BinarySumOp(),
-                         bool inclusive = true);
+                         const T& initial = T(), bool inclusive = true);
 
     template <typename T, typename BinarySumOp = std::plus<T> >
     void PrefixSumDoubling(T& value, BinarySumOp sum_op = BinarySumOp(),
-                           bool inclusive = true);
+                           const T& initial = T(), bool inclusive = true);
 
     template <typename T, typename BinarySumOp = std::plus<T> >
     void PrefixSumHypercube(T& value, BinarySumOp sum_op = BinarySumOp());
@@ -172,6 +178,14 @@ public:
 
     template <typename T>
     void BroadcastBinomialTree(T& value, size_t origin = 0);
+
+    /**************************************************************************/
+
+    template <typename T>
+    void AllGatherRecursiveDoublingPowerOfTwo(T* values, size_t n);
+
+    template <typename T>
+    void AllGatherBruck(T* values, size_t n);
 
     /**************************************************************************/
 
@@ -226,46 +240,46 @@ protected:
     ["long", "Long"], ["unsigned long", "UnsignedLong"],
     ["long long", "LongLong"], ["unsigned long long", "UnsignedLongLong"])
   {
-    print "virtual void PrefixSumPlus$$e[1]($$e[0]& value);\n";
-    print "virtual void ExPrefixSumPlus$$e[1]($$e[0]& value);\n";
+    print "virtual void PrefixSumPlus$$e[1]($$e[0]& value, const $$e[0]& initial);\n";
+    print "virtual void ExPrefixSumPlus$$e[1]($$e[0]& value, const $$e[0]& initial);\n";
     print "virtual void Broadcast$$e[1]($$e[0]& value, size_t origin);\n";
     print "virtual void AllReducePlus$$e[1]($$e[0]& value);\n";
     print "virtual void AllReduceMinimum$$e[1]($$e[0]& value);\n";
     print "virtual void AllReduceMaximum$$e[1]($$e[0]& value);\n";
   }
 ]]]*/
-    virtual void PrefixSumPlusInt(int& value);
-    virtual void ExPrefixSumPlusInt(int& value);
+    virtual void PrefixSumPlusInt(int& value, const int& initial);
+    virtual void ExPrefixSumPlusInt(int& value, const int& initial);
     virtual void BroadcastInt(int& value, size_t origin);
     virtual void AllReducePlusInt(int& value);
     virtual void AllReduceMinimumInt(int& value);
     virtual void AllReduceMaximumInt(int& value);
-    virtual void PrefixSumPlusUnsignedInt(unsigned int& value);
-    virtual void ExPrefixSumPlusUnsignedInt(unsigned int& value);
+    virtual void PrefixSumPlusUnsignedInt(unsigned int& value, const unsigned int& initial);
+    virtual void ExPrefixSumPlusUnsignedInt(unsigned int& value, const unsigned int& initial);
     virtual void BroadcastUnsignedInt(unsigned int& value, size_t origin);
     virtual void AllReducePlusUnsignedInt(unsigned int& value);
     virtual void AllReduceMinimumUnsignedInt(unsigned int& value);
     virtual void AllReduceMaximumUnsignedInt(unsigned int& value);
-    virtual void PrefixSumPlusLong(long& value);
-    virtual void ExPrefixSumPlusLong(long& value);
+    virtual void PrefixSumPlusLong(long& value, const long& initial);
+    virtual void ExPrefixSumPlusLong(long& value, const long& initial);
     virtual void BroadcastLong(long& value, size_t origin);
     virtual void AllReducePlusLong(long& value);
     virtual void AllReduceMinimumLong(long& value);
     virtual void AllReduceMaximumLong(long& value);
-    virtual void PrefixSumPlusUnsignedLong(unsigned long& value);
-    virtual void ExPrefixSumPlusUnsignedLong(unsigned long& value);
+    virtual void PrefixSumPlusUnsignedLong(unsigned long& value, const unsigned long& initial);
+    virtual void ExPrefixSumPlusUnsignedLong(unsigned long& value, const unsigned long& initial);
     virtual void BroadcastUnsignedLong(unsigned long& value, size_t origin);
     virtual void AllReducePlusUnsignedLong(unsigned long& value);
     virtual void AllReduceMinimumUnsignedLong(unsigned long& value);
     virtual void AllReduceMaximumUnsignedLong(unsigned long& value);
-    virtual void PrefixSumPlusLongLong(long long& value);
-    virtual void ExPrefixSumPlusLongLong(long long& value);
+    virtual void PrefixSumPlusLongLong(long long& value, const long long& initial);
+    virtual void ExPrefixSumPlusLongLong(long long& value, const long long& initial);
     virtual void BroadcastLongLong(long long& value, size_t origin);
     virtual void AllReducePlusLongLong(long long& value);
     virtual void AllReduceMinimumLongLong(long long& value);
     virtual void AllReduceMaximumLongLong(long long& value);
-    virtual void PrefixSumPlusUnsignedLongLong(unsigned long long& value);
-    virtual void ExPrefixSumPlusUnsignedLongLong(unsigned long long& value);
+    virtual void PrefixSumPlusUnsignedLongLong(unsigned long long& value, const unsigned long long& initial);
+    virtual void ExPrefixSumPlusUnsignedLongLong(unsigned long long& value, const unsigned long long& initial);
     virtual void BroadcastUnsignedLongLong(unsigned long long& value, size_t origin);
     virtual void AllReducePlusUnsignedLongLong(unsigned long long& value);
     virtual void AllReduceMinimumUnsignedLongLong(unsigned long long& value);
@@ -302,9 +316,8 @@ void ExecuteGroupThreads(
     }
 
     // tear down mesh by closing all group objects
-    for (size_t i = 0; i < num_hosts; ++i) {
+    for (size_t i = 0; i < num_hosts; ++i)
         groups[i]->Close();
-    }
 }
 
 //! Construct a mock or tcp-loopback Group network and run a thread for each
@@ -324,13 +337,13 @@ void RunLoopbackGroupTest(
     ["long long", "LongLong"], ["unsigned long long", "UnsignedLongLong"])
   {
     print "template <>\n";
-    print "inline void Group::PrefixSum($$e[0]& value, std::plus<$$e[0]>) {\n";
-    print "    return PrefixSumPlus$$e[1](value);\n";
+    print "inline void Group::PrefixSum($$e[0]& value, std::plus<$$e[0]>, const $$e[0]& initial) {\n";
+    print "    return PrefixSumPlus$$e[1](value, initial);\n";
     print "}\n";
 
     print "template <>\n";
-    print "inline void Group::ExPrefixSum($$e[0]& value, std::plus<$$e[0]>) {\n";
-    print "    return ExPrefixSumPlus$$e[1](value);\n";
+    print "inline void Group::ExPrefixSum($$e[0]& value, std::plus<$$e[0]>, const $$e[0]& initial) {\n";
+    print "    return ExPrefixSumPlus$$e[1](value, initial);\n";
     print "}\n";
 
     print "template <>\n";
@@ -355,12 +368,12 @@ void RunLoopbackGroupTest(
   }
 ]]]*/
 template <>
-inline void Group::PrefixSum(int& value, std::plus<int>) {
-    return PrefixSumPlusInt(value);
+inline void Group::PrefixSum(int& value, std::plus<int>, const int& initial) {
+    return PrefixSumPlusInt(value, initial);
 }
 template <>
-inline void Group::ExPrefixSum(int& value, std::plus<int>) {
-    return ExPrefixSumPlusInt(value);
+inline void Group::ExPrefixSum(int& value, std::plus<int>, const int& initial) {
+    return ExPrefixSumPlusInt(value, initial);
 }
 template <>
 inline void Group::Broadcast(int& value, size_t origin) {
@@ -379,12 +392,12 @@ inline void Group::AllReduce(int& value, common::maximum<int>) {
     return AllReduceMaximumInt(value);
 }
 template <>
-inline void Group::PrefixSum(unsigned int& value, std::plus<unsigned int>) {
-    return PrefixSumPlusUnsignedInt(value);
+inline void Group::PrefixSum(unsigned int& value, std::plus<unsigned int>, const unsigned int& initial) {
+    return PrefixSumPlusUnsignedInt(value, initial);
 }
 template <>
-inline void Group::ExPrefixSum(unsigned int& value, std::plus<unsigned int>) {
-    return ExPrefixSumPlusUnsignedInt(value);
+inline void Group::ExPrefixSum(unsigned int& value, std::plus<unsigned int>, const unsigned int& initial) {
+    return ExPrefixSumPlusUnsignedInt(value, initial);
 }
 template <>
 inline void Group::Broadcast(unsigned int& value, size_t origin) {
@@ -403,12 +416,12 @@ inline void Group::AllReduce(unsigned int& value, common::maximum<unsigned int>)
     return AllReduceMaximumUnsignedInt(value);
 }
 template <>
-inline void Group::PrefixSum(long& value, std::plus<long>) {
-    return PrefixSumPlusLong(value);
+inline void Group::PrefixSum(long& value, std::plus<long>, const long& initial) {
+    return PrefixSumPlusLong(value, initial);
 }
 template <>
-inline void Group::ExPrefixSum(long& value, std::plus<long>) {
-    return ExPrefixSumPlusLong(value);
+inline void Group::ExPrefixSum(long& value, std::plus<long>, const long& initial) {
+    return ExPrefixSumPlusLong(value, initial);
 }
 template <>
 inline void Group::Broadcast(long& value, size_t origin) {
@@ -427,12 +440,12 @@ inline void Group::AllReduce(long& value, common::maximum<long>) {
     return AllReduceMaximumLong(value);
 }
 template <>
-inline void Group::PrefixSum(unsigned long& value, std::plus<unsigned long>) {
-    return PrefixSumPlusUnsignedLong(value);
+inline void Group::PrefixSum(unsigned long& value, std::plus<unsigned long>, const unsigned long& initial) {
+    return PrefixSumPlusUnsignedLong(value, initial);
 }
 template <>
-inline void Group::ExPrefixSum(unsigned long& value, std::plus<unsigned long>) {
-    return ExPrefixSumPlusUnsignedLong(value);
+inline void Group::ExPrefixSum(unsigned long& value, std::plus<unsigned long>, const unsigned long& initial) {
+    return ExPrefixSumPlusUnsignedLong(value, initial);
 }
 template <>
 inline void Group::Broadcast(unsigned long& value, size_t origin) {
@@ -451,12 +464,12 @@ inline void Group::AllReduce(unsigned long& value, common::maximum<unsigned long
     return AllReduceMaximumUnsignedLong(value);
 }
 template <>
-inline void Group::PrefixSum(long long& value, std::plus<long long>) {
-    return PrefixSumPlusLongLong(value);
+inline void Group::PrefixSum(long long& value, std::plus<long long>, const long long& initial) {
+    return PrefixSumPlusLongLong(value, initial);
 }
 template <>
-inline void Group::ExPrefixSum(long long& value, std::plus<long long>) {
-    return ExPrefixSumPlusLongLong(value);
+inline void Group::ExPrefixSum(long long& value, std::plus<long long>, const long long& initial) {
+    return ExPrefixSumPlusLongLong(value, initial);
 }
 template <>
 inline void Group::Broadcast(long long& value, size_t origin) {
@@ -475,12 +488,12 @@ inline void Group::AllReduce(long long& value, common::maximum<long long>) {
     return AllReduceMaximumLongLong(value);
 }
 template <>
-inline void Group::PrefixSum(unsigned long long& value, std::plus<unsigned long long>) {
-    return PrefixSumPlusUnsignedLongLong(value);
+inline void Group::PrefixSum(unsigned long long& value, std::plus<unsigned long long>, const unsigned long long& initial) {
+    return PrefixSumPlusUnsignedLongLong(value, initial);
 }
 template <>
-inline void Group::ExPrefixSum(unsigned long long& value, std::plus<unsigned long long>) {
-    return ExPrefixSumPlusUnsignedLongLong(value);
+inline void Group::ExPrefixSum(unsigned long long& value, std::plus<unsigned long long>, const unsigned long long& initial) {
+    return ExPrefixSumPlusUnsignedLongLong(value, initial);
 }
 template <>
 inline void Group::Broadcast(unsigned long long& value, size_t origin) {

@@ -13,7 +13,6 @@
 #define THRILL_DATA_STREAM_SINK_HEADER
 
 #include <thrill/common/logger.hpp>
-#include <thrill/common/semaphore.hpp>
 #include <thrill/common/stats_counter.hpp>
 #include <thrill/common/stats_timer.hpp>
 #include <thrill/data/block.hpp>
@@ -135,13 +134,6 @@ private:
     size_t peer_rank_ = size_t(-1);
     size_t peer_local_worker_ = size_t(-1);
     bool closed_ = false;
-
-    //! number of PinnedBlocks to queue in the network layer
-    static constexpr size_t num_queue_ = 8;
-
-    //! semaphore to stall the amount of PinnedBlocks passed to the network
-    //! layer for transmission.
-    common::Semaphore sem_ { num_queue_ };
 
     size_t item_counter_ = 0;
     size_t byte_counter_ = 0;

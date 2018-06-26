@@ -16,11 +16,13 @@
 #include <thrill/common/profile_task.hpp>
 #include <thrill/data/block.hpp>
 #include <thrill/data/byte_block.hpp>
-#include <thrill/io/block_manager.hpp>
-#include <thrill/io/request.hpp>
 #include <thrill/mem/manager.hpp>
 
+#include <foxxll/io/request.hpp>
+#include <foxxll/mng/block_manager.hpp>
+
 #include <algorithm>
+#include <condition_variable>
 #include <functional>
 #include <mutex>
 #include <string>
@@ -98,11 +100,11 @@ public:
     void AdviseFree(size_t size);
 
     //! Return any currently being written block (for waiting on completion)
-    io::RequestPtr GetAnyWriting();
+    foxxll::request_ptr GetAnyWriting();
 
     //! Evict a Block from the LRU chain into external memory. This can return
     //! nullptr if no blocks available, or if the Block was not dirty.
-    io::RequestPtr EvictBlockLRU();
+    foxxll::request_ptr EvictBlockLRU();
 
     //! Allocates a byte block with the request size. May block this thread if
     //! the hard memory limit is reached, until memory is freed by another
@@ -113,7 +115,7 @@ public:
     //! Allocate a byte block from an external file, used to directly map system
     //! files to data::File.
     ByteBlockPtr MapExternalBlock(
-        const io::FileBasePtr& file, int64_t offset, size_t size);
+        const foxxll::file_ptr& file, uint64_t offset, size_t size);
 
     //! Increment a ByteBlock's pin count, requires the pin count to be > 0.
     void IncBlockPinCount(ByteBlock* block_ptr, size_t local_worker_id);
@@ -170,6 +172,10 @@ public:
     //! Pins a block by swapping it in if required.
     PinRequestPtr PinBlock(const Block& block, size_t local_worker_id);
 
+    //! calculate maximum merging degree from available memory and the number of
+    //! files. additionally calculate the prefetch size of each File.
+    std::pair<size_t, size_t> MaxMergeDegreePrefetch(size_t num_files);
+
 private:
     //! locked before internal state is changed
     std::mutex mutex_;
@@ -203,13 +209,13 @@ private:
     void IntIncBlockPinCount(ByteBlock* block_ptr, size_t local_worker_id);
 
     //! callback for async write of blocks during eviction
-    void OnWriteComplete(ByteBlock* block_ptr, io::Request* req, bool success);
+    void OnWriteComplete(ByteBlock* block_ptr, foxxll::request* req, bool success);
 
     //! callback for async read of blocks for pin requests
-    void OnReadComplete(PinRequest* read, io::Request* req, bool success);
+    void OnReadComplete(PinRequest* read, foxxll::request* req, bool success);
 
     //! make ostream-able
-    friend std::ostream& operator << (std::ostream& os, const PinCount& p);
+    friend std ::ostream& operator << (std::ostream& os, const PinCount& p);
 
     //! for calling OnWriteComplete
     friend class ByteBlock;

@@ -13,12 +13,12 @@
 #ifndef THRILL_DATA_STREAM_DATA_HEADER
 #define THRILL_DATA_STREAM_DATA_HEADER
 
-#include <thrill/common/semaphore.hpp>
 #include <thrill/common/stats_counter.hpp>
 #include <thrill/common/stats_timer.hpp>
 #include <thrill/data/block_writer.hpp>
 #include <thrill/data/file.hpp>
 #include <thrill/data/multiplexer.hpp>
+#include <tlx/semaphore.hpp>
 
 #include <mutex>
 #include <vector>
@@ -47,8 +47,39 @@ class StreamData : public tlx::ReferenceCounter
 public:
     using Writer = BlockWriter<StreamSink>;
 
-    StreamData(Multiplexer& multiplexer, const StreamId& id,
-               size_t local_worker_id, size_t dia_id);
+    /*!
+     * An extra class derived from std::vector<> for delivery of the
+     * BlockWriters of a Stream. The purpose is to enforce a custom way to close
+     * stream writers cyclically such that PE k first sends it's Close-packet to
+     * k+1, k+2, etc.
+     */
+    class Writers : public std::vector<BlockWriter<StreamSink> >
+    {
+    public:
+        Writers(size_t my_worker_rank = 0);
+
+        //! copyable: default copy-constructor
+        Writers(const Writers&) = default;
+        //! copyable: default assignment operator
+        Writers& operator = (const Writers&) = default;
+        //! move-constructor: default
+        Writers(Writers&&) = default;
+        //! move-assignment operator: default
+        Writers& operator = (Writers&&) = default;
+
+        //! custom destructor to close writers is a cyclic fashion
+        void Close();
+
+        //! custom destructor to close writers is a cyclic fashion
+        ~Writers();
+
+    private:
+        //! rank of this worker
+        size_t my_worker_rank_;
+    };
+
+    StreamData(Multiplexer& multiplexer, size_t send_size_limit,
+               const StreamId& id, size_t local_worker_id, size_t dia_id);
 
     virtual ~StreamData();
 
@@ -78,7 +109,7 @@ public:
 
     //! Creates BlockWriters for each worker. BlockWriter can only be opened
     //! once, otherwise the block sequence is incorrectly interleaved!
-    virtual std::vector<Writer> GetWriters() = 0;
+    virtual Writers GetWriters() = 0;
 
     ///////// expose these members - getters would be too java-ish /////////////
 
@@ -108,6 +139,10 @@ public:
     //! Timers from first rx / tx package until rx / tx direction is closed.
     common::StatsTimerStopped tx_timespan_, rx_timespan_;
 
+    //! semaphore to stall the amount of PinnedBlocks (measured in bytes) passed
+    //! to the network layer for transmission.
+    tlx::Semaphore sem_queue_;
+
     ///////////////////////////////////////////////////////////////////////////
 
 protected:
@@ -124,10 +159,10 @@ protected:
 
     //! number of remaining expected stream closing operations. Required to know
     //! when to stop rx_lifetime
-    size_t remaining_closing_blocks_;
+    std::atomic<size_t> remaining_closing_blocks_;
 
     //! number of received stream closing Blocks.
-    common::Semaphore sem_closing_blocks_;
+    tlx::Semaphore sem_closing_blocks_;
 
     //! friends for access to multiplexer_
     friend class StreamSink;
@@ -159,11 +194,12 @@ public:
 
     //! Creates a StreamSet with the given number of streams (num workers per
     //! host).
-    StreamSet(Multiplexer& multiplexer, StreamId id,
-              size_t workers_per_host, size_t dia_id) {
+    StreamSet(Multiplexer& multiplexer, size_t send_size_limit,
+              StreamId id, size_t workers_per_host, size_t dia_id) {
         for (size_t i = 0; i < workers_per_host; ++i) {
             streams_.emplace_back(
-                tlx::make_counting<StreamData>(multiplexer, id, i, dia_id));
+                tlx::make_counting<StreamData>(
+                    multiplexer, send_size_limit, id, i, dia_id));
         }
         remaining_ = workers_per_host;
     }

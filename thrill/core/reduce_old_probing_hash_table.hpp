@@ -174,9 +174,7 @@ public:
         while (TLX_UNLIKELY(mem::memory_exceeded && num_items_ != 0))
             SpillAnyPartition();
 
-        typename IndexFunction::Result h = index_function_(
-            key(kv), num_partitions_,
-            num_buckets_per_partition_, num_buckets_);
+        typename IndexFunction::Result h = calculate_index(kv);
 
         assert(h.partition_id < num_partitions_);
 
@@ -403,6 +401,9 @@ public:
 
     //! \}
 
+public:
+    using Super::calculate_index;
+
 private:
     using Super::config_;
     using Super::key_equal_function_;
@@ -444,9 +445,9 @@ class ReduceTableSelect<
 {
 public:
     using type = ReduceOldProbingHashTable<
-              TableItem, Key, Value, KeyExtractor, ReduceFunction,
-              Emitter, Manipulator, VolatileKey, ReduceConfig,
-              IndexFunction, KeyEqualFunction>;
+        TableItem, Key, Value, KeyExtractor, ReduceFunction,
+        Emitter, Manipulator, VolatileKey, ReduceConfig,
+        IndexFunction, KeyEqualFunction>;
 };
 
 } // namespace core

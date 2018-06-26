@@ -5,6 +5,7 @@
  *
  * Copyright (C) 2015 Matthias Stumpp <mstumpp@gmail.com>
  * Copyright (C) 2016 Timo Bingmann <tb@panthema.net>
+ * Copyright (C) 2017 Tim Zeitz <dev.tim.zeitz@gmail.com>
  *
  * All rights reserved. Published under the BSD-2 license in the LICENSE file.
  ******************************************************************************/
@@ -192,10 +193,7 @@ public:
      */
     bool Insert(const TableItem& kv) {
 
-        typename IndexFunction::Result h = index_function_(
-            key(kv), num_partitions_,
-            num_buckets_per_partition_, num_buckets_);
-
+        typename IndexFunction::Result h = calculate_index(kv);
         assert(h.partition_id < num_partitions_);
 
         if (TLX_UNLIKELY(key_equal_function_(key(kv), Key()))) {
@@ -514,6 +512,9 @@ public:
 
     //! \}
 
+public:
+    using Super::calculate_index;
+
 private:
     using Super::config_;
     using Super::immediate_flush_;
@@ -561,9 +562,9 @@ class ReduceTableSelect<
 {
 public:
     using type = ReduceProbingHashTable<
-              TableItem, Key, Value, KeyExtractor, ReduceFunction,
-              Emitter, Manipulator, VolatileKey, ReduceConfig,
-              IndexFunction, KeyEqualFunction>;
+        TableItem, Key, Value, KeyExtractor, ReduceFunction,
+        Emitter, Manipulator, VolatileKey, ReduceConfig,
+        IndexFunction, KeyEqualFunction>;
 };
 
 } // namespace core

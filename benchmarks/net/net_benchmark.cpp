@@ -400,7 +400,6 @@ void Bandwidth::Test(api::Context& ctx) {
                 << " hosts=" << ctx.num_hosts()
                 << " outer_repeat=" << outer_repeat
                 << " inner_repeats=" << inner_repeats_
-                << " ping_pongs=" << counter_
                 << " time[us]=" << time
                 << " time_per_ping_pong[us]="
                 << static_cast<double>(time) / static_cast<double>(counter_)
@@ -667,7 +666,7 @@ public:
 
             group_ = &ctx.net.group();
             std::unique_ptr<net::Dispatcher> dispatcher =
-                group_->ConstructDispatcher(mem_manager);
+                group_->ConstructDispatcher();
             dispatcher_ = dispatcher.get();
 
             t.Start();
@@ -757,7 +756,7 @@ public:
             void* p = (void*)block.data();
 
             dispatcher_->AsyncWrite(
-                group_->connection(r_rank), std::move(block),
+                group_->connection(r_rank), /* seq */ 0, std::move(block),
                 [this, p](net::Connection& /* c */) {
                     LOG << "AsyncWrite complete " << p;
                     OnComplete();
@@ -768,7 +767,7 @@ public:
         else if (my_rank == r_rank) {
 
             dispatcher_->AsyncRead(
-                group_->connection(s_rank), block_size_,
+                group_->connection(s_rank), /* seq */ 0, block_size_,
                 [this](net::Connection& /* c */, net::Buffer&& block) {
                     LOG << "AsyncRead complete " << (void*)block.data();
                     OnComplete();

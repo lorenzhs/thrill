@@ -12,13 +12,13 @@
 #include <thrill/common/math.hpp>
 #include <thrill/data/block.hpp>
 #include <thrill/data/block_pool.hpp>
-#include <thrill/io/file_base.hpp>
-#include <thrill/io/iostats.hpp>
 #include <thrill/mem/aligned_allocator.hpp>
 #include <thrill/mem/pool.hpp>
 
+#include <foxxll/io/file.hpp>
+#include <foxxll/io/iostats.hpp>
 #include <tlx/die.hpp>
-#include <tlx/lru_cache.hpp>
+#include <tlx/container/lru_cache.hpp>
 #include <tlx/math/is_power_of_two.hpp>
 #include <tlx/string/join_generic.hpp>
 
@@ -75,7 +75,7 @@ static void OurNewHandler() {
     }
 
     static size_t s_iter = 0;
-    io::RequestPtr req;
+    foxxll::request_ptr req;
 
     // first try to find a handle to a currently being written block.
     for (size_t i = 0; i < s_blockpools.size(); ++i) {
@@ -228,16 +228,16 @@ std::ostream& operator << (std::ostream& os, const BlockPool::PinCount& p) {
 
 //! type of set of ByteBlocks currently begin written to EM.
 using WritingMap = std::unordered_map<
-          ByteBlock*, io::RequestPtr,
-          std::hash<ByteBlock*>, std::equal_to<>,
-          mem::GPoolAllocator<std::pair<ByteBlock* const, io::RequestPtr> > >;
+    ByteBlock*, foxxll::request_ptr,
+    std::hash<ByteBlock*>, std::equal_to<>,
+    mem::GPoolAllocator<std::pair<ByteBlock* const, foxxll::request_ptr> > >;
 
 //! type of set of ByteBlocks currently begin read from EM.
 using ReadingMap = std::unordered_map<
-          ByteBlock*, PinRequestPtr,
-          std::hash<ByteBlock*>, std::equal_to<>,
-          mem::GPoolAllocator<
-              std::pair<ByteBlock* const, PinRequestPtr> > >;
+    ByteBlock*, PinRequestPtr,
+    std::hash<ByteBlock*>, std::equal_to<>,
+    mem::GPoolAllocator<
+        std::pair<ByteBlock* const, PinRequestPtr> > >;
 
 class BlockPool::Data
 {
@@ -272,13 +272,13 @@ public:
         mem::GPoolAllocator<ByteBlock*> > swapped_;
 
     //! I/O layer stats when BlockPool was created.
-    io::StatsData io_stats_first_;
+    foxxll::stats_data io_stats_first_;
 
     //! I/O layer stats of previous profile tick
-    io::StatsData io_stats_prev_;
+    foxxll::stats_data io_stats_prev_;
 
     //! reference to io block manager
-    io::BlockManager* bm_;
+    foxxll::block_manager* bm_;
 
     //! Allocator for ByteBlocks such that they are aligned for faster
     //! I/O. Allocations are counted via mem_manager_.
@@ -331,7 +331,7 @@ public:
          size_t workers_per_host)
         : soft_ram_limit_(soft_ram_limit),
           hard_ram_limit_(hard_ram_limit),
-          bm_(io::BlockManager::GetInstance()),
+          bm_(foxxll::block_manager::get_instance()),
           aligned_alloc_(mem::Allocator<char>(block_pool.mem_manager_)),
           pin_count_(workers_per_host) { }
 
@@ -349,11 +349,11 @@ public:
         BlockPool& bp, ByteBlock* block_ptr, size_t local_worker_id);
 
     //! Evict a block from the lru list into external memory
-    io::RequestPtr IntEvictBlockLRU();
+    foxxll::request_ptr IntEvictBlockLRU();
 
     //! Evict a block into external memory. The block must be unpinned and not
     //! swapped.
-    io::RequestPtr IntEvictBlock(ByteBlock* block_ptr);
+    foxxll::request_ptr IntEvictBlock(ByteBlock* block_ptr);
 
     //! \name Block Statistics
     //! \{
@@ -393,7 +393,7 @@ BlockPool::BlockPool(size_t soft_ram_limit, size_t hard_ram_limit,
     }
 
     d_->io_stats_first_ = d_->io_stats_prev_ =
-                              io::StatsData(*io::Stats::GetInstance());
+                              foxxll::stats_data(*foxxll::stats::get_instance());
 
     logger_ << "class" << "BlockPool"
             << "event" << "create"
@@ -408,7 +408,7 @@ BlockPool::~BlockPool() {
     while (d_->writing_.begin() != d_->writing_.end()) {
 
         ByteBlock* block_ptr = d_->writing_.begin()->first;
-        io::RequestPtr req = d_->writing_.begin()->second;
+        foxxll::request_ptr req = d_->writing_.begin()->second;
 
         LOGC(debug_em)
             << "BlockPool::~BlockPool() block=" << block_ptr
@@ -457,8 +457,8 @@ BlockPool::~BlockPool() {
     // wait for deletion of last ByteBlocks. this may actually be needed, when
     // the I/O handlers have been finished, and the corresponding references are
     // freed, but DestroyBlock() could not be called yet.
-    d_->cv_total_byte_blocks_.wait(
-        lock, [this]() { return d_->total_byte_blocks_ == 0; });
+    while (d_->total_byte_blocks_ != 0)
+        d_->cv_total_byte_blocks_.wait(lock);
 
     d_->pin_count_.AssertZero();
     die_unequal(d_->total_ram_bytes_, 0u);
@@ -526,7 +526,7 @@ BlockPool::AllocateByteBlock(size_t size, size_t local_worker_id) {
 }
 
 ByteBlockPtr BlockPool::MapExternalBlock(
-    const io::FileBasePtr& file, int64_t offset, size_t size) {
+    const foxxll::file_ptr& file, uint64_t offset, size_t size) {
     std::unique_lock<std::mutex> lock(mutex_);
     // create tlx::CountingPtr, no need for special make_shared()-equivalent
     ByteBlockPtr block_ptr(
@@ -577,7 +577,7 @@ PinRequestPtr BlockPool::PinBlock(const Block& block, size_t local_worker_id) {
         die_unless(d_->reading_.find(block_ptr) == d_->reading_.end());
 
         LOGC(debug_pin)
-            << "BlockPool::PinBlock block=" << &block
+            << "BlockPool::PinBlock block=" << block
             << " already pinned by another thread"
             << d_->pin_count_;
 
@@ -600,7 +600,7 @@ PinRequestPtr BlockPool::PinBlock(const Block& block, size_t local_worker_id) {
 
         // get reference count to request, since complete handler removes it
         // from the map.
-        io::RequestPtr req = write_it->second;
+        foxxll::request_ptr req = write_it->second;
         lock.unlock();
         // cancel I/O request
         if (!req->cancel()) {
@@ -682,7 +682,7 @@ PinRequestPtr BlockPool::PinBlock(const Block& block, size_t local_worker_id) {
     }
 
     LOGC(debug_em)
-        << "BlockPool::PinBlock block=" << &block
+        << "BlockPool::PinBlock block=" << block
         << " requested from external memory"
         << d_->pin_count_;
 
@@ -692,7 +692,7 @@ PinRequestPtr BlockPool::PinBlock(const Block& block, size_t local_worker_id) {
             // parameters for the read
             data, block_ptr->em_bid_.offset, block_ptr->size(),
             // construct an immediate CompletionHandler callback
-            io::CompletionHandler::make<
+            foxxll::completion_handler::make<
                 PinRequest, &PinRequest::OnComplete>(*read));
 
     d_->reading_bytes_ += block_ptr->size();
@@ -700,12 +700,28 @@ PinRequestPtr BlockPool::PinBlock(const Block& block, size_t local_worker_id) {
     return read;
 }
 
-void PinRequest::OnComplete(io::Request* req, bool success) {
+std::pair<size_t, size_t> BlockPool::MaxMergeDegreePrefetch(size_t num_files) {
+    size_t avail_bytes = hard_ram_limit() / workers_per_host_ / 2;
+    size_t avail_blocks = avail_bytes / default_block_size;
+
+    if (num_files >= avail_blocks) {
+        // more files than blocks available -> partial merge of avail_bytes
+        // Files with prefetch = 0, which is at most one block per File.
+        return std::make_pair(avail_blocks, 0u);
+    }
+    else {
+        // less files than available Blocks -> split prefetch size equally
+        // among Files.
+        return std::make_pair(num_files, avail_bytes / num_files);
+    }
+}
+
+void PinRequest::OnComplete(foxxll::request* req, bool success) {
     return block_pool_->OnReadComplete(this, req, success);
 }
 
 void BlockPool::OnReadComplete(
-    PinRequest* read, io::Request* req, bool success) {
+    PinRequest* read, foxxll::request* req, bool success) {
     std::unique_lock<std::mutex> lock(mutex_);
 
     ByteBlock* block_ptr = read->block_.byte_block().get();
@@ -713,10 +729,10 @@ void BlockPool::OnReadComplete(
 
     LOGC(debug_em)
         << "OnReadComplete():"
-        << " req " << req << " block " << block_ptr
+        << " req " << req << " block " << *block_ptr
         << " size " << block_size << " done,"
         << " from " << block_ptr->em_bid_ << " success = " << success;
-    req->check_error();
+    req->check_errors();
 
     if (!success)
     {
@@ -749,13 +765,21 @@ void BlockPool::OnReadComplete(
 
         if (!block_ptr->ext_file_) {
             d_->bm_->delete_block(block_ptr->em_bid_);
-            block_ptr->em_bid_ = io::BID<0>();
+            block_ptr->em_bid_ = foxxll::BID<0>();
         }
     }
 
     read->ready_ = true;
     d_->reading_bytes_ -= block_size;
     cv_read_complete_.notify_all();
+
+    // first released the foxxll::request's file reference because it is
+    // possible that the PinRequest contains the last reference to this
+    // ByteBlock. In that case the ByteBlock's foxxll::file_ptr is released in
+    // the step below, when the PinRequestPtr is deleted. This triggers an
+    // error, because the current foxxll::request is still active on the
+    // foxxll::file_ptr.
+    req->release_file_reference();
 
     // remove the PinRequest from the hash map. The problem here is that the
     // PinRequestPtr may have been discarded (the Pin wasn't needed after
@@ -913,16 +937,19 @@ size_t BlockPool::reading_blocks() noexcept {
 }
 
 void BlockPool::DestroyBlock(ByteBlock* block_ptr) {
+    // this method is called by ByteBlockPtr's deleter when the reference
+    // counter reaches zero to deallocate the block.
+    std::unique_lock<std::mutex> lock(mutex_);
+
     LOGC(debug_blc)
         << "BlockPool::DestroyBlock() block_ptr=" << block_ptr
         << " byte_block=" << *block_ptr;
 
-    std::unique_lock<std::mutex> lock(mutex_);
-    // this method is called by ByteBlockPtr's deleter when the reference
-    // counter reaches zero to deallocate the block.
-
     // pinned blocks cannot be destroyed since they are always unpinned first
     die_unless(block_ptr->total_pins_ == 0);
+
+    // delete pin_count_ -> mark block as being deleted
+    block_ptr->pin_count_.clear();
 
     do {
         if (block_ptr->in_memory())
@@ -932,7 +959,13 @@ void BlockPool::DestroyBlock(ByteBlock* block_ptr) {
             if (it != d_->writing_.end()) {
                 // get reference count to request, since complete handler
                 // removes it from the map.
-                io::RequestPtr req = it->second;
+                foxxll::request_ptr req = it->second;
+
+                LOGC(debug_em)
+                    << "DestroyBlock()"
+                    << " canceling write I/O request " << req
+                    << " for block " << *block_ptr;
+
                 lock.unlock();
                 // cancel I/O request
                 if (!req->cancel()) {
@@ -954,7 +987,13 @@ void BlockPool::DestroyBlock(ByteBlock* block_ptr) {
             if (it != d_->reading_.end()) {
                 // get reference count to request, since complete handler
                 // removes it from the map.
-                io::RequestPtr req = it->second->req_;
+                foxxll::request_ptr req = it->second->req_;
+
+                LOGC(debug_em)
+                    << "DestroyBlock()"
+                    << " canceling read I/O request " << req
+                    << " for block " << *block_ptr;
+
                 lock.unlock();
                 // cancel I/O request
                 if (!req->cancel()) {
@@ -1004,9 +1043,10 @@ void BlockPool::DestroyBlock(ByteBlock* block_ptr) {
             << "BlockPool::DestroyBlock() block_ptr=" << block_ptr
             << " unpinned block in memory, remove from list";
 
-        die_unless(d_->unpinned_blocks_.exists(block_ptr));
-        d_->unpinned_blocks_.erase(block_ptr);
-        d_->unpinned_bytes_ -= block_ptr->size();
+        if (d_->unpinned_blocks_.exists(block_ptr)) {
+            d_->unpinned_blocks_.erase(block_ptr);
+            d_->unpinned_bytes_ -= block_ptr->size();
+        }
 
         // release memory
         sLOGC(debug_alloc)
@@ -1030,7 +1070,7 @@ void BlockPool::DestroyBlock(ByteBlock* block_ptr) {
         d_->swapped_bytes_ -= block_ptr->size();
 
         d_->bm_->delete_block(block_ptr->em_bid_);
-        block_ptr->em_bid_ = io::BID<0>();
+        block_ptr->em_bid_ = foxxll::BID<0>();
     }
 
     assert(d_->total_byte_blocks_ > 0);
@@ -1179,20 +1219,20 @@ void BlockPool::EvictBlock(ByteBlock* block_ptr) {
     d_->IntEvictBlock(block_ptr);
 }
 
-io::RequestPtr BlockPool::GetAnyWriting() {
+foxxll::request_ptr BlockPool::GetAnyWriting() {
     std::unique_lock<std::mutex> lock(mutex_);
-    if (!d_->writing_.size()) return io::RequestPtr();
+    if (!d_->writing_.size()) return foxxll::request_ptr();
     return d_->writing_.begin()->second;
 }
 
-io::RequestPtr BlockPool::EvictBlockLRU() {
+foxxll::request_ptr BlockPool::EvictBlockLRU() {
     std::unique_lock<std::mutex> lock(mutex_);
     return d_->IntEvictBlockLRU();
 }
 
-io::RequestPtr BlockPool::Data::IntEvictBlockLRU() {
+foxxll::request_ptr BlockPool::Data::IntEvictBlockLRU() {
 
-    if (!unpinned_blocks_.size()) return io::RequestPtr();
+    if (!unpinned_blocks_.size()) return foxxll::request_ptr();
 
     ByteBlock* block_ptr = unpinned_blocks_.pop();
     die_unless(block_ptr);
@@ -1201,7 +1241,7 @@ io::RequestPtr BlockPool::Data::IntEvictBlockLRU() {
     return IntEvictBlock(block_ptr);
 }
 
-io::RequestPtr BlockPool::Data::IntEvictBlock(ByteBlock* block_ptr) {
+foxxll::request_ptr BlockPool::Data::IntEvictBlock(ByteBlock* block_ptr) {
 
     // die_unless(block_ptr->block_pool_ == this);
 
@@ -1220,7 +1260,7 @@ io::RequestPtr BlockPool::Data::IntEvictBlock(ByteBlock* block_ptr) {
         block_ptr->data_ = nullptr;
 
         IntReleaseInternalMemory(block_ptr->size());
-        return io::RequestPtr();
+        return foxxll::request_ptr();
     }
 
     if (!notify_em_used_) {
@@ -1235,7 +1275,7 @@ io::RequestPtr BlockPool::Data::IntEvictBlock(ByteBlock* block_ptr) {
 
     // allocate EM block
     block_ptr->em_bid_.size = block_ptr->size();
-    bm_->new_block(io::FullyRandom(), block_ptr->em_bid_);
+    bm_->new_block(foxxll::fully_random(), block_ptr->em_bid_);
 
     LOGC(debug_em)
         << "EvictBlock(): " << block_ptr << " - " << *block_ptr
@@ -1244,24 +1284,25 @@ io::RequestPtr BlockPool::Data::IntEvictBlock(ByteBlock* block_ptr) {
     writing_bytes_ += block_ptr->size();
 
     // initiate writing to EM.
-    io::RequestPtr req =
+    foxxll::request_ptr req =
         block_ptr->em_bid_.storage->awrite(
             block_ptr->data_, block_ptr->em_bid_.offset, block_ptr->size(),
             // construct an immediate CompletionHandler callback
-            io::CompletionHandler::make<
+            foxxll::completion_handler::make<
                 ByteBlock, &ByteBlock::OnWriteComplete>(block_ptr));
 
     return (writing_[block_ptr] = std::move(req));
 }
 
 void BlockPool::OnWriteComplete(
-    ByteBlock* block_ptr, io::Request* req, bool success) {
+    ByteBlock* block_ptr, foxxll::request* req, bool success) {
     std::unique_lock<std::mutex> lock(mutex_);
 
     LOGC(debug_em)
-        << "OnWriteComplete(): " << req
-        << " done, to " << block_ptr->em_bid_ << " success = " << success;
-    req->check_error();
+        << "OnWriteComplete(): request " << req << " done,"
+        << " block " << *block_ptr << " to " << block_ptr->em_bid_
+        << " success = " << success;
+    req->check_errors();
 
     die_unless(!block_ptr->ext_file_);
     die_unequal(d_->writing_.erase(block_ptr), 1u);
@@ -1270,17 +1311,22 @@ void BlockPool::OnWriteComplete(
     if (!success)
     {
         // request was canceled. this is not an I/O error, but intentional,
-        // e.g. because the block was deleted.
+        // e.g. because the block was deleted or if it was re-pinned while being
+        // written to disk.
 
-        die_unless(!d_->unpinned_blocks_.exists(block_ptr));
-        d_->unpinned_blocks_.put(block_ptr);
-        d_->unpinned_bytes_ += block_ptr->size();
+        if (!block_ptr->is_deleted()) {
+            die_unless(!d_->unpinned_blocks_.exists(block_ptr));
+            d_->unpinned_blocks_.put(block_ptr);
+            d_->unpinned_bytes_ += block_ptr->size();
+        }
 
         d_->bm_->delete_block(block_ptr->em_bid_);
-        block_ptr->em_bid_ = io::BID<0>();
+        block_ptr->em_bid_ = foxxll::BID<0>();
     }
-    else    // success
+    else
     {
+        // success
+
         d_->swapped_.insert(block_ptr);
         d_->swapped_bytes_ += block_ptr->size();
 
@@ -1298,9 +1344,9 @@ void BlockPool::OnWriteComplete(
 void BlockPool::RunTask(const std::chrono::steady_clock::time_point& tp) {
     std::unique_lock<std::mutex> lock(mutex_);
 
-    io::StatsData stnow(*io::Stats::GetInstance());
-    io::StatsData stf = stnow - d_->io_stats_first_;
-    io::StatsData stp = stnow - d_->io_stats_prev_;
+    foxxll::stats_data stnow(*foxxll::stats::get_instance());
+    foxxll::stats_data stf = stnow - d_->io_stats_first_;
+    foxxll::stats_data stp = stnow - d_->io_stats_prev_;
     d_->io_stats_prev_ = stnow;
 
     double elapsed = static_cast<double>(
@@ -1336,16 +1382,16 @@ void BlockPool::RunTask(const std::chrono::steady_clock::time_point& tp) {
             << "writing_bytes" << writing_bytes
             << "reading_blocks" << d_->reading_.size()
             << "reading_bytes" << reading_bytes
-            << "rd_ops_total" << stf.read_ops()
-            << "rd_bytes_total" << stf.read_volume()
-            << "wr_ops_total" << stf.write_ops()
-            << "wr_bytes_total" << stf.write_volume()
-            << "rd_ops" << stp.read_ops()
-            << "rd_bytes" << stp.read_volume()
-            << "rd_speed" << static_cast<double>(stp.read_volume()) / elapsed
-            << "wr_ops" << stp.write_ops()
-            << "wr_bytes" << stp.write_volume()
-            << "wr_speed" << static_cast<double>(stp.write_volume()) / elapsed
+            << "rd_ops_total" << stf.get_read_count()
+            << "rd_bytes_total" << stf.get_read_bytes()
+            << "wr_ops_total" << stf.get_write_count()
+            << "wr_bytes_total" << stf.get_write_bytes()
+            << "rd_ops" << stp.get_read_count()
+            << "rd_bytes" << stp.get_read_bytes()
+            << "rd_speed" << static_cast<double>(stp.get_read_bytes()) / elapsed
+            << "wr_ops" << stp.get_write_count()
+            << "wr_bytes" << stp.get_write_bytes()
+            << "wr_speed" << static_cast<double>(stp.get_write_bytes()) / elapsed
             << "disk_allocation" << d_->bm_->current_allocation();
 }
 

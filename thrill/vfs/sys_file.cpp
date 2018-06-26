@@ -51,6 +51,95 @@ namespace vfs {
 
 /******************************************************************************/
 
+static void SysGlobWalkRecursive(const std::string& path, FileList& filelist) {
+#if defined(_MSC_VER)
+
+    WIN32_FIND_DATA ff;
+    HANDLE h = FindFirstFile((path + "\\*").c_str(), &ff);
+
+    if (h == INVALID_HANDLE_VALUE) {
+        throw common::ErrnoException(
+                  "FindFirstFile failed:" + std::to_string(GetLastError()));
+    }
+
+    std::vector<FileInfo> tmp_list;
+
+    do {
+        if (ff.cFileName[0] != '.')
+        {
+            FileInfo fi;
+            if (ff.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+                fi.type = Type::Directory;
+            }
+            else {
+                fi.type = Type::File;
+            }
+            fi.path = path + "\\" + ff.cFileName;
+            fi.size = (static_cast<uint64_t>(ff.nFileSizeHigh) * (MAXDWORD + 1))
+                      + static_cast<uint64_t>(ff.nFileSizeLow);
+            tmp_list.emplace_back(fi);
+        }
+    } while (FindNextFile(h, &ff) != 0);
+
+    DWORD e = GetLastError();
+    if (e != ERROR_NO_MORE_FILES) {
+        throw common::ErrnoException(
+                  "FindFirstFile failed:" + std::to_string(GetLastError()));
+    }
+
+    std::sort(tmp_list.begin(), tmp_list.end());
+
+    for (const FileInfo& fi : tmp_list) {
+        if (fi.type == Type::Directory) {
+            SysGlobWalkRecursive(fi.path, filelist);
+        }
+        else {
+            filelist.emplace_back(fi);
+        }
+    }
+
+#else
+    // read entries
+    DIR* dir = opendir(path.c_str());
+    if (dir == nullptr)
+        throw common::ErrnoException("Could not read directory " + path);
+
+    struct dirent* de, de_entry;
+    struct stat st;
+
+    std::vector<std::string> list;
+
+    while (readdir_r(dir, &de_entry, &de) == 0 && de != nullptr) {
+        // skip ".", "..", and also hidden files (don't create them).
+        if (de->d_name[0] == '.') continue;
+
+        list.emplace_back(path + "/" + de->d_name);
+    }
+
+    closedir(dir);
+
+    // sort file names
+    std::sort(list.begin(), list.end());
+
+    for (const std::string& entry : list) {
+        if (stat(entry.c_str(), &st) != 0)
+            throw common::ErrnoException("Could not lstat() " + entry);
+
+        if (S_ISDIR(st.st_mode)) {
+            // descend into directories
+            SysGlobWalkRecursive(entry, filelist);
+        }
+        else if (S_ISREG(st.st_mode)) {
+            FileInfo fi;
+            fi.type = Type::File;
+            fi.path = entry;
+            fi.size = static_cast<uint64_t>(st.st_size);
+            filelist.emplace_back(fi);
+        }
+    }
+#endif
+}
+
 void SysGlob(const std::string& path, const GlobType& gtype,
              FileList& filelist) {
 
@@ -101,6 +190,9 @@ void SysGlob(const std::string& path, const GlobType& gtype,
                 fi.path = file;
                 fi.size = 0;
                 filelist.emplace_back(fi);
+            }
+            else if (gtype == GlobType::File) {
+                SysGlobWalkRecursive(file, filelist);
             }
         }
     }

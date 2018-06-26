@@ -81,7 +81,7 @@ public:
 
     void StopPreOp(size_t /* id */) final {
         // data has been pushed during pre-op -> close emitters
-        std::vector<data::CatStream::Writer>().swap(emitters_);
+        emitters_.Close();
     }
 
     //! Closes the output file
@@ -108,7 +108,7 @@ private:
     bool ownership_;
 
     data::CatStreamPtr stream_ { context_.GetNewCatStream(this) };
-    std::vector<data::CatStream::Writer> emitters_;
+    data::CatStream::Writers emitters_;
 };
 
 template <typename ValueType, typename Stack>

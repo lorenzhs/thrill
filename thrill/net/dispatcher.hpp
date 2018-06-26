@@ -44,225 +44,29 @@ using TimerCallback = tlx::delegate<bool(), mem::GPoolAllocator<char> >;
 //! Signature of async connection readability/writability callbacks.
 using AsyncCallback = tlx::delegate<bool(), mem::GPoolAllocator<char> >;
 
-//! Signature of async read direct memory callbacks.
-using AsyncReadMemoryCallback = tlx::delegate<
-          void(Connection& c, uint8_t* data, size_t size),
-          mem::GPoolAllocator<char> >;
-
 //! Signature of async read Buffer callbacks.
 using AsyncReadBufferCallback = tlx::delegate<
-          void(Connection& c, Buffer&& buffer), mem::GPoolAllocator<char> >;
+    void(Connection& c, Buffer && buffer), mem::GPoolAllocator<char> >;
 
 //! Signature of async read ByteBlock callbacks.
 using AsyncReadByteBlockCallback = tlx::delegate<
-          void(Connection& c, data::PinnedByteBlockPtr&& bytes),
-          mem::GPoolAllocator<char> >;
+    void(Connection& c, data::PinnedByteBlockPtr && bytes),
+    mem::GPoolAllocator<char> >;
 
 //! Signature of async write callbacks.
 using AsyncWriteCallback = tlx::delegate<
-          void(Connection&), mem::GPoolAllocator<char> >;
+    void(Connection&), mem::GPoolAllocator<char> >;
 
 /******************************************************************************/
 
 static constexpr bool debug_async = false;
 
-class AsyncReadMemory
-{
-public:
-    //! Construct direct memory reader with callback
-    AsyncReadMemory(Connection& conn,
-                    void* data, size_t size,
-                    const AsyncReadMemoryCallback& callback)
-        : conn_(&conn),
-          data_(reinterpret_cast<uint8_t*>(data)), size_(size),
-          callback_(callback) {
-        LOGC(debug_async)
-            << "AsyncReadMemory()"
-            << " size_=" << size_;
-    }
-
-    //! non-copyable: delete copy-constructor
-    AsyncReadMemory(const AsyncReadMemory&) = delete;
-    //! non-copyable: delete assignment operator
-    AsyncReadMemory& operator = (const AsyncReadMemory&) = delete;
-    //! move-constructor: default
-    AsyncReadMemory(AsyncReadMemory&&) = default;
-    //! move-assignment operator: default
-    AsyncReadMemory& operator = (AsyncReadMemory&&) = default;
-
-    ~AsyncReadMemory() {
-        LOGC(debug_async)
-            << "~AsyncReadMemory()"
-            << " size_=" << size_;
-    }
-
-    //! Should be called when the socket is readable
-    bool operator () () {
-        ssize_t r = conn_->RecvOne(data_ + read_size_, size_ - read_size_);
-
-        if (r <= 0) {
-            // these errors are acceptable: just redo the recv later.
-            if (errno == EINTR || errno == EAGAIN) return true;
-
-            // signal artificial IsDone, for clean up.
-            read_size_ = size_;
-
-            // these errors are end-of-file indications (both good and bad)
-            if (errno == 0 || errno == EPIPE || errno == ECONNRESET) {
-                if (callback_) callback_(*conn_, data_, size_);
-                return false;
-            }
-            throw Exception("AsyncReadMemory() error in recv() on "
-                            "connection " + conn_->ToString(), errno);
-        }
-
-        read_size_ += r;
-
-        if (read_size_ == size_) {
-            DoCallback();
-            return false;
-        }
-        else {
-            return true;
-        }
-    }
-
-    bool IsDone() const { return read_size_ == size_; }
-
-    void DoCallback() {
-        if (callback_) {
-            callback_(*conn_, data_, size_);
-            callback_ = AsyncReadMemoryCallback();
-        }
-    }
-
-    //! underlying buffer pointer
-    uint8_t * data() { return data_; }
-
-    //! underlying buffer pointer
-    const uint8_t * data() const { return data_; }
-
-    //! underlying buffer size
-    size_t size() const { return size_; }
-
-private:
-    //! Connection reference
-    Connection* conn_;
-
-    //! Receive memory area
-    uint8_t* data_;
-
-    //! size of received data
-    size_t size_;
-
-    //! total size currently read
-    size_t read_size_ = 0;
-
-    //! functional object to call once data is complete
-    AsyncReadMemoryCallback callback_;
-};
-
-/******************************************************************************/
-
-class AsyncWriteMemory
-{
-public:
-    //! Construct direct memory writer with callback
-    AsyncWriteMemory(Connection& conn,
-                     const void* data, size_t size,
-                     const AsyncWriteCallback& callback)
-        : conn_(&conn),
-          data_(reinterpret_cast<const uint8_t*>(data)), size_(size),
-          callback_(callback) {
-        LOGC(debug_async)
-            << "AsyncWriteMemory()"
-            << " size_=" << size_;
-    }
-
-    //! non-copyable: delete copy-constructor
-    AsyncWriteMemory(const AsyncWriteMemory&) = delete;
-    //! non-copyable: delete assignment operator
-    AsyncWriteMemory& operator = (const AsyncWriteMemory&) = delete;
-    //! move-constructor: default
-    AsyncWriteMemory(AsyncWriteMemory&&) = default;
-    //! move-assignment operator: default
-    AsyncWriteMemory& operator = (AsyncWriteMemory&&) = default;
-
-    ~AsyncWriteMemory() {
-        LOGC(debug_async)
-            << "~AsyncWriteMemory()"
-            << " size_=" << size_;
-    }
-
-    //! Should be called when the socket is writable
-    bool operator () () {
-        ssize_t r = conn_->SendOne(data_ + write_size_, size_ - write_size_);
-
-        if (r <= 0) {
-            if (errno == EINTR || errno == EAGAIN) return true;
-
-            // signal artificial IsDone, for clean up.
-            write_size_ = size_;
-
-            if (errno == EPIPE) {
-                LOG1 << "AsyncWriteMemory() got SIGPIPE";
-                DoCallback();
-                return false;
-            }
-            throw Exception("AsyncWriteMemory() error in send", errno);
-        }
-
-        write_size_ += r;
-
-        if (write_size_ == size_) {
-            DoCallback();
-            return false;
-        }
-        else {
-            return true;
-        }
-    }
-
-    bool IsDone() const { return write_size_ == size_; }
-
-    void DoCallback() {
-        if (callback_) {
-            callback_(*conn_);
-            callback_ = AsyncWriteCallback();
-        }
-    }
-
-    //! underlying buffer pointer
-    const uint8_t * data() const { return data_; }
-
-    //! underlying buffer size
-    size_t size() const { return size_; }
-
-private:
-    //! Connection reference
-    Connection* conn_;
-
-    //! memory area to send
-    const uint8_t* data_;
-
-    //! size of memory area
-    size_t size_;
-
-    //! total size currently written
-    size_t write_size_ = 0;
-
-    //! functional object to call once data is complete
-    AsyncWriteCallback callback_;
-};
-
-/******************************************************************************/
-
 class AsyncReadBuffer
 {
 public:
     //! Construct buffered reader with callback
-    AsyncReadBuffer(Connection& conn,
-                    size_t buffer_size, const AsyncReadBufferCallback& callback)
+    AsyncReadBuffer(Connection& conn, size_t buffer_size,
+                    const AsyncReadBufferCallback& callback)
         : conn_(&conn),
           buffer_(buffer_size),
           callback_(callback) {
@@ -335,6 +139,9 @@ public:
         return DoCallback();
     }
 
+    //! Returns conn_
+    Connection * connection() const { return conn_; }
+
     //! underlying buffer pointer
     uint8_t * data() { return buffer_.data(); }
 
@@ -364,8 +171,7 @@ class AsyncWriteBuffer
 {
 public:
     //! Construct buffered writer with callback
-    AsyncWriteBuffer(Connection& conn,
-                     Buffer&& buffer,
+    AsyncWriteBuffer(Connection& conn, Buffer&& buffer,
                      const AsyncWriteCallback& callback)
         : conn_(&conn),
           buffer_(std::move(buffer)),
@@ -402,7 +208,7 @@ public:
             write_size_ = buffer_.size();
 
             if (errno == EPIPE) {
-                LOG1 << "AsyncWriteBuffer() got SIGPIPE";
+                LOG1 << "AsyncWriteBuffer() got EPIPE";
                 DoCallback();
                 return false;
             }
@@ -428,6 +234,9 @@ public:
             callback_ = AsyncWriteCallback();
         }
     }
+
+    //! Returns conn_
+    Connection * connection() const { return conn_; }
 
     //! underlying buffer pointer
     const uint8_t * data() const { return buffer_.data(); }
@@ -534,6 +343,9 @@ public:
         return DoCallback();
     }
 
+    //! Returns conn_
+    Connection * connection() const { return conn_; }
+
     //! underlying buffer pointer
     uint8_t * data() { return block_->data(); }
 
@@ -566,8 +378,7 @@ class AsyncWriteBlock
 {
 public:
     //! Construct block writer with callback
-    AsyncWriteBlock(Connection& conn,
-                    data::PinnedBlock&& block,
+    AsyncWriteBlock(Connection& conn, data::PinnedBlock&& block,
                     const AsyncWriteCallback& callback)
         : conn_(&conn),
           block_(std::move(block)),
@@ -606,7 +417,7 @@ public:
             written_size_ = block_.size();
 
             if (errno == EPIPE) {
-                LOG1 << "AsyncWriteBlock() got SIGPIPE";
+                LOG1 << "AsyncWriteBlock() got EPIPE";
                 DoCallback();
                 return false;
             }
@@ -631,7 +442,12 @@ public:
             callback_(*conn_);
             callback_ = AsyncWriteCallback();
         }
+        // release Pin
+        block_.Reset();
     }
+
+    //! Returns conn_
+    Connection * connection() const { return conn_; }
 
     //! underlying buffer pointer
     const uint8_t * data() const { return block_.data_begin(); }
@@ -677,8 +493,7 @@ private:
 
 public:
     //! default constructor
-    explicit Dispatcher(mem::Manager& mem_manager)
-        : mem_manager_(mem_manager) { }
+    Dispatcher() = default;
 
     //! non-copyable: delete copy-constructor
     Dispatcher(const Dispatcher&) = delete;
@@ -719,7 +534,7 @@ public:
     //! \{
 
     //! asynchronously read n bytes and deliver them to the callback
-    virtual void AsyncRead(Connection& c, size_t size,
+    virtual void AsyncRead(Connection& c, uint32_t /* seq */, size_t size,
                            const AsyncReadBufferCallback& done_cb) {
         assert(c.IsValid());
 
@@ -739,7 +554,7 @@ public:
     }
 
     //! asynchronously read the full ByteBlock and deliver it to the callback
-    virtual void AsyncRead(Connection& c, size_t size,
+    virtual void AsyncRead(Connection& c, uint32_t /* seq */, size_t size,
                            data::PinnedByteBlockPtr&& block,
                            const AsyncReadByteBlockCallback& done_cb) {
         assert(c.IsValid());
@@ -762,7 +577,7 @@ public:
     //! asynchronously write buffer and callback when delivered. The buffer is
     //! MOVED into the async writer.
     virtual void AsyncWrite(
-        Connection& c, Buffer&& buffer,
+        Connection& c, uint32_t /* seq */, Buffer&& buffer,
         const AsyncWriteCallback& done_cb = AsyncWriteCallback()) {
         assert(c.IsValid());
 
@@ -783,7 +598,7 @@ public:
     //! asynchronously write buffer and callback when delivered. The buffer is
     //! MOVED into the async writer.
     virtual void AsyncWrite(
-        Connection& c, data::PinnedBlock&& block,
+        Connection& c, uint32_t /* seq */, data::PinnedBlock&& block,
         const AsyncWriteCallback& done_cb = AsyncWriteCallback()) {
         assert(c.IsValid());
 
@@ -804,17 +619,17 @@ public:
     //! asynchronously write buffer and callback when delivered. COPIES the data
     //! into a Buffer!
     void AsyncWriteCopy(
-        Connection& c, const void* buffer, size_t size,
+        Connection& c, uint32_t seq, const void* buffer, size_t size,
         const AsyncWriteCallback& done_cb = AsyncWriteCallback()) {
-        return AsyncWrite(c, Buffer(buffer, size), done_cb);
+        return AsyncWrite(c, seq, Buffer(buffer, size), done_cb);
     }
 
     //! asynchronously write buffer and callback when delivered. COPIES the data
     //! into a Buffer!
     void AsyncWriteCopy(
-        Connection& c, const std::string& str,
+        Connection& c, uint32_t seq, const std::string& str,
         const AsyncWriteCallback& done_cb = AsyncWriteCallback()) {
-        return AsyncWriteCopy(c, str.data(), str.size(), done_cb);
+        return AsyncWriteCopy(c, seq, str.data(), str.size(), done_cb);
     }
 
     //! \}
@@ -911,9 +726,6 @@ protected:
     //! true if dispatcher needs to stop
     std::atomic<bool> terminate_ { false };
 
-    //! superior memory manager
-    mem::Manager& mem_manager_;
-
     /*------------------------------------------------------------------------*/
 
     //! struct for timer callbacks
@@ -939,7 +751,7 @@ protected:
 
     //! priority queue of timer callbacks
     using TimerPQ = std::priority_queue<
-              Timer, std::vector<Timer, mem::GPoolAllocator<Timer> > >;
+        Timer, std::vector<Timer, mem::GPoolAllocator<Timer> > >;
 
     //! priority queue of timer callbacks, obviously kept in timeout
     //! order. Currently not addressable.

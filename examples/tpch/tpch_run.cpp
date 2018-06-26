@@ -64,7 +64,7 @@ struct Order {
     bool   priority;
     char   comment[79];
 
-    friend std::ostream& operator << (std::ostream& os, const Order& o) {
+    friend std ::ostream& operator << (std::ostream& os, const Order& o) {
         os << '(' << o.orderpriority << "|" << o.clerk << "|" << o.comment;
         return os << ')';
     }
@@ -257,20 +257,19 @@ static size_t JoinTPCH4(
     ctx.net.Barrier();
 
     if (ctx.my_rank() == 0) {
-        auto traffic = ctx.net_manager().Traffic();
         if (use_detection) {
             LOG1 << "RESULT " << "benchmark=tpch " << "detection=ON"
                  << " items=" << num_items
-                 << " time=" << timer.Milliseconds()
-                 << " traffic=" << traffic.first + traffic.second
-                 << " machines=" << ctx.num_hosts();
+                 << " time=" << timer
+                 << " traffic=" << ctx.net_manager().Traffic()
+                 << " hosts=" << ctx.num_hosts();
         }
         else {
             LOG1 << "RESULT " << "benchmark=tpch " << "detection=OFF"
                  << " items=" << num_items
-                 << " time=" << timer.Milliseconds()
-                 << " traffic=" << traffic.first + traffic.second
-                 << " machines=" << ctx.num_hosts();
+                 << " time=" << timer
+                 << " traffic=" << ctx.net_manager().Traffic()
+                 << " hosts=" << ctx.num_hosts();
         }
     }
 

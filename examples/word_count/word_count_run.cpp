@@ -56,13 +56,12 @@ static void RunWordCount(
         word_pairs.Execute();
         ctx.net.Barrier();
         if (ctx.my_rank() == 0) {
-            auto traffic = ctx.net_manager().Traffic();
             LOG1 << "RESULT"
                  << " benchmark=wordcount"
-                 << " time=" << timer.Milliseconds()
                  << " files=" << input_filelist.size()
-                 << " traffic=" << traffic.first + traffic.second
-                 << " machines=" << ctx.num_hosts();
+                 << " time=" << timer
+                 << " traffic=" << ctx.net_manager().Traffic()
+                 << " hosts=" << ctx.num_hosts();
         }
     }
 }
@@ -89,13 +88,12 @@ static void RunHashWordCount(
         word_pairs.Execute();
         ctx.net.Barrier();
         if (ctx.my_rank() == 0) {
-            auto traffic = ctx.net_manager().Traffic();
             LOG1 << "RESULT"
                  << " benchmark=wordcount_hash"
-                 << " time=" << timer.Milliseconds()
                  << " files=" << input_filelist.size()
-                 << " traffic= " << traffic.first + traffic.second
-                 << " machines=" << ctx.num_hosts();
+                 << " time=" << timer
+                 << " traffic= " << ctx.net_manager().Traffic()
+                 << " hosts=" << ctx.num_hosts();
         }
     }
 }

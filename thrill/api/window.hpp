@@ -145,7 +145,7 @@ class OverlapWindowNode final
           ValueType, Input, WindowFunction, PartialWindowFunction>
 {
     using Super = BaseWindowNode<
-              ValueType, Input, WindowFunction, PartialWindowFunction>;
+        ValueType, Input, WindowFunction, PartialWindowFunction>;
     using Super::debug;
     using Super::context_;
 
@@ -197,13 +197,15 @@ public:
         // this may wrap around, but that is okay. -tb
         size_t rank = first_rank_ - (window_size_ - 1);
 
+        size_t num_items = file_.num_items();
+
         sLOG << "WindowNode::PushData()"
              << "window.size()" << window.size()
              << "first_rank_" << first_rank_
              << "rank" << rank
-             << "file_.num_items" << file_.num_items();
+             << "num_items" << num_items;
 
-        for (size_t i = 0; i < file_.num_items(); ++i, ++rank) {
+        for (size_t i = 0; i < num_items; ++i, ++rank) {
             // append an item.
             window.emplace_back(reader.Next<Input>());
 
@@ -253,7 +255,7 @@ auto DIA<ValueType, Stack>::FlatWindow(
     assert(IsValid());
 
     using WindowNode = api::OverlapWindowNode<
-              ValueOut, ValueType, WindowFunction, PartialWindowFunction>;
+        ValueOut, ValueType, WindowFunction, PartialWindowFunction>;
 
     // cannot check WindowFunction's arguments, since it is a template methods
     // due to the auto emitter.
@@ -287,7 +289,7 @@ auto DIA<ValueType, Stack>::Window(
     assert(IsValid());
 
     using Result
-              = typename FunctionTraits<WindowFunction>::result_type;
+        = typename FunctionTraits<WindowFunction>::result_type;
 
     static_assert(
         std::is_convertible<
@@ -317,8 +319,8 @@ auto DIA<ValueType, Stack>::Window(
            auto /* emit */) { };
 
     using WindowNode = api::OverlapWindowNode<
-              Result, ValueType,
-              decltype(flatwindow_function), decltype(no_operation_function)>;
+        Result, ValueType,
+        decltype(flatwindow_function), decltype(no_operation_function)>;
 
     auto node = tlx::make_counting<WindowNode>(
         *this, "Window", window_size,
@@ -335,7 +337,7 @@ auto DIA<ValueType, Stack>::Window(
     assert(IsValid());
 
     using Result
-              = typename FunctionTraits<WindowFunction>::result_type;
+        = typename FunctionTraits<WindowFunction>::result_type;
 
     static_assert(
         std::is_convertible<
@@ -368,8 +370,8 @@ auto DIA<ValueType, Stack>::Window(
         };
 
     using WindowNode = api::OverlapWindowNode<
-              Result, ValueType,
-              decltype(flatwindow_function), decltype(flatwindow_partial_function)>;
+        Result, ValueType,
+        decltype(flatwindow_function), decltype(flatwindow_partial_function)>;
 
     auto node = tlx::make_counting<WindowNode>(
         *this, "Window", window_size,
@@ -390,7 +392,7 @@ class DisjointWindowNode final
           ValueType, Input, WindowFunction, PartialWindowFunction>
 {
     using Super = BaseWindowNode<
-              ValueType, Input, WindowFunction, PartialWindowFunction>;
+        ValueType, Input, WindowFunction, PartialWindowFunction>;
     using Super::debug;
     using Super::context_;
 
@@ -453,14 +455,15 @@ public:
         assert(window.size() < window_size_);
 
         size_t rank = first_rank_ - (window_size_ - 1);
+        size_t num_items = file_.num_items();
 
         sLOG << "WindowNode::PushData()"
              << "window.size()" << window.size()
              << "rank" << rank
              << "rank+window+1" << (rank + window.size() + 1)
-             << "file_.num_items" << file_.num_items();
+             << "num_items" << num_items;
 
-        for (size_t i = 0; i < file_.num_items(); ++i, ++rank) {
+        for (size_t i = 0; i < num_items; ++i, ++rank) {
             // append an item.
             window.emplace_back(reader.Next<Input>());
 
@@ -508,7 +511,7 @@ auto DIA<ValueType, Stack>::FlatWindow(
     assert(IsValid());
 
     using WindowNode = api::DisjointWindowNode<
-              ValueOut, ValueType, WindowFunction, WindowFunction>;
+        ValueOut, ValueType, WindowFunction, WindowFunction>;
 
     // cannot check WindowFunction's arguments, since it is a template methods
     // due to the auto emitter.
@@ -527,7 +530,7 @@ auto DIA<ValueType, Stack>::Window(
     assert(IsValid());
 
     using Result
-              = typename FunctionTraits<WindowFunction>::result_type;
+        = typename FunctionTraits<WindowFunction>::result_type;
 
     static_assert(
         std::is_convertible<
@@ -552,8 +555,8 @@ auto DIA<ValueType, Stack>::Window(
         };
 
     using WindowNode = api::DisjointWindowNode<
-              Result, ValueType,
-              decltype(flatwindow_function), decltype(flatwindow_function)>;
+        Result, ValueType,
+        decltype(flatwindow_function), decltype(flatwindow_function)>;
 
     auto node = tlx::make_counting<WindowNode>(
         *this, "Window", window_size, flatwindow_function, flatwindow_function);

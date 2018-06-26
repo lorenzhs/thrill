@@ -34,8 +34,10 @@ class Construction
     static constexpr bool debug = false;
 
 public:
-    Construction(std::unique_ptr<Group>* groups, size_t group_count)
-        : groups_(groups),
+    Construction(SelectDispatcher& dispatcher,
+                 std::unique_ptr<Group>* groups, size_t group_count)
+        : dispatcher_(dispatcher),
+          groups_(groups),
           group_count_(group_count)
     { }
 
@@ -103,6 +105,8 @@ public:
             dispatcher_.Dispatch();
         }
 
+        dispatcher_.Cancel(listener_);
+
         // All connected, Dispose listener.
         listener_.Close();
 
@@ -123,6 +127,9 @@ private:
     //! Temporary Manager for construction
     mem::Manager mem_manager_ { nullptr, "Construction" };
 
+    //! Dispatcher instance used by this Manager to perform async operations.
+    SelectDispatcher& dispatcher_;
+
     //! Link to groups to initialize
     std::unique_ptr<Group>* groups_;
 
@@ -134,9 +141,6 @@ private:
 
     //! The Connections responsible for listening to incoming connections.
     Connection listener_;
-
-    //! Dispatcher instance used by this Manager to perform async operations.
-    SelectDispatcher dispatcher_ { mem_manager_ };
 
     //! Some definitions for convenience
     using GroupNodeIdPair = std::pair<size_t, size_t>;
@@ -404,7 +408,7 @@ private:
         const WelcomeMsg hello = { thrill_sign, tcp.group_id(), my_rank_ };
 
         dispatcher_.AsyncWriteCopy(
-            tcp, &hello, sizeof(hello),
+            tcp, /* seq */ 0, &hello, sizeof(hello),
             AsyncWriteCallback::make<
                 Construction, &Construction::OnHelloSent>(this));
 
@@ -412,7 +416,7 @@ private:
             << "client " << tcp.peer_id() << " group id " << tcp.group_id();
 
         dispatcher_.AsyncRead(
-            tcp, sizeof(hello),
+            tcp, /* seq */ 0, sizeof(hello),
             AsyncReadBufferCallback::make<
                 Construction, &Construction::OnIncomingWelcome>(this));
 
@@ -495,7 +499,7 @@ private:
         const WelcomeMsg msg_out = { thrill_sign, msg_in->group_id, my_rank_ };
 
         dispatcher_.AsyncWriteCopy(
-            c, &msg_out, sizeof(msg_out),
+            c, /* seq */ 0, &msg_out, sizeof(msg_out),
             AsyncWriteCallback::make<
                 Construction, &Construction::OnHelloSent>(this));
 
@@ -525,7 +529,7 @@ private:
 
         // wait for welcome message from other side
         dispatcher_.AsyncRead(
-            connections_.back(), sizeof(WelcomeMsg),
+            connections_.back(), /* seq */ 0, sizeof(WelcomeMsg),
             AsyncReadBufferCallback::make<
                 Construction, &Construction::OnIncomingWelcomeAndReply>(this));
 
@@ -536,19 +540,21 @@ private:
 
 //! Connect to peers via endpoints using TCP sockets. Construct a group_count
 //! tcp::Group objects at once. Within each Group this host has my_rank.
-void Construct(size_t my_rank,
+void Construct(SelectDispatcher& dispatcher, size_t my_rank,
                const std::vector<std::string>& endpoints,
                std::unique_ptr<Group>* groups, size_t group_count) {
-    Construction(groups, group_count).Initialize(my_rank, endpoints);
+    Construction(dispatcher, groups, group_count)
+    .Initialize(my_rank, endpoints);
 }
 
 //! Connect to peers via endpoints using TCP sockets. Construct a group_count
 //! net::Group objects at once. Within each Group this host has my_rank.
 std::vector<std::unique_ptr<net::Group> >
-Construct(size_t my_rank, const std::vector<std::string>& endpoints,
-          size_t group_count) {
+Construct(SelectDispatcher& dispatcher, size_t my_rank,
+          const std::vector<std::string>& endpoints, size_t group_count) {
     std::vector<std::unique_ptr<tcp::Group> > tcp_groups(group_count);
-    Construction(&tcp_groups[0], tcp_groups.size()).Initialize(my_rank, endpoints);
+    Construction(dispatcher, &tcp_groups[0], tcp_groups.size())
+    .Initialize(my_rank, endpoints);
     std::vector<std::unique_ptr<net::Group> > groups(group_count);
     std::move(tcp_groups.begin(), tcp_groups.end(), groups.begin());
     return groups;

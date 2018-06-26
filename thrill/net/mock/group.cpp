@@ -87,7 +87,8 @@ ssize_t Connection::SendOne(const void* data, size_t size, Flags flags) {
 
 net::Buffer Connection::RecvNext() {
     std::unique_lock<std::mutex> lock(d_->mutex_);
-    d_->cv_.wait(lock, [=]() { return !d_->inbound_.empty(); });
+    while (d_->inbound_.empty())
+        d_->cv_.wait(lock);
     net::Buffer msg = std::move(d_->inbound_.front());
     d_->inbound_.pop_front();
 
@@ -150,10 +151,9 @@ net::Connection& Group::connection(size_t peer) {
 
 void Group::Close() { }
 
-std::unique_ptr<net::Dispatcher> Group::ConstructDispatcher(
-    mem::Manager& mem_manager) const {
+std::unique_ptr<net::Dispatcher> Group::ConstructDispatcher() const {
     // construct mock::Dispatcher
-    return std::make_unique<Dispatcher>(mem_manager);
+    return std::make_unique<Dispatcher>();
 }
 
 std::vector<std::unique_ptr<Group> >
@@ -198,33 +198,34 @@ void Group::Send(size_t tgt, net::Buffer&& msg) {
 
 struct Dispatcher::Data {
     //! Mutex to lock access to watch lists
-    std::mutex                                     mutex_;
+    std::mutex mutex_;
 
     //! Notification queue for Dispatch
-    common::OurConcurrentBoundedQueue<Connection*> notify_;
+    common::OurConcurrentBoundedQueue<Connection*>
+               notify_;
 
     using Map = std::map<Connection*, Watch>;
 
     //! map from Connection to its watch list
-    Map                                            map_;
+    Map        map_;
 };
 
 struct Dispatcher::Watch {
     //! boolean check whether Watch is registered at Connection
-    bool                 active = false;
+    bool     active = false;
     //! queue of callbacks for fd.
-    mem::deque<Callback> read_cb, write_cb;
+    std::deque<Callback, mem::GPoolAllocator<Callback> >
+             read_cb, write_cb;
     //! only one exception callback for the fd.
-    Callback             except_cb;
-
-    explicit Watch(mem::Manager& mem_manager)
-        : read_cb(mem::Allocator<Callback>(mem_manager)),
-          write_cb(mem::Allocator<Callback>(mem_manager)) { }
+    Callback except_cb;
 };
 
-Dispatcher::Dispatcher(mem::Manager& mem_manager)
-    : net::Dispatcher(mem_manager),
+Dispatcher::Dispatcher()
+    : net::Dispatcher(),
       d_(std::make_unique<Data>())
+{ }
+
+Dispatcher::~Dispatcher()
 { }
 
 //! Register a buffered read callback and a default exception callback.
@@ -276,7 +277,7 @@ void Dispatcher::Interrupt() {
 Dispatcher::Watch& Dispatcher::GetWatch(Connection* c) {
     Data::Map::iterator it = d_->map_.find(c);
     if (it == d_->map_.end())
-        it = d_->map_.emplace(c, Watch(mem_manager_)).first;
+        it = d_->map_.emplace(c, Watch()).first;
     return it->second;
 }
 

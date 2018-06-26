@@ -118,35 +118,11 @@ endif()
 if(MPI_FOUND)
   thrill_build_only(net/mpi_test)
   # run test with mpirun
-  add_test(net_mpi_test1 ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 net_mpi_test)
-  add_test(net_mpi_test2 ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2 net_mpi_test)
-  add_test(net_mpi_test3 ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 3 net_mpi_test)
-  add_test(net_mpi_test7 ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 7 net_mpi_test)
-  add_test(net_mpi_test8 ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 8 net_mpi_test)
-endif()
-
-# compile io tests
-thrill_build_only(io/syscall_file_test)
-thrill_build_only(io/file_io_sizes_test)
-thrill_build_only(io/cancel_io_test)
-thrill_build_test(io/block_manager_test)
-thrill_build_test(io/config_file_test)
-
-# run io tests with different backend files
-thrill_test_only(io_syscall_file_test ".")
-
-thrill_test_only(io_cancel_io_test memory "./testdisk1")
-thrill_test_only(io_cancel_io_test syscall "./testdisk1")
-thrill_test_only(io_cancel_io_test mmap "./testdisk1")
-if(NOT APPLE)
-  thrill_test_only(io_cancel_io_test linuxaio "./testdisk1")
-endif()
-
-thrill_test_only(io_file_io_sizes_test memory "./testdisk1" 134217728)
-thrill_test_only(io_file_io_sizes_test syscall "./testdisk1" 134217728)
-thrill_test_only(io_file_io_sizes_test mmap "./testdisk1" 134217728)
-if(NOT APPLE)
-  thrill_test_only(io_file_io_sizes_test linuxaio "./testdisk1" 134217728)
+  add_test(net_mpi_test1 ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${CMAKE_CURRENT_BINARY_DIR}/net_mpi_test)
+  add_test(net_mpi_test2 ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2 ${CMAKE_CURRENT_BINARY_DIR}/net_mpi_test)
+  add_test(net_mpi_test3 ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 3 ${CMAKE_CURRENT_BINARY_DIR}/net_mpi_test)
+  add_test(net_mpi_test7 ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 7 ${CMAKE_CURRENT_BINARY_DIR}/net_mpi_test)
+  add_test(net_mpi_test8 ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 8 ${CMAKE_CURRENT_BINARY_DIR}/net_mpi_test)
 endif()
 
 thrill_build_test(vfs/sys_file_test)

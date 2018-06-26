@@ -32,12 +32,14 @@ static void TestSingleThreadPrefixSum(net::Group* net) {
     net::FlowControlChannelManager manager(*net, 1);
     net::FlowControlChannel& channel = manager.GetFlowControlChannel(0);
     size_t my_rank = net->my_host_rank();
-    size_t initial = 0;
+    size_t initial = 42;
 
-    size_t resInclusive = channel.PrefixSum(my_rank, initial, std::plus<size_t>(), true);
-    size_t resExclusive = channel.PrefixSum(my_rank, initial, std::plus<size_t>(), false);
-    size_t expectedInclusive = 0;
-    size_t expectedExclusive = 0;
+    size_t resInclusive =
+        channel.PrefixSum(my_rank, std::plus<size_t>(), initial);
+    size_t resExclusive =
+        channel.ExPrefixSum(my_rank, std::plus<size_t>(), initial);
+    size_t expectedInclusive = initial;
+    size_t expectedExclusive = initial;
 
     for (size_t i = 0; i <= my_rank; i++) {
         expectedInclusive += i;
@@ -57,23 +59,16 @@ static void TestSingleThreadVectorPrefixSum(net::Group* net) {
     size_t size = 3;
     size_t my_rank = net->my_host_rank();
     std::vector<size_t> initial(size);
-    std::fill(initial.begin(), initial.end(), 0);
+    std::fill(initial.begin(), initial.end(), 42);
     std::vector<size_t> val(size);
     std::fill(val.begin(), val.end(), my_rank);
 
-    auto addSizeTVectors =
-        [](const std::vector<size_t>& a, const std::vector<size_t>& b) {
-            std::vector<size_t> res(a.size());
-            for (size_t i = 0; i < a.size(); i++) {
-                res[i] = a[i] + b[i];
-            }
-            return res;
-        };
-
-    std::vector<size_t> resInclusive = channel.PrefixSum(val, initial, addSizeTVectors, true);
-    std::vector<size_t> resExclusive = channel.PrefixSum(val, initial, addSizeTVectors, false);
-    size_t expectedInclusive = 0;
-    size_t expectedExclusive = 0;
+    std::vector<size_t> resInclusive = channel.PrefixSum(
+        val, common::ComponentSum<std::vector<size_t> >(), initial);
+    std::vector<size_t> resExclusive = channel.ExPrefixSum(
+        val, common::ComponentSum<std::vector<size_t> >(), initial);
+    size_t expectedInclusive = 42;
+    size_t expectedExclusive = 42;
 
     for (size_t i = 0; i <= my_rank; i++) {
         expectedInclusive += i;
@@ -220,12 +215,14 @@ static void TestMultiThreadPrefixSum(net::Group* net) {
     ExecuteMultiThreads(
         net, count, [=](net::FlowControlChannel& channel) {
             size_t my_rank = channel.my_rank();
-            size_t initial = 0;
+            size_t initial = 42;
 
-            size_t resInclusive = channel.PrefixSum(my_rank, initial, std::plus<size_t>(), true);
-            size_t resExclusive = channel.PrefixSum(my_rank, initial, std::plus<size_t>(), false);
-            size_t expectedInclusive = 0;
-            size_t expectedExclusive = 0;
+            size_t resInclusive = channel.PrefixSum(
+                my_rank, std::plus<size_t>(), initial);
+            size_t resExclusive = channel.ExPrefixSum(
+                my_rank, std::plus<size_t>(), initial);
+            size_t expectedInclusive = 42;
+            size_t expectedExclusive = 42;
 
             for (size_t i = 0; i <= my_rank; i++) {
                 expectedInclusive += i;
@@ -353,13 +350,12 @@ static void TestHardcoreRaceConditionTest(net::Group* net) {
     ExecuteMultiThreads(
         net, count, [=](net::FlowControlChannel& channel) {
             size_t my_rank = channel.my_rank();
-            size_t initial = 0;
             std::vector<size_t> pres;
             std::vector<size_t> rres;
 
             for (int i = 0; i < 20; i++) {
                 // Make a prefix sum and push res
-                pres.push_back(channel.PrefixSum(my_rank, initial));
+                pres.push_back(channel.PrefixSum(my_rank));
                 // Make an all reduce and push res.
                 rres.push_back(channel.AllReduce(my_rank));
 
@@ -381,6 +377,73 @@ static void TestHardcoreRaceConditionTest(net::Group* net) {
                 ASSERT_EQ(rexpected, rres[i]);
             }
         });
+}
+
+/*!
+ * single threaded test for allgather collective
+ */
+static void TestAllGather(net::Group* net) {
+    net::FlowControlChannelManager manager(*net, 1);
+    net::FlowControlChannel& channel = manager.GetFlowControlChannel(0);
+    size_t my_rank = net->my_host_rank();
+    size_t hosts = net->num_hosts();
+
+    std::vector<size_t> expected(hosts);
+    for (size_t i = 0; i < hosts; i++) {
+        expected[i] = i;
+    }
+
+    auto res = channel.AllGather(my_rank);
+
+    for (size_t i = 0; i < hosts; i++) {
+        ASSERT_EQ(expected[i], res->at(i));
+    }
+}
+
+/*!
+ * multi threaded test for allgather collective
+ */
+static void TestAllGatherMultiThreaded(net::Group* net) {
+
+    const size_t count = 4;
+    size_t hosts = net->num_hosts();
+
+    ExecuteMultiThreads(
+        net, count, [=](net::FlowControlChannel& channel) {
+            size_t my_rank = channel.my_rank();
+
+            std::vector<size_t> expected(net->num_hosts());
+            for (size_t i = 0; i < hosts; i++) {
+                expected[i] = i;
+            }
+
+            auto res = channel.AllGather(my_rank);
+
+            for (size_t i = 0; i < hosts; i++) {
+                ASSERT_EQ(expected[i], res->at(i));
+            }
+        });
+}
+
+//! let group of p hosts perform an AllGather collective on std::string
+static void TestAllGatherString(net::Group* net) {
+    net::FlowControlChannelManager manager(*net, 1);
+    net::FlowControlChannel& channel = manager.GetFlowControlChannel(0);
+    size_t hosts = net->num_hosts();
+
+    const std::string template_string = "abcdefghijklmnopqrstuvwxyz";
+
+    std::string local_value = template_string.substr(0, net->my_host_rank());
+    auto result = channel.AllGather(local_value);
+
+    std::vector<std::string> expected(hosts);
+    for (size_t i = 0; i < hosts; ++i) {
+        expected[i] = template_string.substr(0, i);
+    }
+
+    for (size_t i = 0; i < hosts; ++i) {
+        ASSERT_EQ(expected[i], result->at(i));
+    }
 }
 
 #endif // !THRILL_TESTS_NET_FLOW_CONTROL_TEST_BASE_HEADER

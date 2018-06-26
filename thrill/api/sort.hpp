@@ -147,7 +147,7 @@ public:
         sLOG << "Pick" << pick_items << "samples by random access"
              << " from File containing " << local_items_ << " items.";
         for (size_t i = 0; i < pick_items; ++i) {
-            size_t index = rng_() % local_items_;
+            size_t index = context_.rng_() % local_items_;
             sLOG << "got index[" << i << "] = " << index;
             samples_.emplace_back(
                 unsorted_file_.GetItemAt<ValueType>(index), index);
@@ -195,24 +195,6 @@ public:
         }
     }
 
-    //! calculate maximum merging degree from available memory and the number of
-    //! files. additionally calculate the prefetch size of each File.
-    std::pair<size_t, size_t> MaxMergeDegreePrefetch() {
-        size_t avail_blocks = DIABase::mem_limit_ / data::default_block_size;
-        if (files_.size() >= avail_blocks) {
-            // more files than blocks available -> partial merge of avail_blocks
-            // Files with prefetch = 0, which is one read Block per File.
-            return std::make_pair(avail_blocks, 0u);
-        }
-        else {
-            // less files than available Blocks -> split blocks equally among
-            // Files.
-            return std::make_pair(
-                files_.size(),
-                std::min<size_t>(16u, (avail_blocks / files_.size()) - 1));
-        }
-    }
-
     void PushData(bool consume) final {
         Timer timer_pushdata;
         timer_pushdata.Start();
@@ -237,10 +219,10 @@ public:
             size_t merge_degree, prefetch;
 
             // merge batches of files if necessary
-            while (files_.size() > MaxMergeDegreePrefetch().first)
+            while (std::tie(merge_degree, prefetch) =
+                       context_.block_pool().MaxMergeDegreePrefetch(files_.size()),
+                   files_.size() > merge_degree)
             {
-                std::tie(merge_degree, prefetch) = MaxMergeDegreePrefetch();
-
                 sLOG1 << "Partial multi-way-merge of"
                       << merge_degree << "files with prefetch" << prefetch;
 
@@ -248,8 +230,10 @@ public:
                 std::vector<data::File::ConsumeReader> seq;
                 seq.reserve(merge_degree);
 
-                for (size_t t = 0; t < merge_degree; ++t)
-                    seq.emplace_back(files_[t].GetConsumeReader(0));
+                for (size_t t = 0; t < merge_degree; ++t) {
+                    seq.emplace_back(
+                        files_[t].GetConsumeReader(/* prefetch */ 0));
+                }
 
                 StartPrefetch(seq, prefetch);
 
@@ -272,17 +256,18 @@ public:
                 files_.erase(files_.begin(), files_.begin() + merge_degree);
             }
 
-            std::tie(merge_degree, prefetch) = MaxMergeDegreePrefetch();
-
-            sLOG1 << "Start multi-way-merge of" << files_.size() << "files"
-                  << "with prefetch" << prefetch;
+            sLOGC(context_.my_rank() == 0)
+                << "Start multi-way-merge of" << files_.size() << "files"
+                << "with prefetch" << prefetch;
 
             // construct output merger of remaining Files
             std::vector<data::File::Reader> seq;
             seq.reserve(files_.size());
 
-            for (size_t t = 0; t < files_.size(); ++t)
-                seq.emplace_back(files_[t].GetReader(consume, 0));
+            for (size_t t = 0; t < files_.size(); ++t) {
+                seq.emplace_back(
+                    files_[t].GetReader(consume, /* prefetch */ 0));
+            }
 
             StartPrefetch(seq, prefetch);
 
@@ -338,11 +323,9 @@ private:
 
     //! Sample vector: pairs of (sample,local index)
     std::vector<SampleIndexPair> samples_;
-    //! Random generator
-    std::default_random_engine rng_ { std::random_device { } () };
     //! Reservoir sampler
     common::ReservoirSamplingGrow<SampleIndexPair> res_sampler_ {
-        samples_, rng_, desired_imbalance_
+        samples_, context_.rng_, desired_imbalance_
     };
     //! calculate currently desired number of samples
     size_t wanted_sample_size() const {
@@ -378,7 +361,7 @@ private:
     void FindAndSendSplitters(
         std::vector<SampleIndexPair>& splitters, size_t sample_size,
         data::MixStreamPtr& sample_stream,
-        std::vector<data::MixStream::Writer>& sample_writers) {
+        data::MixStream::Writers& sample_writers) {
 
         // Get samples from other workers
         size_t num_total_workers = context_.num_workers();
@@ -393,6 +376,8 @@ private:
         }
         if (samples.size() == 0) return;
 
+        LOG << "FindAndSendSplitters() samples.size()=" << samples.size();
+
         // Find splitters
         std::sort(samples.begin(), samples.end(),
                   [this](
@@ -400,11 +385,13 @@ private:
                       return LessSampleIndex(a, b);
                   });
 
-        size_t splitting_size = samples.size() / num_total_workers;
+        double splitting_size = static_cast<double>(samples.size())
+                                / static_cast<double>(num_total_workers);
 
         // Send splitters to other workers
         for (size_t i = 1; i < num_total_workers; ++i) {
-            splitters.push_back(samples[i * splitting_size]);
+            splitters.push_back(
+                samples[static_cast<size_t>(i * splitting_size)]);
             for (size_t j = 1; j < num_total_workers; j++) {
                 sample_writers[j].Put(splitters.back());
             }
@@ -483,8 +470,7 @@ private:
         data::File::ConsumeReader unsorted_reader =
             unsorted_file_.GetConsumeReader();
 
-        std::vector<data::MixStream::Writer> data_writers =
-            data_stream->GetWriters();
+        data::MixStream::Writers data_writers = data_stream->GetWriters();
 
         // enlarge emitters array to next power of two to have direct access,
         // because we fill the splitter set up with sentinels == last splitter,
@@ -569,9 +555,7 @@ private:
             data_writers[b0].Put(el0);
         }
 
-        // close writers and flush data
-        for (size_t j = 0; j < data_writers.size(); j++)
-            data_writers[j].Close();
+        // implicitly close writers and flush data
     }
 
     void MainOp() {
@@ -603,8 +587,7 @@ private:
         data::MixStreamPtr sample_stream = context_.GetNewMixStream(this);
 
         // Send all samples to worker 0.
-        std::vector<data::MixStream::Writer> sample_writers =
-            sample_stream->GetWriters();
+        data::MixStream::Writers sample_writers = sample_stream->GetWriters();
 
         for (const SampleIndexPair& sample : samples_) {
             // send samples but add the local prefix to index ranks
@@ -745,7 +728,7 @@ private:
         local_out_size_ += vec.size();
 
         // advise block pool to write out data if necessary
-        context_.block_pool().AdviseFree(vec.size() * sizeof(ValueType));
+        // context_.block_pool().AdviseFree(vec.size() * sizeof(ValueType));
 
         timer_sort_.Start();
         sort_algorithm_(vec.begin(), vec.end(), compare_function_);
@@ -799,7 +782,7 @@ auto DIA<ValueType, Stack>::Sort(const CompareFunction& compare_function,
     assert(IsValid());
 
     using SortNode = api::SortNode<
-              ValueType, CompareFunction, DefaultSortAlgorithm, CheckingDriver>;
+        ValueType, CompareFunction, DefaultSortAlgorithm, CheckingDriver>;
 
     static_assert(
         std::is_convertible<
@@ -833,7 +816,7 @@ auto DIA<ValueType, Stack>::Sort(const CompareFunction& compare_function,
     assert(IsValid());
 
     using SortNode = api::SortNode<
-              ValueType, CompareFunction, SortAlgorithm, CheckingDriver>;
+        ValueType, CompareFunction, SortAlgorithm, CheckingDriver>;
 
     static_assert(
         std::is_convertible<

@@ -48,6 +48,7 @@ namespace net {
 class FlowControlChannel
 {
 private:
+    static constexpr bool debug = false;
     static constexpr bool enable_stats = false;
 
     //! The group associated with this channel.
@@ -121,7 +122,8 @@ private:
         void WaitCounter(size_t this_step) {
 #if THRILL_HAVE_THREAD_SANITIZER
             std::unique_lock<std::mutex> lock(mutex);
-            cv.wait(lock, [&]() { return (counter != this_step); });
+            while (counter != this_step)
+                cv.wait(lock);
 #else
             // busy wait on generation counter of predecessor
             while (counter.load(std::memory_order_relaxed) != this_step) { }
@@ -231,12 +233,12 @@ public:
      */
     template <typename T, typename BinarySumOp = std::plus<T> >
     T TLX_ATTRIBUTE_WARN_UNUSED_RESULT
-    PrefixSum(const T& value, const T& initial = T(),
-              const BinarySumOp& sum_op = BinarySumOp(),
-              bool inclusive = true) {
+    PrefixSumBase(const T& value, const BinarySumOp& sum_op = BinarySumOp(),
+                  const T& initial = T(), bool inclusive = true) {
 
         RunTimer run_timer(timer_prefixsum_);
-        if (enable_stats) ++count_prefixsum_;
+        if (enable_stats || debug) ++count_prefixsum_;
+        LOG << "FCC::PrefixSum() ENTER count=" << count_prefixsum_;
 
         T local_value = value;
 
@@ -247,6 +249,9 @@ public:
         barrier_.Await(
             [&]() {
                 RunTimer net_timer(timer_communication_);
+
+                LOG << "FCC::PrefixSum() COMMUNICATE BEGIN"
+                    << " count=" << count_prefixsum_;
 
                 // global prefix
                 T** locals = reinterpret_cast<T**>(alloca(thread_count_ * sizeof(T*)));
@@ -261,11 +266,7 @@ public:
                 }
 
                 T base_sum = local_sum;
-                group_.ExPrefixSum(base_sum, sum_op);
-
-                if (host_rank_ == 0) {
-                    base_sum = initial;
-                }
+                group_.ExPrefixSum(base_sum, sum_op, initial);
 
                 if (inclusive) {
                     for (size_t i = 0; i < thread_count_; i++) {
@@ -278,9 +279,35 @@ public:
                     }
                     *(locals[0]) = base_sum;
                 }
+
+                LOG << "FCC::PrefixSum() COMMUNICATE END"
+                    << " count=" << count_prefixsum_;
             });
 
+        LOG << "FCC::PrefixSum() EXIT count=" << count_prefixsum_;
+
         return local_value;
+    }
+
+    /*!
+     * Calculates the inclusive prefix sum over all workers, given a certain sum
+     * operation.
+     *
+     * This method blocks until the sum is caluclated. Values are applied in
+     * order, that means sum_op(sum_op(a, b), c) if a, b, c are the values of
+     * workers 0, 1, 2.
+     *
+     * \param value The local value of this worker.
+     * \param sum_op The operation to use for
+     * \param initial The initial element of the body defined by T and SumOp
+     * calculating the prefix sum. The default operation is a normal addition.
+     * \return The prefix sum for the position of this worker.
+     */
+    template <typename T, typename BinarySumOp = std::plus<T> >
+    T TLX_ATTRIBUTE_WARN_UNUSED_RESULT
+    PrefixSum(const T& value, const BinarySumOp& sum_op = BinarySumOp(),
+              const T& initial = T()) {
+        return PrefixSumBase(value, sum_op, initial, true);
     }
 
     /*!
@@ -299,9 +326,9 @@ public:
      */
     template <typename T, typename BinarySumOp = std::plus<T> >
     T TLX_ATTRIBUTE_WARN_UNUSED_RESULT
-    ExPrefixSum(const T& value, const T& initial = T(),
-                const BinarySumOp& sum_op = BinarySumOp()) {
-        return PrefixSum(value, initial, sum_op, false);
+    ExPrefixSum(const T& value, const BinarySumOp& sum_op = BinarySumOp(),
+                const T& initial = T()) {
+        return PrefixSumBase(value, sum_op, initial, false);
     }
 
     /*!
@@ -321,11 +348,12 @@ public:
      */
     template <typename T, typename BinarySumOp = std::plus<T> >
     T TLX_ATTRIBUTE_WARN_UNUSED_RESULT
-    ExPrefixSumTotal(T& value, const T& initial = T(),
-                     const BinarySumOp& sum_op = BinarySumOp()) {
+    ExPrefixSumTotal(T& value, const BinarySumOp& sum_op = BinarySumOp(),
+                     const T& initial = T()) {
 
         RunTimer run_timer(timer_prefixsum_);
-        if (enable_stats) ++count_prefixsum_;
+        if (enable_stats || debug) ++count_prefixsum_;
+        LOG << "FCC::ExPrefixSumTotal() ENTER count=" << count_prefixsum_;
 
         using Result = std::pair<T*, T>;
 
@@ -336,6 +364,9 @@ public:
         barrier_.Await(
             [&]() {
                 RunTimer net_timer(timer_communication_);
+
+                LOG << "FCC::ExPrefixSumTotal() COMMUNICATE BEGIN"
+                    << " count=" << count_prefixsum_;
 
                 Result** locals = reinterpret_cast<Result**>(
                     alloca(thread_count_ * sizeof(Result*)));
@@ -351,16 +382,12 @@ public:
                 }
 
                 T base_sum = local_sum;
-                group_.ExPrefixSum(base_sum, sum_op);
+                group_.ExPrefixSum(base_sum, sum_op, initial);
 
                 T total_sum;
                 if (host_rank_ + 1 == num_hosts_)
                     total_sum = sum_op(base_sum, local_sum);
                 group_.Broadcast(total_sum, num_hosts_ - 1);
-
-                if (host_rank_ == 0) {
-                    base_sum = initial;
-                }
 
                 for (size_t i = thread_count_ - 1; i > 0; --i) {
                     *(locals[i]->first) = sum_op(base_sum, *(locals[i - 1]->first));
@@ -368,7 +395,12 @@ public:
                 }
                 *(locals[0]->first) = base_sum;
                 locals[0]->second = total_sum;
+
+                LOG << "FCC::ExPrefixSumTotal() COMMUNICATE END"
+                    << " count=" << count_prefixsum_;
             });
+
+        LOG << "FCC::ExPrefixSumTotal() EXIT count=" << count_prefixsum_;
 
         return result.second;
     }
@@ -392,7 +424,8 @@ public:
     Broadcast(const T& value, size_t origin = 0) {
 
         RunTimer run_timer(timer_broadcast_);
-        if (enable_stats) ++count_broadcast_;
+        if (enable_stats || debug) ++count_broadcast_;
+        LOG << "FCC::Broadcast() ENTER count=" << count_broadcast_;
 
         T local = value;
 
@@ -410,14 +443,86 @@ public:
 
         barrier_.Await(
             [&]() {
+                LOG << "FCC::Broadcast() COMMUNICATE BEGIN"
+                    << " count=" << count_broadcast_;
+
                 // copy from primary PE to all others
                 T res = *GetLocalShared<T>(step, primary_pe);
                 for (size_t i = 0; i < thread_count_; i++) {
                     *GetLocalShared<T>(step, i) = res;
                 }
+
+                LOG << "FCC::Broadcast() COMMUNICATE END"
+                    << " count=" << count_broadcast_;
             });
 
+        LOG << "FCC::Broadcast() EXIT count=" << count_broadcast_;
+
         return local;
+    }
+
+    /*!
+     * Gathers the value of a serializable type T over all workers and
+     * provides result to all workers as a shared pointer to a
+     * vector.
+     *
+     * \param value
+     * The value this worker contributes to the allgather operation.
+     * \return
+     * The result of the allgather operation as a shared pointer to a
+     * vector.
+     */
+    template <typename T>
+    std::shared_ptr<std::vector<T> > TLX_ATTRIBUTE_WARN_UNUSED_RESULT
+    AllGather(const T& value) {
+        RunTimer run_timer(timer_reduce_);
+        if (enable_stats) ++count_reduce_;
+
+        using SharedVectorT = std::shared_ptr<std::vector<T> >;
+
+        SharedVectorT sp;
+        std::pair<T, SharedVectorT> local(value, sp);
+
+        size_t step = GetNextStep();
+        SetLocalShared(step, &local);
+
+        barrier_.Await(
+            [&]() {
+                RunTimer net_timer(timer_communication_);
+
+                size_t n = num_workers();
+
+                // allocate shared vector of correct final size
+                auto local_gather = std::make_shared<std::vector<T> >(n);
+
+                if (tlx::is_power_of_two(group().num_hosts())) {
+                        // gather local values and insert at correct final positions in the vector
+                    for (size_t i = 0; i < thread_count_; i++) {
+                        local_gather->at(thread_count_ * group_.my_host_rank() + i) =
+                            GetLocalShared<std::pair<T, SharedVectorT> >(step, i)->first;
+                    }
+
+                    // global allgather
+                    group_.AllGatherRecursiveDoublingPowerOfTwo(local_gather->data(), thread_count_);
+                }
+                else {
+                        // gather local values and insert at correct final positions in the vector
+                    for (size_t i = 0; i < thread_count_; i++) {
+                        local_gather->at(i) =
+                            GetLocalShared<std::pair<T, SharedVectorT> >(step, i)->first;
+                    }
+
+                    // global allgather
+                    group_.AllGatherBruck(local_gather->data(), thread_count_);
+                }
+
+                // distribute shared pointer to worker threads
+                for (size_t i = 0; i < thread_count_; i++) {
+                    GetLocalShared<std::pair<T, SharedVectorT> >(step, i)->second = local_gather;
+                }
+            });
+
+        return local.second;
     }
 
     /*!
@@ -440,7 +545,8 @@ public:
         assert(root < num_workers());
 
         RunTimer run_timer(timer_reduce_);
-        if (enable_stats) ++count_reduce_;
+        if (enable_stats || debug) ++count_reduce_;
+        LOG << "FCC::Reduce() ENTER count=" << count_reduce_;
 
         T local = value;
 
@@ -450,6 +556,9 @@ public:
         barrier_.Await(
             [&]() {
                 RunTimer net_timer(timer_communication_);
+
+                LOG << "FCC::Reduce() COMMUNICATE BEGIN"
+                    << " count=" << count_reduce_;
 
                 // local reduce
                 T local_sum = *GetLocalShared<T>(step, 0);
@@ -463,7 +572,12 @@ public:
                 // set the local value only at the root
                 if (root / thread_count_ == group_.my_host_rank())
                     *GetLocalShared<T>(step, root % thread_count_) = local_sum;
+
+                LOG << "FCC::Reduce() COMMUNICATE END"
+                    << " count=" << count_reduce_;
             });
+
+        LOG << "FCC::Reduce() EXIT count=" << count_reduce_;
 
         return local;
     }
@@ -485,7 +599,8 @@ public:
     AllReduce(const T& value, const BinarySumOp& sum_op = BinarySumOp()) {
 
         RunTimer run_timer(timer_allreduce_);
-        if (enable_stats) ++count_allreduce_;
+        if (enable_stats || debug) ++count_allreduce_;
+        LOG << "FCC::AllReduce() ENTER count=" << count_allreduce_;
 
         T local = value;
 
@@ -495,6 +610,9 @@ public:
         barrier_.Await(
             [&]() {
                 RunTimer net_timer(timer_communication_);
+
+                LOG << "FCC::AllReduce() COMMUNICATE BEGIN"
+                    << " count=" << count_allreduce_;
 
                 // local reduce
                 T local_sum = *GetLocalShared<T>(step, 0);
@@ -509,7 +627,12 @@ public:
                 for (size_t i = 0; i < thread_count_; i++) {
                     *GetLocalShared<T>(step, i) = local_sum;
                 }
+
+                LOG << "FCC::AllReduce() COMMUNICATE END"
+                    << " count=" << count_allreduce_;
             });
+
+        LOG << "FCC::AllReduce() EXIT count=" << count_allreduce_;
 
         return local;
     }
@@ -530,7 +653,8 @@ public:
     std::vector<T> Predecessor(size_t k, const std::vector<T>& my_values) {
 
         RunTimer run_timer(timer_predecessor_);
-        if (enable_stats) ++count_predecessor_;
+        if (enable_stats || debug) ++count_predecessor_;
+        LOG << "FCC::Predecessor() ENTER count=" << count_predecessor_;
 
         std::vector<T> result;
         size_t step = GetNextStep();
@@ -640,7 +764,14 @@ public:
         }
 
         // await until all threads have retrieved their value.
-        barrier_.Await([this]() { generation_++; });
+        barrier_.Await([this]() {
+                           LOG << "FCC::Predecessor() COMMUNICATE"
+                               << " count=" << count_predecessor_;
+
+                           generation_++;
+                       });
+
+        LOG << "FCC::Predecessor() EXIT count=" << count_predecessor_;
 
         return result;
     }
@@ -657,31 +788,37 @@ public:
 
 #if !defined(_MSC_VER)
 
-extern template size_t FlowControlChannel::PrefixSum(
-    const size_t&, const size_t&, const std::plus<size_t>&, bool);
+extern template size_t FlowControlChannel::PrefixSumBase(
+    const size_t&, const std::plus<size_t>&, const size_t&, bool);
 
-extern template std::array<size_t, 2> FlowControlChannel::PrefixSum(
-    const std::array<size_t, 2>&, const std::array<size_t, 2>&,
-    const common::ComponentSum<std::array<size_t, 2> >&, bool);
-extern template std::array<size_t, 3> FlowControlChannel::PrefixSum(
-    const std::array<size_t, 3>&, const std::array<size_t, 3>&,
-    const common::ComponentSum<std::array<size_t, 3> >&, bool);
-extern template std::array<size_t, 4> FlowControlChannel::PrefixSum(
-    const std::array<size_t, 4>&, const std::array<size_t, 4>&,
-    const common::ComponentSum<std::array<size_t, 4> >&, bool);
+extern template std::array<size_t, 2> FlowControlChannel::PrefixSumBase(
+    const std::array<size_t, 2>&,
+    const common::ComponentSum<std::array<size_t, 2> >&,
+    const std::array<size_t, 2>&, bool);
+extern template std::array<size_t, 3> FlowControlChannel::PrefixSumBase(
+    const std::array<size_t, 3>&,
+    const common::ComponentSum<std::array<size_t, 3> >&,
+    const std::array<size_t, 3>&, bool);
+extern template std::array<size_t, 4> FlowControlChannel::PrefixSumBase(
+    const std::array<size_t, 4>&,
+    const common::ComponentSum<std::array<size_t, 4> >&,
+    const std::array<size_t, 4>&, bool);
 
 extern template size_t FlowControlChannel::ExPrefixSumTotal(
-    size_t&, const size_t&, const std::plus<size_t>&);
+    size_t&, const std::plus<size_t>&, const size_t&);
 
 extern template std::array<size_t, 2> FlowControlChannel::ExPrefixSumTotal(
-    std::array<size_t, 2>&, const std::array<size_t, 2>&,
-    const common::ComponentSum<std::array<size_t, 2> >&);
+    std::array<size_t, 2>&,
+    const common::ComponentSum<std::array<size_t, 2> >&,
+    const std::array<size_t, 2>&);
 extern template std::array<size_t, 3> FlowControlChannel::ExPrefixSumTotal(
-    std::array<size_t, 3>&, const std::array<size_t, 3>&,
-    const common::ComponentSum<std::array<size_t, 3> >&);
+    std::array<size_t, 3>&,
+    const common::ComponentSum<std::array<size_t, 3> >&,
+    const std::array<size_t, 3>&);
 extern template std::array<size_t, 4> FlowControlChannel::ExPrefixSumTotal(
-    std::array<size_t, 4>&, const std::array<size_t, 4>&,
-    const common::ComponentSum<std::array<size_t, 4> >&);
+    std::array<size_t, 4>&,
+    const common::ComponentSum<std::array<size_t, 4> >&,
+    const std::array<size_t, 4>&);
 
 extern template size_t FlowControlChannel::Broadcast(const size_t&, size_t);
 

@@ -51,8 +51,8 @@ public:
     using Handle = MixStream;
 
     //! Creates a new stream instance
-    MixStreamData(Multiplexer& multiplexer, const StreamId& id,
-                  size_t local_worker_id, size_t dia_id);
+    MixStreamData(Multiplexer& multiplexer, size_t send_size_limit,
+                  const StreamId& id, size_t local_worker_id, size_t dia_id);
 
     //! non-copyable: delete copy-constructor
     MixStreamData(const MixStreamData&) = delete;
@@ -69,7 +69,7 @@ public:
 
     //! Creates BlockWriters for each worker. BlockWriter can only be opened
     //! once, otherwise the block sequence is incorrectly interleaved!
-    std::vector<Writer> GetWriters() final;
+    Writers GetWriters() final;
 
     //! Creates a BlockReader which mixes items from all workers.
     MixReader GetMixReader(bool consume);
@@ -88,6 +88,11 @@ private:
     //! flag if Close() was completed
     bool is_closed_ = false;
 
+    struct SeqReordering;
+
+    //! Block Sequence numbers
+    std::vector<SeqReordering> seq_;
+
     //! BlockQueue to store incoming Blocks with source.
     MixBlockQueue queue_;
 
@@ -96,11 +101,10 @@ private:
     friend class StreamSink;
 
     //! called from Multiplexer when there is a new Block for this Stream.
-    void OnStreamBlock(size_t from, PinnedBlock&& b);
+    void OnStreamBlock(size_t from, uint32_t seq, PinnedBlock&& b);
 
-    //! called from Multiplexer when a MixStreamData closed notification was
-    //! received.
-    void OnCloseStream(size_t from);
+    //! called to process PinnedBlock in sequence
+    void OnStreamBlockOrdered(size_t from, PinnedBlock&& b);
 };
 
 // we have two types of MixStream smart pointers: one for internal use in the
@@ -136,7 +140,7 @@ public:
 
     //! Creates BlockWriters for each worker. BlockWriter can only be opened
     //! once, otherwise the block sequence is incorrectly interleaved!
-    std::vector<Writer> GetWriters();
+    Writers GetWriters();
 
     //! Creates a BlockReader which concatenates items from all workers in an
     //! arbitrary order.

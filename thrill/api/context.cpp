@@ -19,10 +19,11 @@
 #include <thrill/common/profile_thread.hpp>
 #include <thrill/common/string.hpp>
 #include <thrill/common/system_exception.hpp>
-#include <thrill/io/iostats.hpp>
 #include <thrill/vfs/file_io.hpp>
 
+#include <foxxll/io/iostats.hpp>
 #include <tlx/math/abs_diff.hpp>
+#include <tlx/port/setenv.hpp>
 #include <tlx/string/format_si_iec_units.hpp>
 #include <tlx/string/parse_si_iec_units.hpp>
 #include <tlx/string/split.hpp>
@@ -32,9 +33,11 @@
 
 #if THRILL_HAVE_NET_TCP
 #include <thrill/net/tcp/construct.hpp>
+#include <thrill/net/tcp/select_dispatcher.hpp>
 #endif
 
 #if THRILL_HAVE_NET_MPI
+#include <thrill/net/mpi/dispatcher.hpp>
 #include <thrill/net/mpi/group.hpp>
 #endif
 
@@ -89,7 +92,8 @@ template <typename NetGroup>
 static inline
 std::vector<std::unique_ptr<HostContext> >
 ConstructLoopbackHostContexts(
-    const MemoryConfig& mem_config, size_t num_hosts, size_t workers_per_host) {
+    const MemoryConfig& mem_config,
+    size_t num_hosts, size_t workers_per_host) {
 
     static constexpr size_t kGroupCount = net::Manager::kGroupCount;
 
@@ -100,7 +104,15 @@ ConstructLoopbackHostContexts(
         group[g] = NetGroup::ConstructLoopbackMesh(num_hosts);
     }
 
+    std::vector<std::unique_ptr<net::DispatcherThread> > dispatcher;
+    for (size_t h = 0; h < num_hosts; ++h) {
+        dispatcher.emplace_back(
+            std::make_unique<net::DispatcherThread>(
+                std::make_unique<typename NetGroup::Dispatcher>(), h));
+    }
+
     // construct host context
+
     std::vector<std::unique_ptr<HostContext> > host_context;
 
     for (size_t h = 0; h < num_hosts; h++) {
@@ -110,7 +122,8 @@ ConstructLoopbackHostContexts(
 
         host_context.emplace_back(
             std::make_unique<HostContext>(
-                h, mem_config, std::move(host_group), workers_per_host));
+                h, mem_config, std::move(dispatcher[h]),
+                std::move(host_group), workers_per_host));
     }
 
     return host_context;
@@ -128,6 +141,8 @@ RunLoopbackThreads(
     mem_config.print(workers_per_host);
 
     // construct a mock network of hosts
+    typename NetGroup::Dispatcher dispatcher;
+
     std::vector<std::unique_ptr<HostContext> > host_contexts =
         ConstructLoopbackHostContexts<NetGroup>(
             host_mem_config, num_hosts, workers_per_host);
@@ -136,14 +151,14 @@ RunLoopbackThreads(
     std::vector<std::thread> threads(num_hosts* workers_per_host);
 
     for (size_t host = 0; host < num_hosts; ++host) {
-        mem::by_string log_prefix = "host " + mem::to_string(host);
+        std::string log_prefix = "host " + std::to_string(host);
         for (size_t worker = 0; worker < workers_per_host; ++worker) {
             size_t id = host * workers_per_host + worker;
             threads[id] = common::CreateThread(
                 [&host_contexts, &job_startpoint, host, worker, log_prefix] {
                     Context ctx(*host_contexts[host], worker);
                     common::NameThisThread(
-                        log_prefix + " worker " + mem::to_string(worker));
+                        log_prefix + " worker " + std::to_string(worker));
 
                     ctx.Launch(job_startpoint);
                 });
@@ -300,22 +315,6 @@ HostContext::ConstructLoopback(size_t num_hosts, size_t workers_per_host) {
         mem_config, num_hosts, workers_per_host);
 }
 
-// Windows porting madness because setenv() is apparently dangerous
-#if defined(_MSC_VER)
-int wrap_setenv(const char* name, const char* value, int overwrite) {
-    if (!overwrite) {
-        size_t envsize = 0;
-        int errcode = getenv_s(&envsize, nullptr, 0, name);
-        if (errcode || envsize) return errcode;
-    }
-    return _putenv_s(name, value);
-}
-#else
-int wrap_setenv(const char* name, const char* value, int overwrite) {
-    return setenv(name, value, overwrite);
-}
-#endif
-
 void RunLocalTests(const std::function<void(Context&)>& job_startpoint) {
     // set fixed amount of RAM for testing
     RunLocalTests(4 * 1024 * 1024 * 1024llu, job_startpoint);
@@ -325,7 +324,7 @@ void RunLocalTests(
     size_t ram, const std::function<void(Context&)>& job_startpoint) {
 
     // discard json log
-    wrap_setenv("THRILL_LOG", "", /* overwrite */ 1);
+    tlx::setenv("THRILL_LOG", "", /* overwrite */ 1);
 
     // set fixed amount of RAM for testing
     MemoryConfig mem_config;
@@ -356,7 +355,7 @@ void RunLocalSameThread(const std::function<void(Context&)>& job_startpoint) {
     mem_config.setup(4 * 1024 * 1024 * 1024llu);
     mem_config.print(workers_per_host);
 
-    // construct three full mesh connection cliques, deliver net::tcp::Groups.
+    // construct two full mesh connection cliques, deliver net::tcp::Groups.
     std::array<std::vector<std::unique_ptr<TestGroup> >, kGroupCount> group;
 
     for (size_t g = 0; g < kGroupCount; ++g) {
@@ -367,11 +366,15 @@ void RunLocalSameThread(const std::function<void(Context&)>& job_startpoint) {
         { std::move(group[0][0]), std::move(group[1][0]) }
     };
 
+    auto dispatcher = std::make_unique<net::DispatcherThread>(
+        std::make_unique<TestGroup::Dispatcher>(), my_host_rank);
+
     HostContext host_context(
-        0, mem_config, std::move(host_group), workers_per_host);
+        0, mem_config,
+        std::move(dispatcher), std::move(host_group), workers_per_host);
 
     Context ctx(host_context, 0);
-    common::NameThisThread("worker " + mem::to_string(my_host_rank));
+    common::NameThisThread("worker " + std::to_string(my_host_rank));
 
     job_startpoint(ctx);
 }
@@ -570,17 +573,25 @@ int RunBackendTcp(const std::function<void(Context&)>& job_startpoint) {
     static constexpr size_t kGroupCount = net::Manager::kGroupCount;
 
     // construct three TCP network groups
+    auto select_dispatcher = std::make_unique<net::tcp::SelectDispatcher>();
+
     std::array<std::unique_ptr<net::tcp::Group>, kGroupCount> groups;
     net::tcp::Construct(
-        my_host_rank, hostlist, groups.data(), net::Manager::kGroupCount);
+        *select_dispatcher, my_host_rank, hostlist,
+        groups.data(), net::Manager::kGroupCount);
 
     std::array<net::GroupPtr, kGroupCount> host_groups = {
         { std::move(groups[0]), std::move(groups[1]) }
     };
 
     // construct HostContext
+
+    auto dispatcher = std::make_unique<net::DispatcherThread>(
+        std::move(select_dispatcher), my_host_rank);
+
     HostContext host_context(
-        0, mem_config, std::move(host_groups), workers_per_host);
+        0, mem_config,
+        std::move(dispatcher), std::move(host_groups), workers_per_host);
 
     std::vector<std::thread> threads(workers_per_host);
 
@@ -588,7 +599,7 @@ int RunBackendTcp(const std::function<void(Context&)>& job_startpoint) {
         threads[worker] = common::CreateThread(
             [&host_context, &job_startpoint, worker] {
                 Context ctx(host_context, worker);
-                common::NameThisThread("worker " + mem::to_string(worker));
+                common::NameThisThread("worker " + std::to_string(worker));
 
                 ctx.Launch(job_startpoint);
             });
@@ -596,15 +607,13 @@ int RunBackendTcp(const std::function<void(Context&)>& job_startpoint) {
     }
 
     // join worker threads
-    int global_result = 0;
-
     for (size_t i = 0; i < workers_per_host; i++) {
         threads[i].join();
     }
 
     if (!Deinitialize()) return -1;
 
-    return global_result;
+    return 0;
 }
 #endif
 
@@ -659,8 +668,11 @@ int RunBackendMpi(const std::function<void(Context&)>& job_startpoint) {
     static constexpr size_t kGroupCount = net::Manager::kGroupCount;
 
     // construct three MPI network groups
+    auto dispatcher = std::make_unique<net::DispatcherThread>(
+        std::make_unique<net::mpi::Dispatcher>(num_hosts), mpi_rank);
+
     std::array<std::unique_ptr<net::mpi::Group>, kGroupCount> groups;
-    net::mpi::Construct(num_hosts, groups.data(), kGroupCount);
+    net::mpi::Construct(num_hosts, *dispatcher, groups.data(), kGroupCount);
 
     std::array<net::GroupPtr, kGroupCount> host_groups = {
         { std::move(groups[0]), std::move(groups[1]) }
@@ -668,7 +680,8 @@ int RunBackendMpi(const std::function<void(Context&)>& job_startpoint) {
 
     // construct HostContext
     HostContext host_context(
-        0, mem_config, std::move(host_groups), workers_per_host);
+        0, mem_config,
+        std::move(dispatcher), std::move(host_groups), workers_per_host);
 
     // launch worker threads
     std::vector<std::thread> threads(workers_per_host);
@@ -677,8 +690,8 @@ int RunBackendMpi(const std::function<void(Context&)>& job_startpoint) {
         threads[worker] = common::CreateThread(
             [&host_context, &job_startpoint, worker] {
                 Context ctx(host_context, worker);
-                common::NameThisThread("host " + mem::to_string(ctx.host_rank())
-                                       + " worker " + mem::to_string(worker));
+                common::NameThisThread("host " + std::to_string(ctx.host_rank())
+                                       + " worker " + std::to_string(worker));
 
                 ctx.Launch(job_startpoint);
             });
@@ -686,15 +699,13 @@ int RunBackendMpi(const std::function<void(Context&)>& job_startpoint) {
     }
 
     // join worker threads
-    int global_result = 0;
-
     for (size_t i = 0; i < workers_per_host; i++) {
         threads[i].join();
     }
 
     if (!Deinitialize()) return -1;
 
-    return global_result;
+    return 0;
 }
 #endif
 
@@ -753,8 +764,8 @@ int RunBackendIb(const std::function<void(Context&)>& job_startpoint) {
         threads[worker] = common::CreateThread(
             [&host_context, &job_startpoint, worker] {
                 Context ctx(host_context, worker);
-                common::NameThisThread("host " + mem::to_string(ctx.host_rank())
-                                       + " worker " + mem::to_string(worker));
+                common::NameThisThread("host " + std::to_string(ctx.host_rank())
+                                       + " worker " + std::to_string(worker));
 
                 ctx.Launch(job_startpoint);
             });
@@ -762,15 +773,13 @@ int RunBackendIb(const std::function<void(Context&)>& job_startpoint) {
     }
 
     // join worker threads
-    int global_result = 0;
-
     for (size_t i = 0; i < workers_per_host; i++) {
         threads[i].join();
     }
 
     if (!Deinitialize()) return -1;
 
-    return global_result;
+    return 0;
 }
 #endif
 
@@ -1028,16 +1037,16 @@ void MemoryConfig::print(size_t workers_per_host) const {
 HostContext::HostContext(
     size_t local_host_id,
     const MemoryConfig& mem_config,
+    std::unique_ptr<net::DispatcherThread> dispatcher,
     std::array<net::GroupPtr, net::Manager::kGroupCount>&& groups,
-
     size_t workers_per_host)
-
     : mem_config_(mem_config),
       base_logger_(MakeHostLogPath(groups[0]->my_host_rank())),
       logger_(&base_logger_, "host_rank", groups[0]->my_host_rank()),
       profiler_(std::make_unique<common::ProfileThread>()),
       local_host_id_(local_host_id),
       workers_per_host_(workers_per_host),
+      dispatcher_(std::move(dispatcher)),
       net_manager_(std::move(groups), logger_) {
 
     // write command line parameters to json log
@@ -1048,6 +1057,11 @@ HostContext::HostContext(
     // run memory profiler only on local host 0 (especially for test runs)
     if (local_host_id == 0)
         mem::StartMemProfiler(*profiler_, logger_);
+}
+
+HostContext::~HostContext() {
+    // stop dispatcher _before_ stopping multiplexer
+    dispatcher_->Terminate();
 }
 
 std::string HostContext::MakeHostLogPath(size_t host_rank) {
@@ -1074,6 +1088,23 @@ std::string HostContext::MakeHostLogPath(size_t host_rank) {
 
 /******************************************************************************/
 // Context methods
+
+Context::Context(HostContext& host_context, size_t local_worker_id)
+    : local_host_id_(host_context.local_host_id()),
+      local_worker_id_(local_worker_id),
+      workers_per_host_(host_context.workers_per_host()),
+      mem_limit_(host_context.worker_mem_limit()),
+      mem_config_(host_context.mem_config()),
+      mem_manager_(host_context.mem_manager()),
+      net_manager_(host_context.net_manager()),
+      flow_manager_(host_context.flow_manager()),
+      block_pool_(host_context.block_pool()),
+      multiplexer_(host_context.data_multiplexer()),
+      rng_(std::random_device { }
+           () + (local_worker_id_ << 16)),
+      base_logger_(&host_context.base_logger_) {
+    assert(local_worker_id < workers_per_host());
+}
 
 data::File Context::GetFile(DIABase* dia) {
     return GetFile(dia != nullptr ? dia->id() : 0);
@@ -1131,7 +1162,7 @@ struct OverallStats {
     //! maximum external memory allocation
     size_t io_max_allocation;
 
-    friend std::ostream& operator << (std::ostream& os, const OverallStats& c) {
+    friend std ::ostream& operator << (std::ostream& os, const OverallStats& c) {
         return os << "[OverallStats"
                   << " runtime=" << c.runtime
                   << " max_block_bytes=" << c.max_block_bytes
@@ -1178,15 +1209,6 @@ void Context::Launch(const std::function<void(Context&)>& job_startpoint) {
             << "event" << "job-done"
             << "elapsed" << overall_timer;
 
-    // wait for all local workers to finish, prior to closing multiplexer's
-    // streams.
-    net.LocalBarrier();
-
-    if (my_rank() == 0)
-        multiplexer_.Close();
-
-    net.LocalBarrier();
-
     overall_timer.Stop();
 
     // collect overall statistics
@@ -1196,15 +1218,14 @@ void Context::Launch(const std::function<void(Context&)>& job_startpoint) {
     stats.max_block_bytes =
         local_worker_id_ == 0 ? block_pool().max_total_bytes() : 0;
 
-    std::tie(stats.net_traffic_tx, stats.net_traffic_rx) =
-        local_worker_id_ == 0 ? net_manager_.Traffic()
-        : std::pair<size_t, size_t>(0, 0);
+    stats.net_traffic_tx = local_worker_id_ == 0 ? net_manager_.Traffic().tx : 0;
+    stats.net_traffic_rx = local_worker_id_ == 0 ? net_manager_.Traffic().rx : 0;
 
     if (local_host_id_ == 0 && local_worker_id_ == 0) {
-        io::StatsData io_stats(*io::Stats::GetInstance());
-        stats.io_volume = io_stats.read_volume() + io_stats.write_volume();
+        foxxll::stats_data io_stats(*foxxll::stats::get_instance());
+        stats.io_volume = io_stats.get_read_bytes() + io_stats.get_write_bytes();
         stats.io_max_allocation =
-            io::BlockManager::GetInstance()->maximum_allocation();
+            foxxll::block_manager::get_instance()->maximum_allocation();
     }
     else {
         stats.io_volume = 0;
